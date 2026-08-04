@@ -17,6 +17,7 @@ import dagre from "dagre";
 import { getCanvasTasks } from "@/app/actions/tasks";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { STATUS_LABEL, isOverdue } from "@/lib/priority";
 import { TaskDetail } from "./task-detail";
 
 type CanvasTask = {
@@ -26,12 +27,6 @@ type CanvasTask = {
   status: "TODO" | "IN_PROGRESS" | "DONE";
   visibility: "PUBLIC" | "PRIVATE";
   dueDate: Date | null;
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  TODO: "진행전",
-  IN_PROGRESS: "진행중",
-  DONE: "종료",
 };
 
 const NODE_WIDTH = 200;
@@ -51,7 +46,7 @@ function layout(tasks: CanvasTask[]) {
 
 function CanvasNode({ data }: NodeProps<Node<{ task: CanvasTask; onOpen: (id: string) => void }>>) {
   const { task, onOpen } = data;
-  const overdue = !!task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "DONE";
+  const overdue = isOverdue(task.dueDate, task.status);
 
   return (
     <div

@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
 import { listVisibleProjects } from "@/lib/projects";
 
+export { isOverdue } from "@/lib/priority";
+
 const PRIORITY_RANK: Record<string, number> = { URGENT: 4, HIGH: 3, NORMAL: 2, LOW: 1 };
 
 export function getMaxPriority(priorities: { level: string }[]): string {
@@ -212,10 +214,6 @@ export async function listAllTasksForUser(
   }
 
   return sortTasks(tasks);
-}
-
-export function isOverdue(dueDate: Date | null, status: string) {
-  return !!dueDate && dueDate < new Date() && status !== "DONE";
 }
 
 export type TaskTreeNode = {

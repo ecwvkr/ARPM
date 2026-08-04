@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { updateTaskStatus, completeTask } from "@/app/actions/tasks";
+import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
 import { TaskCard } from "./task-card";
 import type { ProjectTaskSummary } from "./task-list";
 
 const COLUMNS = [
-  { status: "TODO" as const, label: "진행전" },
-  { status: "IN_PROGRESS" as const, label: "진행중" },
-  { status: "DONE" as const, label: "종료" },
+  { status: "TODO" as const, label: STATUS_LABEL.TODO },
+  { status: "IN_PROGRESS" as const, label: STATUS_LABEL.IN_PROGRESS },
+  { status: "DONE" as const, label: STATUS_LABEL.DONE },
 ];
 
 export function KanbanBoard({ tasks }: { tasks: ProjectTaskSummary[] }) {
@@ -43,34 +44,27 @@ export function KanbanBoard({ tasks }: { tasks: ProjectTaskSummary[] }) {
               {col.label} ({colTasks.length})
             </h3>
             <div className="space-y-2">
-              {colTasks.map((task) => {
-                const overdue = !!task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "DONE";
-                return (
-                  <div
-                    key={task.id}
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData("text/plain", task.id)}
-                  >
-                    <TaskCard
-                      taskId={task.id}
-                      title={task.title}
-                      statusLabel={col.label}
-                      visibility={task.visibility}
-                      overdue={overdue}
-                      masterName={task.master.name}
-                      participantCount={task.participants.length}
-                      commentCount={task._count.comments}
-                      dueDate={task.dueDate}
-                      priorities={task.priorities.map((p) => ({
-                        userId: p.userId,
-                        userName: p.user.name,
-                        level: p.level,
-                      }))}
-                      tags={task.tags}
-                    />
-                  </div>
-                );
-              })}
+              {colTasks.map((task) => (
+                <div
+                  key={task.id}
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData("text/plain", task.id)}
+                >
+                  <TaskCard
+                    taskId={task.id}
+                    title={task.title}
+                    statusLabel={col.label}
+                    visibility={task.visibility}
+                    overdue={isOverdue(task.dueDate, task.status)}
+                    masterName={task.master.name}
+                    participantCount={task.participants.length}
+                    commentCount={task._count.comments}
+                    dueDate={task.dueDate}
+                    priorities={toPriorityBadges(task.priorities)}
+                    tags={task.tags}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         );

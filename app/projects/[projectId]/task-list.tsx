@@ -1,11 +1,6 @@
-import { listTasksForProject, isOverdue } from "@/lib/tasks";
+import { listTasksForProject } from "@/lib/tasks";
+import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
 import { TaskCard } from "./task-card";
-
-const STATUS_LABEL: Record<string, string> = {
-  TODO: "진행전",
-  IN_PROGRESS: "진행중",
-  DONE: "종료",
-};
 
 export async function TaskList({
   projectId,
@@ -36,11 +31,7 @@ export async function TaskList({
           participantCount={task.participants.length}
           commentCount={task._count.comments}
           dueDate={task.dueDate}
-          priorities={task.priorities.map((p) => ({
-            userId: p.userId,
-            userName: p.user.name,
-            level: p.level,
-          }))}
+          priorities={toPriorityBadges(task.priorities)}
           tags={task.tags}
         />
       ))}

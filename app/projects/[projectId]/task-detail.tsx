@@ -20,7 +20,7 @@ import {
   listMovableTargets,
   setMyPriority,
 } from "@/app/actions/tasks";
-import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/priority";
+import { PRIORITY_LABEL, PRIORITY_COLOR, STATUS_LABEL, isOverdue } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,12 +36,6 @@ import {
 import { TaskTreePicker } from "./task-tree-picker";
 
 type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
-
-const STATUS_LABEL: Record<string, string> = {
-  TODO: "진행전",
-  IN_PROGRESS: "진행중",
-  DONE: "종료",
-};
 
 export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -69,7 +63,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
   }
 
   const { task, canManage, canParticipantAct, canComment, canJoin, canLeave } = detail;
-  const overdue = !!task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "DONE";
+  const overdue = isOverdue(task.dueDate, task.status);
   const locked = task.completedAt !== null;
 
   return (
