@@ -3,9 +3,12 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { getProjectAccess } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/app/notification-bell";
 import { VisibilityForm } from "./visibility-form";
 import { InviteForm } from "./invite-form";
 import { AdminControls } from "./admin-controls";
+import { TaskList } from "./task-list";
+import { NewTaskDialog } from "./new-task-dialog";
 
 export default async function ProjectDetailPage({
   params,
@@ -42,9 +45,12 @@ export default async function ProjectDetailPage({
           </div>
           <p className="text-sm text-muted-foreground">owner: {project.owner.name}</p>
         </div>
-        {session.user.isSuperAdmin && (
-          <AdminControls projectId={project.id} isArchived={project.isArchived} />
-        )}
+        <div className="flex items-center gap-2">
+          {session.user.isSuperAdmin && (
+            <AdminControls projectId={project.id} isArchived={project.isArchived} />
+          )}
+          <NotificationBell />
+        </div>
       </header>
 
       <main className="flex-1 space-y-8 px-6 py-6">
@@ -68,10 +74,15 @@ export default async function ProjectDetailPage({
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-sm font-medium">업무</h2>
-          <p className="text-sm text-muted-foreground">
-            업무 기능은 다음 단계에서 추가됩니다.
-          </p>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium">업무</h2>
+            <NewTaskDialog projectId={project.id} />
+          </div>
+          <TaskList
+            projectId={project.id}
+            userId={session.user.id}
+            isSuperAdmin={!!session.user.isSuperAdmin}
+          />
         </section>
       </main>
     </div>

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
 import { LogoutButton } from "./logout-button";
 import { NewProjectDialog } from "./new-project-dialog";
+import { NotificationBell } from "./notification-bell";
 import { ProjectCard } from "./project-card";
 
 export default async function DashboardPage({
@@ -32,6 +33,7 @@ export default async function DashboardPage({
         </div>
         <div className="flex items-center gap-2">
           <NewProjectDialog />
+          <NotificationBell />
           <LogoutButton />
         </div>
       </header>
