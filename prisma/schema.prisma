@@ -15,6 +15,7 @@ model User {
   avatarUrl    String?
   passwordHash String
   isSuperAdmin Boolean  @default(false)
+  accentColor  String?
   createdAt    DateTime @default(now())
 
   ownedProjects      Project[]         @relation("ProjectOwner")

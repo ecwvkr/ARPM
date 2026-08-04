@@ -1,18 +1,9 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { BottomNav } from "@/components/bottom-nav";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "AR_PM",
@@ -25,12 +16,18 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = await auth();
+  const user = session?.user?.id
+    ? await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { accentColor: true },
+      })
+    : null;
+  const accentStyle = user?.accentColor
+    ? ({ "--primary": user.accentColor, "--ring": user.accentColor } as CSSProperties)
+    : undefined;
 
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="ko" className="h-full antialiased" style={accentStyle}>
       <body className={`min-h-full flex flex-col ${session ? "pb-16" : ""}`}>
         {children}
         {session && <BottomNav />}

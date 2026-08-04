@@ -9,7 +9,7 @@ const ITEMS = [
   { label: "프로젝트", href: "/", icon: Folder },
   { label: "캘린더", href: null, icon: Calendar },
   { label: "캔버스", href: null, icon: Waypoints },
-  { label: "설정", href: null, icon: Settings },
+  { label: "설정", href: "/settings", icon: Settings },
 ] as const;
 
 export function BottomNav() {
@@ -19,7 +19,7 @@ export function BottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t-[0.5px] bg-background">
       <ul className="mx-auto flex max-w-3xl items-stretch justify-between">
         {ITEMS.map(({ label, href, icon: Icon }) => {
-          const active = href !== null && pathname === href;
+          const active = href !== null && (href === "/" ? pathname === "/" : pathname.startsWith(href));
           if (href === null) {
             return (
               <li key={label} className="flex-1">
