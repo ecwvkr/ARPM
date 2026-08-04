@@ -15,13 +15,23 @@ import {
   inviteToTask,
   addComment,
   deleteTask,
+  deriveTask,
+  moveTask,
+  listMovableTargets,
 } from "@/app/actions/tasks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { TaskTreePicker } from "./task-tree-picker";
 
 type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
 
@@ -75,6 +85,14 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
         </div>
         {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
         <p className="text-xs text-muted-foreground">master: {task.master.name}</p>
+        {task.parent && (
+          <p className="text-xs text-muted-foreground">상위 업무: {task.parent.title}</p>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">파생</h3>
+        <DeriveDialog parentTaskId={taskId} onDone={afterMutation} />
       </section>
 
       {canParticipantAct && !locked && (
@@ -212,7 +230,12 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
           <section className="space-y-2">
             <h3 className="text-sm font-medium">참여자 초대 (공유 범위 지정)</h3>
-            <InviteForm taskId={taskId} taskTitle={task.title} onDone={afterMutation} />
+            <InviteForm taskId={taskId} onDone={afterMutation} />
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-medium">부모 변경</h3>
+            <MoveForm taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
           </section>
 
           {task.participants.length > 0 && (
@@ -320,52 +343,135 @@ function EditInfoForm({
   );
 }
 
-function InviteForm({
-  taskId,
-  taskTitle,
-  onDone,
-}: {
-  taskId: string;
-  taskTitle: string;
-  onDone: () => void;
-}) {
+function InviteForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
   const action = inviteToTask.bind(null, taskId);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const [includeSubtree, setIncludeSubtree] = useState(true);
+  const [grants, setGrants] = useState<{ taskId: string; includeSubtree: boolean }[]>([]);
 
   return (
     <form
       action={async (formData) => {
-        formData.set("includeSubtree", String(includeSubtree));
+        formData.set("grants", JSON.stringify(grants));
         await formAction(formData);
         onDone();
       }}
       className="space-y-2"
     >
       <Input name="email" type="email" placeholder="이메일로 초대" required />
-      <div className="flex items-center gap-2 rounded-md border-[0.5px] p-2 text-sm">
-        <Checkbox
-          checked={includeSubtree}
-          onCheckedChange={(v) => setIncludeSubtree(v === true)}
-        />
-        <span>
-          {taskTitle}
-          <span className="ml-1 text-xs text-muted-foreground">
-            {includeSubtree ? "(하위 포함)" : "(해당 업무만)"}
-          </span>
-        </span>
-      </div>
-      <div className="flex gap-2 text-xs">
-        <button type="button" className="underline underline-offset-2" onClick={() => setIncludeSubtree(true)}>
-          전체 공유
-        </button>
-        <button type="button" className="underline underline-offset-2" onClick={() => setIncludeSubtree(false)}>
-          이 업무만
-        </button>
-      </div>
+      <TaskTreePicker rootTaskId={taskId} onChange={setGrants} />
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-      <Button type="submit" size="sm" disabled={isPending}>
+      <Button type="submit" size="sm" disabled={isPending || grants.length === 0}>
         초대
+      </Button>
+    </form>
+  );
+}
+
+function DeriveDialog({ parentTaskId, onDone }: { parentTaskId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const action = deriveTask.bind(null, parentTaskId);
+  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const submitted = useRef(false);
+
+  useEffect(() => {
+    if (submitted.current && !isPending && !errorMessage) {
+      submitted.current = false;
+      setOpen(false);
+      onDone();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPending, errorMessage]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm" variant="outline">파생하기</Button>} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>하위 업무 파생</DialogTitle>
+        </DialogHeader>
+        <form
+          action={formAction}
+          onSubmit={() => {
+            submitted.current = true;
+          }}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="derive-title">제목</Label>
+            <Input id="derive-title" name="title" required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="derive-memo">메모</Label>
+            <Textarea id="derive-memo" name="memo" rows={3} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="derive-dueDate">기한</Label>
+            <Input id="derive-dueDate" name="dueDate" type="date" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="derive-visibility">공개 범위</Label>
+            <select
+              id="derive-visibility"
+              name="visibility"
+              defaultValue="PUBLIC"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
+            >
+              <option value="PUBLIC">공개</option>
+              <option value="PRIVATE">비공개</option>
+            </select>
+          </div>
+          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+          <Button type="submit" disabled={isPending} className="w-full">
+            {isPending ? "생성 중..." : "파생하기"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MoveForm({
+  taskId,
+  currentParentId,
+  onDone,
+}: {
+  taskId: string;
+  currentParentId: string | null;
+  onDone: () => void;
+}) {
+  const [targets, setTargets] = useState<{ id: string; title: string }[] | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    listMovableTargets(taskId).then(setTargets);
+  }, [taskId]);
+
+  if (!targets) return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
+
+  return (
+    <form
+      action={(formData) =>
+        startTransition(async () => {
+          await moveTask(taskId, formData);
+          onDone();
+        })
+      }
+      className="flex items-center gap-2"
+    >
+      <select
+        name="parentId"
+        defaultValue={currentParentId ?? ""}
+        className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
+      >
+        <option value="">(최상위)</option>
+        {targets.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.title}
+          </option>
+        ))}
+      </select>
+      <Button type="submit" size="sm" variant="outline" disabled={isPending}>
+        이동
       </Button>
     </form>
   );

@@ -9,11 +9,14 @@ import { InviteForm } from "./invite-form";
 import { AdminControls } from "./admin-controls";
 import { TaskList } from "./task-list";
 import { NewTaskDialog } from "./new-task-dialog";
+import { TaskCanvas } from "./task-canvas";
 
 export default async function ProjectDetailPage({
   params,
+  searchParams,
 }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
+  const { view } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -75,14 +78,35 @@ export default async function ProjectDetailPage({
 
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium">업무</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-medium">업무</h2>
+              <div className="flex gap-1 text-xs">
+                <Link
+                  href={`/projects/${project.id}`}
+                  className={view === "canvas" ? "text-muted-foreground underline underline-offset-2" : "font-medium underline underline-offset-2"}
+                >
+                  대시보드
+                </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link
+                  href={`/projects/${project.id}?view=canvas`}
+                  className={view === "canvas" ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
+                >
+                  캔버스
+                </Link>
+              </div>
+            </div>
             <NewTaskDialog projectId={project.id} />
           </div>
-          <TaskList
-            projectId={project.id}
-            userId={session.user.id}
-            isSuperAdmin={!!session.user.isSuperAdmin}
-          />
+          {view === "canvas" ? (
+            <TaskCanvas projectId={project.id} />
+          ) : (
+            <TaskList
+              projectId={project.id}
+              userId={session.user.id}
+              isSuperAdmin={!!session.user.isSuperAdmin}
+            />
+          )}
         </section>
       </main>
     </div>

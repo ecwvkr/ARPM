@@ -5,7 +5,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
-import { getTaskAccess } from "@/lib/tasks";
+import {
+  getTaskAccess,
+  listTasksForProject,
+  buildSubtree,
+  collectSubtreeIds,
+  collectDescendantIds,
+} from "@/lib/tasks";
 
 export async function getTaskDetail(taskId: string) {
   const session = await auth();
@@ -43,6 +49,119 @@ export async function createTask(
   });
 
   revalidatePath(`/projects/${projectId}`);
+}
+
+export async function deriveTask(
+  parentTaskId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task: parent, canView } = await getTaskAccess(parentTaskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!parent || !canView) return "접근할 수 없습니다.";
+
+  const title = (formData.get("title") as string | null)?.trim();
+  if (!title) return "제목을 입력하세요.";
+
+  const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const dueDateRaw = formData.get("dueDate") as string | null;
+  const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+
+  await prisma.task.create({
+    data: {
+      projectId: parent.projectId,
+      parentId: parent.id,
+      title,
+      memo,
+      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      visibility,
+      masterId: session.user.id,
+    },
+  });
+
+  if (parent.masterId !== session.user.id) {
+    await prisma.notification.create({
+      data: {
+        userId: parent.masterId,
+        type: "SUBTASK_CREATED",
+        refId: parent.id,
+        message: `"${parent.title}"에 새 하위 업무 "${title}"가 생성되었습니다.`,
+      },
+    });
+  }
+
+  revalidatePath(`/projects/${parent.projectId}`);
+}
+
+export async function moveTask(taskId: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canManage) throw new Error("master만 이동할 수 있습니다.");
+
+  const newParentIdRaw = formData.get("parentId") as string | null;
+  const newParentId = newParentIdRaw && newParentIdRaw !== "" ? newParentIdRaw : null;
+
+  if (newParentId) {
+    if (newParentId === taskId) throw new Error("자기 자신을 부모로 지정할 수 없습니다.");
+
+    const projectTasks = await listTasksForProject(task.projectId, session.user.id, true);
+    const target = projectTasks.find((t) => t.id === newParentId);
+    if (!target) throw new Error("같은 프로젝트 내에서만 이동할 수 있습니다.");
+
+    const descendants = collectDescendantIds(projectTasks, taskId);
+    if (descendants.has(newParentId)) throw new Error("하위 업무를 부모로 지정할 수 없습니다.");
+  }
+
+  await prisma.task.update({ where: { id: taskId }, data: { parentId: newParentId } });
+  revalidatePath(`/projects/${task.projectId}`);
+}
+
+export async function listMovableTargets(taskId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canManage) return [];
+
+  const projectTasks = await listTasksForProject(task.projectId, session.user.id, !!session.user.isSuperAdmin);
+  const descendants = collectDescendantIds(projectTasks, taskId);
+
+  return projectTasks
+    .filter((t) => t.id !== taskId && !descendants.has(t.id))
+    .map((t) => ({ id: t.id, title: t.title }));
+}
+
+export async function getTaskSubtree(taskId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canManage) return null;
+
+  const projectTasks = await listTasksForProject(task.projectId, session.user.id, !!session.user.isSuperAdmin);
+  return buildSubtree(projectTasks, taskId);
+}
+
+export async function getCanvasTasks(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { canView } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!canView) return [];
+
+  const tasks = await listTasksForProject(projectId, session.user.id, !!session.user.isSuperAdmin);
+  return tasks.map((t) => ({
+    id: t.id,
+    parentId: t.parentId,
+    title: t.title,
+    status: t.status,
+    visibility: t.visibility,
+    dueDate: t.dueDate,
+  }));
 }
 
 export async function joinTask(taskId: string) {
@@ -185,13 +304,32 @@ export async function inviteToTask(
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return "해당 이메일의 유저를 찾을 수 없습니다.";
 
-  const includeSubtree = formData.get("includeSubtree") === "true";
+  const grantsRaw = formData.get("grants") as string | null;
+  let grants: { taskId: string; includeSubtree: boolean }[];
+  try {
+    grants = grantsRaw ? JSON.parse(grantsRaw) : [{ taskId, includeSubtree: true }];
+  } catch {
+    return "잘못된 요청입니다.";
+  }
+  if (!Array.isArray(grants) || grants.length === 0) return "공유할 업무를 선택하세요.";
 
-  await prisma.taskParticipant.upsert({
-    where: { taskId_userId: { taskId, userId: user.id } },
-    update: { includeSubtree },
-    create: { taskId, userId: user.id, includeSubtree },
-  });
+  const projectTasks = await listTasksForProject(task.projectId, session.user.id, !!session.user.isSuperAdmin);
+  const subtree = buildSubtree(projectTasks, taskId);
+  const validIds = subtree ? collectSubtreeIds(subtree) : new Set([taskId]);
+
+  for (const g of grants) {
+    if (!validIds.has(g.taskId)) return "잘못된 요청입니다.";
+  }
+
+  await prisma.$transaction(
+    grants.map((g) =>
+      prisma.taskParticipant.upsert({
+        where: { taskId_userId: { taskId: g.taskId, userId: user.id } },
+        update: { includeSubtree: g.includeSubtree },
+        create: { taskId: g.taskId, userId: user.id, includeSubtree: g.includeSubtree },
+      }),
+    ),
+  );
 
   revalidatePath(`/projects/${task.projectId}`);
 }
