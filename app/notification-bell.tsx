@@ -43,9 +43,7 @@ export function NotificationBell() {
           <Button variant="outline" size="icon" className="relative">
             <Bell className="size-4" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] text-white">
-                {unreadCount}
-              </span>
+              <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />
             )}
           </Button>
         }

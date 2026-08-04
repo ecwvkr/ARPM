@@ -26,7 +26,7 @@ export function listVisibleProjects(
     include: {
       owner: true,
       members: true,
-      _count: { select: { tasks: true } },
+      tasks: { select: { status: true } },
     },
     orderBy: { createdAt: "desc" },
   });

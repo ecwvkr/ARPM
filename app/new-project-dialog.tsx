@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createProject } from "@/app/actions/projects";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +23,16 @@ export function NewProjectDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button>새 프로젝트</Button>} />
+      <DialogTrigger
+        render={
+          <Button
+            variant="outline"
+            className="w-full rounded-full border-[0.5px] py-6"
+          >
+            <Plus className="size-5" />
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>새 프로젝트</DialogTitle>
