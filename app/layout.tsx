@@ -15,6 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AR_PM",
   description: "프로젝트·업무 관리 툴",
+  appleWebApp: {
+    title: "AR_PM",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
