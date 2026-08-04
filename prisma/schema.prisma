@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  avatarUrl    String?
+  passwordHash String
+  isSuperAdmin Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  ownedProjects      Project[]         @relation("ProjectOwner")
+  projectMemberships ProjectMember[]
+  masteredTasks      Task[]            @relation("TaskMaster")
+  taskParticipations TaskParticipant[]
+  priorities         TaskPriority[]
+  comments           Comment[]
+  notifications      Notification[]
+}
+
+model Project {
+  id         String     @id @default(cuid())
+  name       String
+  goalDate   DateTime?
+  visibility Visibility @default(PRIVATE)
+  isArchived Boolean    @default(false) // 숨김(총관리자)
+  deletedAt  DateTime? // 소프트 삭제(총관리자)
+  ownerId    String
+  owner      User       @relation("ProjectOwner", fields: [ownerId], references: [id])
+  createdAt  DateTime   @default(now())
+
+  members ProjectMember[]
+  tasks   Task[]
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      ProjectRole @default(MEMBER)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  projectId   String
+  parentId    String? // 트리: 부모 1 (동일 프로젝트 내)
+  title       String
+  memo        String?
+  status      TaskStatus @default(TODO)
+  visibility  Visibility @default(PUBLIC)
+  masterId    String
+  createdAt   DateTime   @default(now())
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       Task?             @relation("TaskTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Task[]            @relation("TaskTree")
+  master       User              @relation("TaskMaster", fields: [masterId], references: [id])
+  participants TaskParticipant[]
+  priorities   TaskPriority[]
+  comments     Comment[]
+}
+
+model TaskParticipant {
+  taskId         String
+  userId         String
+  includeSubtree Boolean  @default(true) // false = '해당 업무만 공유'
+  joinedAt       DateTime @default(now())
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+}
+
+model TaskPriority {
+  // 참여자별 우선순위
+  taskId    String
+  userId    String
+  level     Priority @default(NORMAL)
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  refId     String?
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ProjectRole {
+  OWNER
+  MEMBER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  URGENT
+  HIGH
+  NORMAL
+  LOW
+}
