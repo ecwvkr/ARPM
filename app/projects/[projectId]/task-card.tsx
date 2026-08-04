@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PRIORITY_COLOR, PRIORITY_LABEL } from "@/lib/priority";
 import { TaskDetail } from "./task-detail";
 
 export function TaskCard({
@@ -15,6 +16,8 @@ export function TaskCard({
   participantCount,
   commentCount,
   dueDate,
+  priorities = [],
+  projectName,
 }: {
   taskId: string;
   title: string;
@@ -25,6 +28,8 @@ export function TaskCard({
   participantCount: number;
   commentCount: number;
   dueDate: Date | null;
+  priorities?: { userId: string; userName: string; level: string }[];
+  projectName?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -46,12 +51,25 @@ export function TaskCard({
           {overdue && <Badge variant="destructive">지연</Badge>}
         </div>
         <div className="space-y-0.5 text-xs text-muted-foreground">
+          {projectName && <p>{projectName}</p>}
           <p>master: {masterName}</p>
           <p>
             참여자 {participantCount}명 · 코멘트 {commentCount}개
           </p>
           {dueDate && <p>기한 {new Date(dueDate).toLocaleDateString("ko-KR")}</p>}
         </div>
+        {priorities.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            {priorities.map((p) => (
+              <span
+                key={p.userId}
+                title={`${p.userName}: ${PRIORITY_LABEL[p.level]}`}
+                className="inline-block size-2 rounded-full"
+                style={{ backgroundColor: PRIORITY_COLOR[p.level] }}
+              />
+            ))}
+          </div>
+        )}
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>

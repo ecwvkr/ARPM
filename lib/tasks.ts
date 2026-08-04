@@ -1,5 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
+import { listVisibleProjects } from "@/lib/projects";
+
+const PRIORITY_RANK: Record<string, number> = { URGENT: 4, HIGH: 3, NORMAL: 2, LOW: 1 };
+
+export function getMaxPriority(priorities: { level: string }[]): string {
+  if (priorities.length === 0) return "NORMAL";
+  return priorities.reduce(
+    (max, p) => (PRIORITY_RANK[p.level] > PRIORITY_RANK[max] ? p.level : max),
+    "NORMAL",
+  );
+}
+
+export function sortTasks<
+  T extends { dueDate: Date | null; createdAt: Date; priorities: { level: string }[] },
+>(tasks: T[]): T[] {
+  return [...tasks].sort((a, b) => {
+    const aDue = a.dueDate ? a.dueDate.getTime() : Infinity;
+    const bDue = b.dueDate ? b.dueDate.getTime() : Infinity;
+    if (aDue !== bDue) return aDue - bDue;
+
+    const aPriority = PRIORITY_RANK[getMaxPriority(a.priorities)];
+    const bPriority = PRIORITY_RANK[getMaxPriority(b.priorities)];
+    if (aPriority !== bPriority) return bPriority - aPriority;
+
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
 
 async function hasInheritedAccess(startParentId: string | null, userId: string): Promise<boolean> {
   let currentId = startParentId;
@@ -25,6 +52,7 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
       master: true,
       parent: { select: { id: true, title: true } },
       participants: { include: { user: true } },
+      priorities: { include: { user: true } },
       comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
       project: true,
     },
@@ -41,6 +69,8 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
       canComment: false,
       canJoin: false,
       canLeave: false,
+      canSetPriority: false,
+      myPriority: "NORMAL",
     };
   }
 
@@ -63,8 +93,22 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
   const locked = task.completedAt !== null;
   const canJoin = canView && !isMaster && !isParticipant && !inheritedAccess && !locked;
   const canLeave = isParticipant && !isMaster && !locked;
+  const canSetPriority = task.status === "IN_PROGRESS" && canParticipantAct;
+  const myPriority = task.priorities.find((p) => p.userId === userId)?.level ?? "NORMAL";
 
-  return { task, isMaster, isParticipant, canView, canManage, canParticipantAct, canComment, canJoin, canLeave };
+  return {
+    task,
+    isMaster,
+    isParticipant,
+    canView,
+    canManage,
+    canParticipantAct,
+    canComment,
+    canJoin,
+    canLeave,
+    canSetPriority,
+    myPriority,
+  };
 }
 
 type TaskWithParticipants = {
@@ -97,16 +141,50 @@ export async function listTasksForProject(projectId: string, userId: string, isS
     where: { projectId },
     include: {
       master: true,
-      participants: true,
+      participants: { include: { user: true } },
+      priorities: { include: { user: true } },
       _count: { select: { comments: true } },
     },
     orderBy: { createdAt: "asc" },
   });
 
-  if (isSuperAdmin) return allTasks;
+  const visible = isSuperAdmin
+    ? allTasks
+    : (() => {
+        const byId = new Map(allTasks.map((t) => [t.id, t]));
+        return allTasks.filter((t) => canViewTask(t, byId, userId));
+      })();
 
-  const byId = new Map(allTasks.map((t) => [t.id, t]));
-  return allTasks.filter((t) => canViewTask(t, byId, userId));
+  return sortTasks(visible);
+}
+
+export async function listAllTasksForUser(
+  userId: string,
+  isSuperAdmin: boolean,
+  filters: { projectId?: string; status?: "TODO" | "IN_PROGRESS" | "DONE"; mineOnly?: boolean } = {},
+) {
+  const projects = await listVisibleProjects(userId, isSuperAdmin, false);
+  const targetProjects = filters.projectId
+    ? projects.filter((p) => p.id === filters.projectId)
+    : projects;
+
+  const perProject = await Promise.all(
+    targetProjects.map(async (p) => {
+      const tasks = await listTasksForProject(p.id, userId, isSuperAdmin);
+      return tasks.map((t) => ({ ...t, projectName: p.name }));
+    }),
+  );
+
+  let tasks = perProject.flat();
+
+  if (filters.status) tasks = tasks.filter((t) => t.status === filters.status);
+  if (filters.mineOnly) {
+    tasks = tasks.filter(
+      (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),
+    );
+  }
+
+  return sortTasks(tasks);
 }
 
 export function isOverdue(dueDate: Date | null, status: string) {

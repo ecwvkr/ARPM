@@ -18,7 +18,9 @@ import {
   deriveTask,
   moveTask,
   listMovableTargets,
+  setMyPriority,
 } from "@/app/actions/tasks";
+import { PRIORITY_LABEL, PRIORITY_COLOR } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,6 +147,34 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
         <section className="space-y-2">
           <h3 className="text-sm font-medium">기한 연장</h3>
           <ExtendDueDateForm taskId={taskId} onDone={afterMutation} />
+        </section>
+      )}
+
+      {detail.canSetPriority && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">내 우선순위</h3>
+          <div className="flex gap-2">
+            {(["URGENT", "HIGH", "NORMAL", "LOW"] as const).map((level) => (
+              <Button
+                key={level}
+                size="sm"
+                variant={detail.myPriority === level ? "default" : "outline"}
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await setMyPriority(taskId, level);
+                    afterMutation();
+                  })
+                }
+              >
+                <span
+                  className="mr-1.5 inline-block size-2 rounded-full"
+                  style={{ backgroundColor: PRIORITY_COLOR[level] }}
+                />
+                {PRIORITY_LABEL[level]}
+              </Button>
+            ))}
+          </div>
         </section>
       )}
 

@@ -221,6 +221,23 @@ export async function completeTask(taskId: string) {
   revalidatePath(`/projects/${task.projectId}`);
 }
 
+export async function setMyPriority(taskId: string, level: "URGENT" | "HIGH" | "NORMAL" | "LOW") {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canParticipantAct } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canParticipantAct) throw new Error("권한이 없습니다.");
+  if (task.status !== "IN_PROGRESS") throw new Error("진행 중인 업무만 우선순위를 설정할 수 있습니다.");
+
+  await prisma.taskPriority.upsert({
+    where: { taskId_userId: { taskId, userId: session.user.id } },
+    update: { level },
+    create: { taskId, userId: session.user.id, level },
+  });
+
+  revalidatePath(`/projects/${task.projectId}`);
+}
+
 export async function extendDueDate(
   taskId: string,
   _prevState: string | undefined,

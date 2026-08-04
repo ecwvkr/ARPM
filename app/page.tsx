@@ -5,6 +5,7 @@ import { LogoutButton } from "./logout-button";
 import { NewProjectDialog } from "./new-project-dialog";
 import { NotificationBell } from "./notification-bell";
 import { ProjectCard } from "./project-card";
+import { WidthContainer } from "@/components/width-container";
 
 export default async function DashboardPage({
   searchParams,
@@ -32,12 +33,18 @@ export default async function DashboardPage({
           <p className="text-sm text-muted-foreground">{session?.user?.name}님</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/tasks"
+            className="text-sm text-muted-foreground underline underline-offset-2"
+          >
+            전체 업무
+          </Link>
           <NewProjectDialog />
           <NotificationBell />
           <LogoutButton />
         </div>
       </header>
-      <main className="flex-1 space-y-6 px-6 py-6">
+      <WidthContainer mainClassName="space-y-6 px-6 py-6">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <SummaryCard label="전체 프로젝트" value={projects.length} />
           <SummaryCard label="내가 만든 프로젝트" value={ownedCount} />
@@ -62,7 +69,7 @@ export default async function DashboardPage({
             ))}
           </div>
         )}
-      </main>
+      </WidthContainer>
     </div>
   );
 }

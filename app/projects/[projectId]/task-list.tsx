@@ -36,8 +36,15 @@ export async function TaskList({
           participantCount={task.participants.length}
           commentCount={task._count.comments}
           dueDate={task.dueDate}
+          priorities={task.priorities.map((p) => ({
+            userId: p.userId,
+            userName: p.user.name,
+            level: p.level,
+          }))}
         />
       ))}
     </div>
   );
 }
+
+export type ProjectTaskSummary = Awaited<ReturnType<typeof listTasksForProject>>[number];

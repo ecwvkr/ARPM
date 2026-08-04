@@ -10,6 +10,8 @@ import { AdminControls } from "./admin-controls";
 import { TaskList } from "./task-list";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCanvas } from "./task-canvas";
+import { TaskStatusGroups } from "./task-status-groups";
+import { WidthContainer } from "@/components/width-container";
 
 export default async function ProjectDetailPage({
   params,
@@ -56,7 +58,7 @@ export default async function ProjectDetailPage({
         </div>
       </header>
 
-      <main className="flex-1 space-y-8 px-6 py-6">
+      <WidthContainer mainClassName="space-y-8 px-6 py-6">
         {isOwner && (
           <section className="space-y-2">
             <h2 className="text-sm font-medium">공개 범위</h2>
@@ -83,9 +85,16 @@ export default async function ProjectDetailPage({
               <div className="flex gap-1 text-xs">
                 <Link
                   href={`/projects/${project.id}`}
-                  className={view === "canvas" ? "text-muted-foreground underline underline-offset-2" : "font-medium underline underline-offset-2"}
+                  className={!view ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
                 >
                   대시보드
+                </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link
+                  href={`/projects/${project.id}?view=status`}
+                  className={view === "status" ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
+                >
+                  상태그룹
                 </Link>
                 <span className="text-muted-foreground">·</span>
                 <Link
@@ -100,6 +109,12 @@ export default async function ProjectDetailPage({
           </div>
           {view === "canvas" ? (
             <TaskCanvas projectId={project.id} />
+          ) : view === "status" ? (
+            <TaskStatusGroups
+              projectId={project.id}
+              userId={session.user.id}
+              isSuperAdmin={!!session.user.isSuperAdmin}
+            />
           ) : (
             <TaskList
               projectId={project.id}
@@ -108,7 +123,7 @@ export default async function ProjectDetailPage({
             />
           )}
         </section>
-      </main>
+      </WidthContainer>
     </div>
   );
 }
