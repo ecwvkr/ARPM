@@ -74,6 +74,8 @@ export function TaskCard({
             {priorities.map((p) => (
               <span
                 key={p.userId}
+                role="img"
+                aria-label={`${p.userName}: ${PRIORITY_LABEL[p.level]}`}
                 title={`${p.userName}: ${PRIORITY_LABEL[p.level]}`}
                 className="inline-block size-2 rounded-full"
                 style={{ backgroundColor: PRIORITY_COLOR[p.level] }}
