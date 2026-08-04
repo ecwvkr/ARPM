@@ -87,7 +87,6 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
     ? ownGrant.includeSubtree || !inheritedWouldGrant
     : inheritedWouldGrant;
   const isParticipant = !!ownGrant && grantedAccess;
-  const inheritedAccess = !ownGrant && grantedAccess;
 
   const canView = isSuperAdmin
     ? true

@@ -29,12 +29,12 @@ export default function LoginPage() {
         <CardContent>
           <form action={formAction} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">이메일</Label>
+              <Label htmlFor="email">이메일 또는 아이디</Label>
               <Input
                 id="email"
                 name="email"
-                type="email"
-                autoComplete="email"
+                type="text"
+                autoComplete="username"
                 required
               />
             </div>

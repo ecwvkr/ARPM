@@ -3,14 +3,15 @@ import { prisma } from "../lib/prisma";
 
 async function main() {
   const password = await bcrypt.hash("password123", 10);
+  const adminPassword = await bcrypt.hash("admin1234", 10);
 
   await prisma.user.upsert({
     where: { email: "admin@arpm.local" },
-    update: {},
+    update: { email: "admin", passwordHash: adminPassword },
     create: {
       name: "총관리자",
-      email: "admin@arpm.local",
-      passwordHash: password,
+      email: "admin",
+      passwordHash: adminPassword,
       isSuperAdmin: true,
     },
   });
@@ -35,7 +36,7 @@ async function main() {
     },
   });
 
-  console.log("시드 완료: admin@arpm.local / kim@arpm.local / lee@arpm.local (비밀번호: password123)");
+  console.log("시드 완료: admin(비밀번호: admin1234) / kim@arpm.local / lee@arpm.local (비밀번호: password123)");
 }
 
 main()
