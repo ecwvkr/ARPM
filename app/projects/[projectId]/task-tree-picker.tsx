@@ -112,6 +112,9 @@ export function TaskTreePicker({
           이 업무만
         </button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        하위 노드를 체크 후 &apos;이 업무만&apos;로 지정하면 그 아래 가지는 접근에서 제외됩니다.
+      </p>
       <div className="rounded-md border-[0.5px] p-2">
         <Row
           node={tree}

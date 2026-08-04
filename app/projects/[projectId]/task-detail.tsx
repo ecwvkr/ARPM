@@ -86,6 +86,15 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           </Badge>
         </div>
         {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
+        {task.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {task.tags.map((tag) => (
+              <Badge key={tag} variant="outline">
+                #{tag}
+              </Badge>
+            ))}
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">master: {task.master.name}</p>
         {task.parent && (
           <p className="text-xs text-muted-foreground">상위 업무: {task.parent.title}</p>
@@ -230,7 +239,13 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
         <>
           <section className="space-y-2">
             <h3 className="text-sm font-medium">업무 정보 수정</h3>
-            <EditInfoForm taskId={taskId} title={task.title} memo={task.memo ?? ""} onDone={afterMutation} />
+            <EditInfoForm
+              taskId={taskId}
+              title={task.title}
+              memo={task.memo ?? ""}
+              tags={task.tags}
+              onDone={afterMutation}
+            />
           </section>
 
           <section className="space-y-2">
@@ -345,11 +360,13 @@ function EditInfoForm({
   taskId,
   title,
   memo,
+  tags,
   onDone,
 }: {
   taskId: string;
   title: string;
   memo: string;
+  tags: string[];
   onDone: () => void;
 }) {
   const action = updateTaskInfo.bind(null, taskId);
@@ -365,6 +382,7 @@ function EditInfoForm({
     >
       <Input name="title" defaultValue={title} required />
       <Textarea name="memo" defaultValue={memo} placeholder="메모" rows={3} />
+      <Input name="tags" defaultValue={tags.join(", ")} placeholder="태그 (쉼표로 구분)" />
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
       <Button type="submit" size="sm" variant="outline" disabled={isPending}>
         저장
@@ -437,6 +455,10 @@ function DeriveDialog({ parentTaskId, onDone }: { parentTaskId: string; onDone: 
           <div className="space-y-1.5">
             <Label htmlFor="derive-dueDate">기한</Label>
             <Input id="derive-dueDate" name="dueDate" type="date" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="derive-tags">태그 (쉼표로 구분)</Label>
+            <Input id="derive-tags" name="tags" placeholder="예: 프론트엔드, 급함" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="derive-visibility">공개 범위</Label>

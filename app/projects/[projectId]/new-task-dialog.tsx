@@ -54,6 +54,10 @@ export function NewTaskDialog({ projectId }: { projectId: string }) {
             <Input id="dueDate" name="dueDate" type="date" />
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="tags">태그 (쉼표로 구분)</Label>
+            <Input id="tags" name="tags" placeholder="예: 프론트엔드, 급함" />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="visibility">공개 범위</Label>
             <select
               id="visibility"

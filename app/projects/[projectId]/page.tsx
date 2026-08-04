@@ -11,6 +11,7 @@ import { TaskList } from "./task-list";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCanvas } from "./task-canvas";
 import { TaskStatusGroups } from "./task-status-groups";
+import { TaskKanban } from "./task-kanban";
 import { WidthContainer } from "@/components/width-container";
 
 export default async function ProjectDetailPage({
@@ -103,6 +104,13 @@ export default async function ProjectDetailPage({
                 >
                   캔버스
                 </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link
+                  href={`/projects/${project.id}?view=kanban`}
+                  className={view === "kanban" ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
+                >
+                  칸반
+                </Link>
               </div>
             </div>
             <NewTaskDialog projectId={project.id} />
@@ -111,6 +119,12 @@ export default async function ProjectDetailPage({
             <TaskCanvas projectId={project.id} />
           ) : view === "status" ? (
             <TaskStatusGroups
+              projectId={project.id}
+              userId={session.user.id}
+              isSuperAdmin={!!session.user.isSuperAdmin}
+            />
+          ) : view === "kanban" ? (
+            <TaskKanban
               projectId={project.id}
               userId={session.user.id}
               isSuperAdmin={!!session.user.isSuperAdmin}

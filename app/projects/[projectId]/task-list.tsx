@@ -41,6 +41,7 @@ export async function TaskList({
             userName: p.user.name,
             level: p.level,
           }))}
+          tags={task.tags}
         />
       ))}
     </div>

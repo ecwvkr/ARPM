@@ -28,6 +28,8 @@ export function sortTasks<
   });
 }
 
+// 가장 가까운 조상의 grant가 우선한다: 전체 공유(true) 상속 도중 특정 가지에 false grant를
+// 두면 그 아래는 차단된다("공유 제외" — §Phase5). 조상에 grant가 전혀 없으면 다음 조상으로 계속.
 async function hasInheritedAccess(startParentId: string | null, userId: string): Promise<boolean> {
   let currentId = startParentId;
   while (currentId) {
@@ -35,11 +37,11 @@ async function hasInheritedAccess(startParentId: string | null, userId: string):
       where: { id: currentId },
       select: {
         parentId: true,
-        participants: { where: { userId, includeSubtree: true }, select: { userId: true } },
+        participants: { where: { userId }, select: { includeSubtree: true } },
       },
     });
     if (!ancestor) return false;
-    if (ancestor.participants.length > 0) return true;
+    if (ancestor.participants.length > 0) return ancestor.participants[0].includeSubtree;
     currentId = ancestor.parentId;
   }
   return false;
@@ -77,21 +79,27 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
   const { canView: canViewProject } = await getProjectAccess(task.projectId, userId, isSuperAdmin);
 
   const isMaster = task.masterId === userId;
-  const isParticipant = task.participants.some((p) => p.userId === userId);
-  const inheritedAccess =
-    !isMaster && !isParticipant ? await hasInheritedAccess(task.parentId, userId) : false;
+  const ownGrant = task.participants.find((p) => p.userId === userId);
+  // 조상이 이미 true로 포함하고 있는데 이 노드에 false grant가 있다면 "가지 제외"로 보고
+  // 이 노드부터 차단한다. 조상 grant가 없다면(=단독 초대) false는 "이 업무만 공유"로 취급한다.
+  const inheritedWouldGrant = !isMaster ? await hasInheritedAccess(task.parentId, userId) : false;
+  const grantedAccess = ownGrant
+    ? ownGrant.includeSubtree || !inheritedWouldGrant
+    : inheritedWouldGrant;
+  const isParticipant = !!ownGrant && grantedAccess;
+  const inheritedAccess = !ownGrant && grantedAccess;
 
   const canView = isSuperAdmin
     ? true
     : task.visibility === "PUBLIC"
       ? canViewProject
-      : isMaster || isParticipant || inheritedAccess;
+      : isMaster || grantedAccess;
 
   const canManage = isMaster;
-  const canParticipantAct = isMaster || isParticipant || inheritedAccess;
+  const canParticipantAct = isMaster || grantedAccess;
   const canComment = canView;
   const locked = task.completedAt !== null;
-  const canJoin = canView && !isMaster && !isParticipant && !inheritedAccess && !locked;
+  const canJoin = canView && !isMaster && !grantedAccess && !locked;
   const canLeave = isParticipant && !isMaster && !locked;
   const canSetPriority = task.status === "IN_PROGRESS" && canParticipantAct;
   const myPriority = task.priorities.find((p) => p.userId === userId)?.level ?? "NORMAL";
@@ -119,6 +127,20 @@ type TaskWithParticipants = {
   participants: { userId: string; includeSubtree: boolean }[];
 };
 
+function nearestAncestorGrant<T extends TaskWithParticipants>(
+  task: T,
+  byId: Map<string, T>,
+  userId: string,
+): boolean {
+  let current = task.parentId ? byId.get(task.parentId) : undefined;
+  while (current) {
+    const grant = current.participants.find((p) => p.userId === userId);
+    if (grant) return grant.includeSubtree;
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+  return false;
+}
+
 function canViewTask<T extends TaskWithParticipants>(
   task: T,
   byId: Map<string, T>,
@@ -126,14 +148,14 @@ function canViewTask<T extends TaskWithParticipants>(
 ): boolean {
   if (task.visibility === "PUBLIC") return true;
   if (task.masterId === userId) return true;
-  if (task.participants.some((p) => p.userId === userId)) return true;
 
-  let current = task.parentId ? byId.get(task.parentId) : undefined;
-  while (current) {
-    if (current.participants.some((p) => p.userId === userId && p.includeSubtree)) return true;
-    current = current.parentId ? byId.get(current.parentId) : undefined;
-  }
-  return false;
+  const inheritedWouldGrant = nearestAncestorGrant(task, byId, userId);
+  const ownGrant = task.participants.find((p) => p.userId === userId);
+
+  // 조상이 이미 포함(true)하는데 이 노드에 false grant가 있으면 "가지 제외"로 차단.
+  // 조상 grant가 없다면 false는 "이 업무만 공유"로 취급해 이 노드는 보인다.
+  if (ownGrant) return ownGrant.includeSubtree || !inheritedWouldGrant;
+  return inheritedWouldGrant;
 }
 
 export async function listTasksForProject(projectId: string, userId: string, isSuperAdmin: boolean) {
@@ -161,7 +183,12 @@ export async function listTasksForProject(projectId: string, userId: string, isS
 export async function listAllTasksForUser(
   userId: string,
   isSuperAdmin: boolean,
-  filters: { projectId?: string; status?: "TODO" | "IN_PROGRESS" | "DONE"; mineOnly?: boolean } = {},
+  filters: {
+    projectId?: string;
+    status?: "TODO" | "IN_PROGRESS" | "DONE";
+    mineOnly?: boolean;
+    tag?: string;
+  } = {},
 ) {
   const projects = await listVisibleProjects(userId, isSuperAdmin, false);
   const targetProjects = filters.projectId
@@ -178,6 +205,7 @@ export async function listAllTasksForUser(
   let tasks = perProject.flat();
 
   if (filters.status) tasks = tasks.filter((t) => t.status === filters.status);
+  if (filters.tag) tasks = tasks.filter((t) => t.tags.includes(filters.tag!));
   if (filters.mineOnly) {
     tasks = tasks.filter(
       (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),

@@ -18,6 +18,7 @@ export function TaskCard({
   dueDate,
   priorities = [],
   projectName,
+  tags = [],
 }: {
   taskId: string;
   title: string;
@@ -30,6 +31,7 @@ export function TaskCard({
   dueDate: Date | null;
   priorities?: { userId: string; userName: string; level: string }[];
   projectName?: string;
+  tags?: string[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -58,6 +60,15 @@ export function TaskCard({
           </p>
           {dueDate && <p>기한 {new Date(dueDate).toLocaleDateString("ko-KR")}</p>}
         </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <Badge key={tag} variant="outline" className="text-[10px]">
+                #{tag}
+              </Badge>
+            ))}
+          </div>
+        )}
         {priorities.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
             {priorities.map((p) => (

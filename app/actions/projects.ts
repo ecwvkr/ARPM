@@ -65,11 +65,23 @@ export async function inviteMember(
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return "해당 이메일의 유저를 찾을 수 없습니다.";
 
-  await prisma.projectMember.upsert({
-    where: { projectId_userId: { projectId, userId: user.id } },
-    update: {},
-    create: { projectId, userId: user.id, role: "MEMBER" },
-  });
+  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId }, select: { name: true } });
+
+  await prisma.$transaction([
+    prisma.projectMember.upsert({
+      where: { projectId_userId: { projectId, userId: user.id } },
+      update: {},
+      create: { projectId, userId: user.id, role: "MEMBER" },
+    }),
+    prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: "PROJECT_INVITED",
+        refId: projectId,
+        message: `"${project.name}" 프로젝트에 초대되었습니다.`,
+      },
+    }),
+  ]);
 
   revalidatePath(`/projects/${projectId}`);
 }

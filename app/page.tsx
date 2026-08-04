@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
+import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { LogoutButton } from "./logout-button";
 import { NewProjectDialog } from "./new-project-dialog";
 import { NotificationBell } from "./notification-bell";
@@ -13,6 +14,8 @@ export default async function DashboardPage({
   const session = await auth();
   const params = await searchParams;
   const showHidden = session?.user?.isSuperAdmin && params.hidden === "1";
+
+  if (session?.user?.id) await ensureDeadlineNotifications(session.user.id);
 
   const projects = await listVisibleProjects(
     session!.user.id,

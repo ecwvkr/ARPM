@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Input } from "@/components/ui/input";
 
 export function TaskFilters({ projects }: { projects: { id: string; name: string }[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [tagInput, setTagInput] = useState(searchParams.get("tag") ?? "");
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -40,6 +43,17 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
         <option value="IN_PROGRESS">진행중</option>
         <option value="DONE">종료</option>
       </select>
+
+      <Input
+        value={tagInput}
+        onChange={(e) => setTagInput(e.target.value)}
+        onBlur={() => setParam("tag", tagInput.trim())}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setParam("tag", tagInput.trim());
+        }}
+        placeholder="태그로 검색"
+        className="h-auto w-32 py-1.5 text-sm"
+      />
 
       <button
         type="button"

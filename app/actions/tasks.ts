@@ -13,6 +13,11 @@ import {
   collectDescendantIds,
 } from "@/lib/tasks";
 
+function parseTags(formData: FormData): string[] {
+  const raw = (formData.get("tags") as string | null) ?? "";
+  return Array.from(new Set(raw.split(",").map((t) => t.trim()).filter(Boolean)));
+}
+
 export async function getTaskDetail(taskId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -45,6 +50,7 @@ export async function createTask(
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
       visibility,
       masterId: session.user.id,
+      tags: parseTags(formData),
     },
   });
 
@@ -78,6 +84,7 @@ export async function deriveTask(
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
       visibility,
       masterId: session.user.id,
+      tags: parseTags(formData),
     },
   });
 
@@ -271,7 +278,10 @@ export async function updateTaskInfo(
   if (!title) return "제목을 입력하세요.";
   const memo = (formData.get("memo") as string | null)?.trim() || null;
 
-  await prisma.task.update({ where: { id: taskId }, data: { title, memo } });
+  await prisma.task.update({
+    where: { id: taskId },
+    data: { title, memo, tags: parseTags(formData) },
+  });
   revalidatePath(`/projects/${task.projectId}`);
 }
 
@@ -300,7 +310,17 @@ export async function transferMaster(taskId: string, formData: FormData) {
   const isEligible = task.participants.some((p) => p.userId === newMasterId);
   if (!isEligible) throw new Error("참여자에게만 위임할 수 있습니다.");
 
-  await prisma.task.update({ where: { id: taskId }, data: { masterId: newMasterId } });
+  await prisma.$transaction([
+    prisma.task.update({ where: { id: taskId }, data: { masterId: newMasterId } }),
+    prisma.notification.create({
+      data: {
+        userId: newMasterId,
+        type: "MASTER_DELEGATED",
+        refId: task.id,
+        message: `"${task.title}" 업무의 master로 위임되었습니다.`,
+      },
+    }),
+  ]);
   revalidatePath(`/projects/${task.projectId}`);
 }
 
@@ -338,15 +358,23 @@ export async function inviteToTask(
     if (!validIds.has(g.taskId)) return "잘못된 요청입니다.";
   }
 
-  await prisma.$transaction(
-    grants.map((g) =>
+  await prisma.$transaction([
+    ...grants.map((g) =>
       prisma.taskParticipant.upsert({
         where: { taskId_userId: { taskId: g.taskId, userId: user.id } },
         update: { includeSubtree: g.includeSubtree },
         create: { taskId: g.taskId, userId: user.id, includeSubtree: g.includeSubtree },
       }),
     ),
-  );
+    prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: "TASK_INVITED",
+        refId: task.id,
+        message: `"${task.title}" 업무에 초대되었습니다.`,
+      },
+    }),
+  ]);
 
   revalidatePath(`/projects/${task.projectId}`);
 }
