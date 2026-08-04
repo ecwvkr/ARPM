@@ -43,6 +43,7 @@ export function WidthContainer({
             key={w}
             type="button"
             onClick={() => choose(w)}
+            aria-pressed={width === w}
             className={
               width === w
                 ? "font-medium text-foreground underline underline-offset-2"

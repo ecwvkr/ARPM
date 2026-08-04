@@ -10,7 +10,7 @@ export function LogoutButton() {
         await signOut({ redirectTo: "/login" });
       }}
     >
-      <Button variant="outline" size="icon" type="submit" title="로그아웃">
+      <Button variant="outline" size="icon" type="submit" title="로그아웃" aria-label="로그아웃" className="size-11">
         <LogOut className="size-4" />
       </Button>
     </form>

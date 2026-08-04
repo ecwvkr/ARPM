@@ -40,7 +40,7 @@ export function NotificationBell() {
     >
       <PopoverTrigger
         render={
-          <Button variant="outline" size="icon" className="relative">
+          <Button variant="outline" size="icon" className="relative size-11" aria-label="알림">
             <Bell className="size-4" />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />

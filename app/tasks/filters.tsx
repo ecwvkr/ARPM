@@ -23,6 +23,7 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
       <select
         value={searchParams.get("projectId") ?? ""}
         onChange={(e) => setParam("projectId", e.target.value)}
+        aria-label="프로젝트 필터"
         className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
       >
         <option value="">전체 프로젝트</option>
@@ -36,6 +37,7 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
       <select
         value={searchParams.get("status") ?? ""}
         onChange={(e) => setParam("status", e.target.value)}
+        aria-label="상태 필터"
         className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
       >
         <option value="">전체 상태</option>
@@ -58,6 +60,7 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
       <button
         type="button"
         onClick={() => setParam("mine", mine ? "" : "1")}
+        aria-pressed={mine}
         className={
           mine
             ? "rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"

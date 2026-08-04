@@ -16,6 +16,7 @@ export function VisibilityForm({
     <form action={action} className="flex items-center gap-2">
       <select
         name="visibility"
+        aria-label="공개 범위"
         defaultValue={visibility}
         className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
       >

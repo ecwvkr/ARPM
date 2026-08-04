@@ -255,6 +255,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             >
               <select
                 name="visibility"
+                aria-label="공개 범위"
                 defaultValue={task.visibility}
                 className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
               >
@@ -291,6 +292,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
               >
                 <select
                   name="userId"
+                  aria-label="master 위임 대상"
                   className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
                 >
                   {task.participants.map((p) => (
@@ -506,6 +508,7 @@ function MoveForm({
     >
       <select
         name="parentId"
+        aria-label="부모 업무"
         defaultValue={currentParentId ?? ""}
         className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
       >

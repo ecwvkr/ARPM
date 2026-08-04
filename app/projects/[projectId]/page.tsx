@@ -9,7 +9,7 @@ import { InviteForm } from "./invite-form";
 import { AdminControls } from "./admin-controls";
 import { TaskList } from "./task-list";
 import { NewTaskDialog } from "./new-task-dialog";
-import { TaskCanvas } from "./task-canvas";
+import { TaskCanvas } from "./canvas-loader";
 import { TaskStatusGroups } from "./task-status-groups";
 import { TaskKanban } from "./task-kanban";
 import { WidthContainer } from "@/components/width-container";

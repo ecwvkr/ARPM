@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { pickForeground } from "@/lib/color";
 import { BottomNav } from "@/components/bottom-nav";
 import "./globals.css";
 
@@ -23,7 +24,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       })
     : null;
   const accentStyle = user?.accentColor
-    ? ({ "--primary": user.accentColor, "--ring": user.accentColor } as CSSProperties)
+    ? ({
+        "--primary": user.accentColor,
+        "--ring": user.accentColor,
+        "--primary-foreground": pickForeground(user.accentColor),
+      } as CSSProperties)
     : undefined;
 
   return (
