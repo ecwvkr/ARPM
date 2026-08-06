@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { IconLogout } from "@tabler/icons-react";
 import { signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
 
@@ -11,7 +11,7 @@ export function LogoutButton() {
       }}
     >
       <Button variant="outline" size="icon" type="submit" title="로그아웃" aria-label="로그아웃" className="size-11">
-        <LogOut className="size-4" />
+        <IconLogout className="size-4" />
       </Button>
     </form>
   );

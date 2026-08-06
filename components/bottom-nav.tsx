@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Folder, Calendar, Waypoints, Settings } from "lucide-react";
+import { IconLayoutGrid, IconFolder, IconCalendar, IconSitemap, IconSettings } from "@tabler/icons-react";
 
 const ITEMS = [
-  { label: "대시보드", href: "/", icon: LayoutGrid },
-  { label: "프로젝트", href: "/", icon: Folder },
-  { label: "캘린더", href: null, icon: Calendar },
-  { label: "캔버스", href: null, icon: Waypoints },
-  { label: "설정", href: "/settings", icon: Settings },
+  { label: "대시보드", href: "/", icon: IconLayoutGrid },
+  { label: "프로젝트", href: "/", icon: IconFolder },
+  { label: "캘린더", href: null, icon: IconCalendar },
+  { label: "캔버스", href: null, icon: IconSitemap },
+  { label: "설정", href: "/settings", icon: IconSettings },
 ] as const;
 
 export function BottomNav() {

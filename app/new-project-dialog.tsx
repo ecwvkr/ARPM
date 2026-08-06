@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createProject } from "@/app/actions/projects";
-import { Plus } from "lucide-react";
+import { IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,7 @@ export function NewProjectDialog() {
             variant="outline"
             className="w-full rounded-full border-[0.5px] py-6"
           >
-            <Plus className="size-5" />
+            <IconPlus className="size-5" />
           </Button>
         }
       />

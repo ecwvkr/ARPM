@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Bell } from "lucide-react";
+import { IconBell } from "@tabler/icons-react";
 import { listMyNotifications, markAllNotificationsRead } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -41,7 +41,7 @@ export function NotificationBell() {
       <PopoverTrigger
         render={
           <Button variant="outline" size="icon" className="relative size-11" aria-label="알림">
-            <Bell className="size-4" />
+            <IconBell className="size-4" />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />
             )}
