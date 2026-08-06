@@ -12,6 +12,7 @@ import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCanvas } from "./canvas-loader";
 import { TaskStatusGroups } from "./task-status-groups";
 import { TaskKanban } from "./task-kanban";
+import { TaskDeepLink } from "./task-deep-link";
 import { WidthContainer } from "@/components/width-container";
 
 export default async function ProjectDetailPage({
@@ -138,6 +139,8 @@ export default async function ProjectDetailPage({
           )}
         </section>
       </WidthContainer>
+
+      <TaskDeepLink />
     </div>
   );
 }

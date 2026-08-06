@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { LogoutButton } from "@/app/logout-button";
 import { WidthContainer } from "@/components/width-container";
 import { AccentColorForm } from "./accent-color-form";
+import { CreateAccountForm } from "./create-account-form";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -23,6 +24,16 @@ export default async function SettingsPage() {
           </p>
           <AccentColorForm currentColor={session.user.accentColor} />
         </section>
+
+        {session.user.isSuperAdmin && (
+          <section className="space-y-2">
+            <h2 className="text-sm font-medium">계정 관리</h2>
+            <p className="text-sm text-muted-foreground">
+              새 팀원 계정을 직접 발급합니다. 자유 가입은 지원하지 않습니다.
+            </p>
+            <CreateAccountForm />
+          </section>
+        )}
       </WidthContainer>
     </div>
   );

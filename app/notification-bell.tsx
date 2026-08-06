@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { IconBell } from "@tabler/icons-react";
 import { listMyNotifications, markAllNotificationsRead } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ type Notification = {
   message: string;
   isRead: boolean;
   createdAt: Date;
+  href: string | null;
 };
 
 export function NotificationBell() {
@@ -72,17 +74,26 @@ export function NotificationBell() {
           {!isPending && notifications.length === 0 && (
             <p className="px-1 py-2 text-sm text-muted-foreground">알림이 없습니다.</p>
           )}
-          {notifications.map((n) => (
-            <div
-              key={n.id}
-              className={`rounded-md px-2 py-1.5 text-sm ${n.isRead ? "text-muted-foreground" : "bg-accent"}`}
-            >
-              {n.message}
-              <div className="text-xs text-muted-foreground">
-                {new Date(n.createdAt).toLocaleString("ko-KR")}
+          {notifications.map((n) => {
+            const className = `block rounded-md px-2 py-1.5 text-sm ${n.isRead ? "text-muted-foreground" : "bg-accent"}`;
+            const body = (
+              <>
+                {n.message}
+                <div className="text-xs text-muted-foreground">
+                  {new Date(n.createdAt).toLocaleString("ko-KR")}
+                </div>
+              </>
+            );
+            return n.href ? (
+              <Link key={n.id} href={n.href} className={`${className} hover:bg-muted`} onClick={() => setOpen(false)}>
+                {body}
+              </Link>
+            ) : (
+              <div key={n.id} className={className}>
+                {body}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </PopoverContent>
     </Popover>
