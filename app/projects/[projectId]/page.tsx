@@ -35,7 +35,7 @@ export default async function ProjectDetailPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b-[0.5px] px-6 py-4">
+      <header className="flex items-center justify-between px-6 py-4 shadow-sm">
         <div className="space-y-1">
           <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
             ← 전체 프로젝트

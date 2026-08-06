@@ -131,7 +131,7 @@
     "donts": [
       "Don't give 진행전 and 진행중 different status-badge colors — they intentionally share the \"open\" black.",
       "Don't add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.",
-      "Don't assume every hand-built surface matches this system yet: the dashboard summary cards and the header/bottom-nav still use the earlier flat/hairline-border language (project-card.tsx and task-card.tsx were brought in line with the Float-or-Flat Rule). Reconciling the rest is a deliberate future pass, not an oversight to silently fix."
+"Don't assume every hairline divider in the app is gone: task-status-groups.tsx's internal section divider and the desktop width-toggle bar still use the old 0.5px hairline border — minor secondary chrome, out of scope for this pass. The dashboard summary cards, project/task cards, and header/bottom-nav are now fully unified with the Float-or-Flat Rule."
     ]
   }
 }

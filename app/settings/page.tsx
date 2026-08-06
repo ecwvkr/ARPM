@@ -10,7 +10,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b-[0.5px] px-6 py-4">
+      <header className="flex items-center justify-between px-6 py-4 shadow-sm">
         <h1 className="text-base font-medium">설정</h1>
         <LogoutButton />
       </header>

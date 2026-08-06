@@ -39,7 +39,7 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b-[0.5px] px-6 py-4">
+      <header className="flex items-center justify-between px-6 py-4 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
             AR
@@ -101,7 +101,7 @@ export default async function DashboardPage({
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border-[0.5px] bg-card p-4 text-center">
+    <div className="rounded-4xl bg-card p-4 text-center shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-2xl font-black">{value}개</p>
     </div>

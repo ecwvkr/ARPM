@@ -149,6 +149,7 @@ Elevation now means something different than before: **containers float, control
 - **Popover lift** (`shadow-lg`): notification/menu popovers.
 - **Drawer lift** (`shadow-xl`-equivalent, `bg-black/30` backdrop): the task-detail Sheet.
 - **Canvas-lift** (`shadow-sm`): React Flow task nodes, unchanged — still the lightest touch in the system since it only needs to separate from the canvas grid, not float above the whole page.
+- **Chrome separator** (`shadow-sm` on the header; `shadow-[0_-1px_3px_rgba(0,0,0,0.06)]` on the bottom nav): the fixed top header and bottom navigation bar no longer use a hairline border to separate from content — they cast a soft shadow toward the content instead, consistent with the system-wide move away from hairline dividers.
 
 ### Named Rules
 **The Float-or-Flat Rule.** If a component is a container people read other components *inside of* (Card, Dialog, Popover, Sheet), it floats — real shadow, real lift. If it's a single control (Button, Input, Textarea, Checkbox, Badge), it stays flat — no shadow, ever. There is no in-between tier.
@@ -182,6 +183,7 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 - **Card** (shadcn primitive): 26px radius, Paper background, `shadow-md` + subtle ring, generous internal padding (24px). Used inside dialogs/task detail.
 - **Task Card** (hand-built, now unified): 26px radius, Paper background, `shadow-md` + subtle ring — hairline border removed in favor of the same float treatment as the Card primitive. Hover deepens to `shadow-lg` rather than tinting the fill.
 - **Project Card** (hand-built, now unified): 26px radius, Paper background, `shadow-md` + subtle ring — the flat Fog-gray fill is gone; it now floats like every other container. Hover deepens to `shadow-lg`.
+- **Dashboard Summary Card** (hand-built, now unified): same 26px/`shadow-md`/ring treatment as Task Card and Project Card — the hairline border is gone.
 
 ### Inputs / Fields
 - **Style:** 22px radius, transparent border, filled `bg-input/50` background (no longer a hairline-bordered transparent field), 36px height.
@@ -190,7 +192,7 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 - **Native `<select>` elements** still share this input visual language rather than a distinct control.
 
 ### Navigation
-- **Top header / Bottom Navigation:** unchanged by this pass — still flat, Paper background, 0.5px Hairline divider, no shadow. Icons are now Tabler (`IconLayoutGrid`, `IconFolder`, `IconCalendar`, `IconSitemap`, `IconSettings`) instead of Lucide.
+- **Top header / Bottom Navigation:** Paper background, no border — separation from content is now a soft chrome-separator shadow (see Elevation & Depth) rather than a hairline divider. Icons are Tabler (`IconLayoutGrid`, `IconFolder`, `IconCalendar`, `IconSitemap`, `IconSettings`) instead of Lucide.
 
 ## Do's and Don'ts
 
@@ -204,4 +206,4 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 ### Don't:
 - **Don't** give 진행전 and 진행중 different status-badge colors — they intentionally share the "open" black.
 - **Don't** add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.
-- **Don't** assume every hand-built surface matches this system yet: the dashboard summary cards and the header/bottom-nav still use the earlier flat/hairline-border language (`project-card.tsx` and `task-card.tsx` were brought in line with the Float-or-Flat Rule; the rest have not been touched). Reconciling the remaining ones is a deliberate future pass, not an oversight to silently "fix" — treat the split as the current, real state.
+- **Don't** assume every hairline divider in the app is gone: `task-status-groups.tsx`'s internal section divider and the desktop width-toggle bar (`width-container.tsx`) still use the old 0.5px hairline border — they're minor, secondary chrome, not top-level surfaces, and weren't in scope for this pass. The dashboard summary cards, project/task cards, and header/bottom-nav are now fully unified with the Float-or-Flat Rule.
