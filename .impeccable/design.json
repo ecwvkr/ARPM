@@ -89,12 +89,12 @@
       "css": ".ds-float-card { border-radius: 26px; background: #ffffff; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.06), 0 0 0 1px rgba(10,10,10,0.05); } .ds-float-card-title { font-size: 16px; font-weight: 500; color: #0a0a0a; margin: 0 0 8px; } .ds-float-card-body { font-size: 14px; color: #737373; margin: 0; }"
     },
     {
-      "name": "Task Card (hand-built, unchanged)",
+      "name": "Task Card (hand-built, unified)",
       "kind": "card",
       "refersTo": "task-card",
-      "description": "Still flat and hairline-bordered — the shadcn preset did not touch this file. Documents the current split identity between shadcn primitives and app-level surfaces.",
+      "description": "Brought in line with the Float-or-Flat Rule: hairline border replaced with the same shadow-lift as the Card primitive.",
       "html": "<button class=\"ds-task-card\"><div class=\"ds-task-card-top\"><h3 class=\"ds-task-card-title\">배포 준비</h3><span class=\"ds-badge ds-badge-outline\">공개</span></div><div class=\"ds-task-card-badges\"><span class=\"ds-badge ds-badge-open\">진행중</span><span class=\"ds-badge ds-badge-overdue\">지연</span></div><div class=\"ds-task-card-meta\"><p>master: 총관리자</p><p>참여자 0명 · 코멘트 0개</p></div></button>",
-      "css": ".ds-task-card { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; border-radius: 14px; border: 0.5px solid #e5e5e5; background: #ffffff; padding: 16px; cursor: pointer; } .ds-task-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; } .ds-task-card-title { font-size: 14px; font-weight: 500; color: #0a0a0a; margin: 0; } .ds-badge-outline { background: transparent; border: 1px solid #e5e5e5; color: #0a0a0a; } .ds-task-card-badges { display: flex; flex-wrap: wrap; gap: 6px; } .ds-task-card-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #737373; } .ds-task-card-meta p { margin: 0; }"
+      "css": ".ds-task-card { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; border-radius: 26px; background: #ffffff; padding: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.06), 0 0 0 1px rgba(10,10,10,0.05); cursor: pointer; transition: box-shadow 150ms ease; } .ds-task-card:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1), 0 0 0 1px rgba(10,10,10,0.05); } .ds-task-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; } .ds-task-card-title { font-size: 14px; font-weight: 500; color: #0a0a0a; margin: 0; } .ds-badge-outline { background: transparent; border: 1px solid #e5e5e5; color: #0a0a0a; } .ds-task-card-badges { display: flex; flex-wrap: wrap; gap: 6px; } .ds-task-card-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #737373; } .ds-task-card-meta p { margin: 0; }"
     },
     {
       "name": "Bottom Navigation",
@@ -131,7 +131,7 @@
     "donts": [
       "Don't give 진행전 and 진행중 different status-badge colors — they intentionally share the \"open\" black.",
       "Don't add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.",
-      "Don't assume the whole app already matches this system: project-card.tsx, task-card.tsx, the dashboard summary cards, and the header/bottom-nav are hand-built and still use the earlier flat/hairline-border language. Reconciling the two is a deliberate future pass, not an oversight to silently fix."
+      "Don't assume every hand-built surface matches this system yet: the dashboard summary cards and the header/bottom-nav still use the earlier flat/hairline-border language (project-card.tsx and task-card.tsx were brought in line with the Float-or-Flat Rule). Reconciling the rest is a deliberate future pass, not an oversight to silently fix."
     ]
   }
 }

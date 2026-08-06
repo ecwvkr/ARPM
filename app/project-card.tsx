@@ -18,7 +18,7 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="flex aspect-4/3 flex-col justify-between rounded-2xl bg-secondary p-4 transition-colors hover:bg-accent"
+      className="flex aspect-4/3 flex-col justify-between rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-bold">{project.name}</h3>

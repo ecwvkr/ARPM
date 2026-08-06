@@ -179,9 +179,9 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 - **Visibility:** 공개 = Fog-filled secondary badge; 비공개 = outlined badge — the one badge variant still using a real border.
 
 ### Cards / Containers
-- **Card** (shadcn primitive): 26px radius, Paper background, `shadow-md` + subtle ring, generous internal padding (24px). Used inside dialogs/task detail, not for the hand-built project/task cards (see Do's and Don'ts).
-- **Task Card** (hand-built, unchanged by this pass): 14px radius, Paper background, 0.5px Hairline border, flat — no shadow.
-- **Project Card** (hand-built, unchanged): 18px radius, flat Fog-gray fill, no border, no shadow.
+- **Card** (shadcn primitive): 26px radius, Paper background, `shadow-md` + subtle ring, generous internal padding (24px). Used inside dialogs/task detail.
+- **Task Card** (hand-built, now unified): 26px radius, Paper background, `shadow-md` + subtle ring — hairline border removed in favor of the same float treatment as the Card primitive. Hover deepens to `shadow-lg` rather than tinting the fill.
+- **Project Card** (hand-built, now unified): 26px radius, Paper background, `shadow-md` + subtle ring — the flat Fog-gray fill is gone; it now floats like every other container. Hover deepens to `shadow-lg`.
 
 ### Inputs / Fields
 - **Style:** 22px radius, transparent border, filled `bg-input/50` background (no longer a hairline-bordered transparent field), 36px height.
@@ -204,4 +204,4 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 ### Don't:
 - **Don't** give 진행전 and 진행중 different status-badge colors — they intentionally share the "open" black.
 - **Don't** add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.
-- **Don't** assume the whole app already matches this system: `project-card.tsx`, `task-card.tsx`, the dashboard summary cards, and the header/bottom-nav are hand-built and still use the earlier flat/hairline-border language (this shadcn preset only touched `components/ui/*`, `app/globals.css`, and `app/layout.tsx`). Reconciling the two is a deliberate future pass, not an oversight to silently "fix" — treat the split as the current, real state.
+- **Don't** assume every hand-built surface matches this system yet: the dashboard summary cards and the header/bottom-nav still use the earlier flat/hairline-border language (`project-card.tsx` and `task-card.tsx` were brought in line with the Float-or-Flat Rule; the rest have not been touched). Reconciling the remaining ones is a deliberate future pass, not an oversight to silently "fix" — treat the split as the current, real state.

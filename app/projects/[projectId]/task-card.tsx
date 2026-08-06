@@ -40,7 +40,7 @@ export function TaskCard({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex flex-col gap-2 rounded-xl border-[0.5px] bg-card p-4 text-left transition-colors hover:bg-accent/50"
+        className="flex flex-col gap-2 rounded-4xl bg-card p-4 text-left shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10"
       >
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-medium">{title}</h3>
