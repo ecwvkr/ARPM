@@ -39,6 +39,10 @@ type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
 export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [isPending, startTransition] = useTransition();
+  // ponytail: 공유 관리/부모 변경은 드로어를 열자마자가 아니라 실제로 펼쳤을 때만 불러온다
+  // (각각 프로젝트 전체 업무 트리를 다시 조회하는 무거운 호출이라 미리 불러올 필요가 없음).
+  const [showInvite, setShowInvite] = useState(false);
+  const [showMove, setShowMove] = useState(false);
 
   const reload = () => {
     startTransition(async () => {
@@ -268,13 +272,29 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           </section>
 
           <section className="space-y-2">
-            <h3 className="text-sm font-medium">참여자 초대 (공유 범위 지정)</h3>
-            <InviteForm taskId={taskId} onDone={afterMutation} />
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">참여자 초대 (공유 범위 지정)</h3>
+              {!showInvite && (
+                <Button size="sm" variant="outline" onClick={() => setShowInvite(true)}>
+                  열기
+                </Button>
+              )}
+            </div>
+            {showInvite && <InviteForm taskId={taskId} onDone={afterMutation} />}
           </section>
 
           <section className="space-y-2">
-            <h3 className="text-sm font-medium">부모 변경</h3>
-            <MoveForm taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">부모 변경</h3>
+              {!showMove && (
+                <Button size="sm" variant="outline" onClick={() => setShowMove(true)}>
+                  열기
+                </Button>
+              )}
+            </div>
+            {showMove && (
+              <MoveForm taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
+            )}
           </section>
 
           {task.participants.length > 0 && (
