@@ -37,7 +37,7 @@ export function WidthContainer({
 
   return (
     <>
-      <div className="hidden justify-end gap-2 border-b-[0.5px] px-6 py-1.5 text-xs text-muted-foreground lg:flex">
+      <div className="hidden justify-end gap-2 px-6 py-1.5 text-xs text-muted-foreground shadow-sm lg:flex">
         {Object.keys(WIDTHS).map((w) => (
           <button
             key={w}

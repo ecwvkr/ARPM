@@ -28,12 +28,16 @@ export async function TaskStatusGroups({
       {GROUPS.map((group) => {
         const groupTasks = tasks.filter((t) => t.status === group.status);
         return (
-          <details key={group.status} className="rounded-xl border-[0.5px]" open>
+          <details
+            key={group.status}
+            className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10"
+            open
+          >
             <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
               {group.label} ({groupTasks.length})
             </summary>
             {groupTasks.length > 0 && (
-              <div className="grid grid-cols-1 gap-3 border-t-[0.5px] p-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
                 {groupTasks.map((task) => (
                   <TaskCard
                     key={task.id}

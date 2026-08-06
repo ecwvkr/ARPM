@@ -162,7 +162,7 @@ Meaningfully rounder than before, still built off the same base radius token (`-
 - **18px (`rounded-2xl`)** — Textarea.
 - **Fully round** — Button (pill, given its height), the "AR" logo mark, the primary "+" add-project action.
 
-Borders inside the shadcn primitives have mostly given way to `border-transparent` + a filled/tinted background (Input, Textarea, Checkbox) — the hairline-border language survives only in the hand-built app surfaces that the preset didn't touch (see Do's and Don'ts).
+Borders inside the shadcn primitives have mostly given way to `border-transparent` + a filled/tinted background (Input, Textarea, Checkbox). The hairline-border language is now fully retired across every top-level surface in the app — the last hand-built holdouts (project/task/summary cards, the status-group card, the header, the bottom nav, the width-toggle bar) have all moved to the shadow-based Float-or-Flat treatment.
 
 ## Components
 
@@ -184,6 +184,7 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 - **Task Card** (hand-built, now unified): 26px radius, Paper background, `shadow-md` + subtle ring — hairline border removed in favor of the same float treatment as the Card primitive. Hover deepens to `shadow-lg` rather than tinting the fill.
 - **Project Card** (hand-built, now unified): 26px radius, Paper background, `shadow-md` + subtle ring — the flat Fog-gray fill is gone; it now floats like every other container. Hover deepens to `shadow-lg`.
 - **Dashboard Summary Card** (hand-built, now unified): same 26px/`shadow-md`/ring treatment as Task Card and Project Card — the hairline border is gone.
+- **Status Group Card** (hand-built `<details>` in `task-status-groups.tsx`, now unified): same 26px/`shadow-md`/ring container treatment; the internal divider between the summary row and the task grid was removed rather than replaced — padding alone now separates them.
 
 ### Inputs / Fields
 - **Style:** 22px radius, transparent border, filled `bg-input/50` background (no longer a hairline-bordered transparent field), 36px height.
@@ -206,4 +207,4 @@ Borders inside the shadcn primitives have mostly given way to `border-transparen
 ### Don't:
 - **Don't** give 진행전 and 진행중 different status-badge colors — they intentionally share the "open" black.
 - **Don't** add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.
-- **Don't** assume every hairline divider in the app is gone: `task-status-groups.tsx`'s internal section divider and the desktop width-toggle bar (`width-container.tsx`) still use the old 0.5px hairline border — they're minor, secondary chrome, not top-level surfaces, and weren't in scope for this pass. The dashboard summary cards, project/task cards, and header/bottom-nav are now fully unified with the Float-or-Flat Rule.
+- **Don't** reintroduce a 0.5px hairline border anywhere in the app — every surface (project/task/summary/status-group cards, header, bottom nav, desktop width-toggle bar) has been moved to the shadow-based Float-or-Flat treatment. There are no remaining exceptions as of this pass.
