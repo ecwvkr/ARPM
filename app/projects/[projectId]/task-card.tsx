@@ -63,7 +63,7 @@ export function TaskCard({
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-[10px]">
+              <Badge key={tag} variant="outline" className="text-xs">
                 #{tag}
               </Badge>
             ))}
@@ -86,7 +86,7 @@ export function TaskCard({
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent>
+        <SheetContent side="bottom">
           <SheetHeader>
             <SheetTitle>업무 상세</SheetTitle>
           </SheetHeader>

@@ -21,7 +21,7 @@ export function TaskDeepLink() {
 
   return (
     <Sheet open onOpenChange={(o) => { if (!o) close(); }}>
-      <SheetContent>
+      <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle>업무 상세</SheetTitle>
         </SheetHeader>
