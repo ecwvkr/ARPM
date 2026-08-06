@@ -1,30 +1,21 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-04T00:00:00.000Z",
+  "generatedAt": "2026-08-05T00:00:00.000Z",
   "title": "Design System: AR_PM",
   "extensions": {
     "colorMeta": {
-      "ledger-blue": {
+      "console-black": {
         "role": "primary",
-        "displayName": "Ledger Blue",
-        "canonical": "oklch(0.546 0.215 262.88)",
-        "tonalRamp": [
-          "oklch(0.15 0.08 262.88)",
-          "oklch(0.28 0.14 262.88)",
-          "oklch(0.38 0.18 262.88)",
-          "oklch(0.546 0.215 262.88)",
-          "oklch(0.65 0.16 262.88)",
-          "oklch(0.75 0.11 262.88)",
-          "oklch(0.85 0.06 262.88)",
-          "oklch(0.95 0.02 262.88)"
-        ]
+        "displayName": "Console Black",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": ["oklch(0.145 0 0)", "oklch(0.205 0 0)", "oklch(0.269 0 0)", "oklch(0.371 0 0)", "oklch(0.439 0 0)", "oklch(0.556 0 0)", "oklch(0.87 0 0)", "oklch(1 0 0)"]
       },
-      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(1 0 0)", "tonalRamp": ["oklch(0.145 0 0)", "oklch(0.269 0 0)", "oklch(0.371 0 0)", "oklch(0.439 0 0)", "oklch(0.556 0 0)", "oklch(0.87 0 0)", "oklch(0.97 0 0)", "oklch(1 0 0)"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(1 0 0)" },
       "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(0.145 0 0)" },
       "fog": { "role": "neutral", "displayName": "Fog", "canonical": "oklch(0.97 0 0)" },
-      "fog-ink": { "role": "neutral", "displayName": "Fog Ink", "canonical": "oklch(0.205 0 0)" },
       "ash": { "role": "neutral", "displayName": "Ash", "canonical": "oklch(0.556 0 0)" },
       "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "oklch(0.922 0 0)" },
+      "focus-steel": { "role": "neutral", "displayName": "Focus Steel", "canonical": "oklch(0.708 0 0)" },
       "alert-red": {
         "role": "danger",
         "displayName": "Alert Red",
@@ -37,18 +28,18 @@
       "priority-low": { "role": "accent", "displayName": "Priority Low", "canonical": "#e4e4e7" }
     },
     "typographyMeta": {
-      "title": { "displayName": "Title", "purpose": "Page headers, project/task names, dialog titles. System-default sans (see Typography note in DESIGN.md re: Geist not being wired up)." },
+      "title": { "displayName": "Title", "purpose": "Page headers, project/task names, dialog/sheet titles. Inter with an explicit Korean system-font fallback chain." },
       "body": { "displayName": "Body", "purpose": "Default UI text, memos, comments." },
       "label": { "displayName": "Label", "purpose": "Badges, meta rows, nav labels." }
     },
     "shadows": [
-      { "name": "overlay-ring", "value": "0 0 0 1px oklch(0.145 0 0 / 0.1)", "purpose": "Dialog and Popover content — the only elevation on non-floating-adjacent UI." },
-      { "name": "drawer-shadow", "value": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)", "purpose": "Sheet drawer (task detail)." },
-      { "name": "canvas-lift", "value": "0 1px 2px 0 rgba(0,0,0,0.05)", "purpose": "React Flow task nodes, so a node separates from the canvas grid. The one exception to flat-by-default." }
+      { "name": "card-lift", "value": "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.06)", "purpose": "Default resting elevation for the shadcn Card primitive." },
+      { "name": "dialog-lift", "value": "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", "purpose": "Dialog content — heavier backdrop (black/30 + blur-sm) accompanies it." },
+      { "name": "popover-lift", "value": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)", "purpose": "Notification bell / menu popovers." },
+      { "name": "canvas-lift", "value": "0 1px 2px 0 rgba(0,0,0,0.05)", "purpose": "React Flow task nodes — lightest touch, unchanged from before." }
     ],
     "motion": [
-      { "name": "hover-fade", "value": "opacity 150ms ease, background-color 150ms ease", "purpose": "Default hover transition on buttons and cards — no movement, just a fade." },
-      { "name": "active-press", "value": "transform 100ms ease (translateY(1px))", "purpose": "Button press feedback." },
+      { "name": "hover-fade", "value": "opacity 150ms ease, background-color 150ms ease", "purpose": "Default hover transition on buttons and cards." },
       { "name": "overlay-in-out", "value": "150-200ms ease-in-out fade/scale/slide", "purpose": "Dialog fade+zoom, Sheet slide-in-from-edge, Popover fade." }
     ],
     "breakpoints": [
@@ -61,86 +52,86 @@
       "name": "Button — Primary",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The one filled action in the system. Used for the single confirming action in a form or dialog.",
+      "description": "The one filled action in the system. Now a full pill (26px radius) at 36px height, black fill instead of a brand hue.",
       "html": "<button class=\"ds-btn-primary\">저장</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: #2563eb; color: #ffffff; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: opacity 150ms ease; } .ds-btn-primary:hover { opacity: 0.8; } .ds-btn-primary:focus-visible { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.5); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:disabled { pointer-events: none; opacity: 0.5; }"
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 26px; border: 1px solid transparent; background: #171717; color: #ffffff; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: opacity 150ms ease; } .ds-btn-primary:hover { opacity: 0.8; } .ds-btn-primary:focus-visible { outline: none; border-color: #171717; box-shadow: 0 0 0 3px rgba(23,23,23,0.3); } .ds-btn-primary:disabled { pointer-events: none; opacity: 0.5; }"
     },
     {
       "name": "Button — Outline",
       "kind": "button",
       "refersTo": "button-outline",
-      "description": "The default secondary action — most buttons in the app (저장, 초대, 이동, 위임) are this variant, not the primary.",
+      "description": "Default secondary action — most buttons in the app are this variant.",
       "html": "<button class=\"ds-btn-outline\">저장</button>",
-      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid #e5e5e5; background: #ffffff; color: #0a0a0a; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-outline:hover { background: #f5f5f5; } .ds-btn-outline:focus-visible { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.5); } .ds-btn-outline:active { transform: translateY(1px); }"
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 26px; border: 1px solid #e5e5e5; background: #ffffff; color: #0a0a0a; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-outline:hover { background: #f5f5f5; } .ds-btn-outline:focus-visible { outline: none; border-color: #171717; box-shadow: 0 0 0 3px rgba(23,23,23,0.3); }"
     },
     {
       "name": "Input — Text Field",
       "kind": "input",
       "refersTo": "input",
-      "description": "Shared visual language across text inputs and native <select> elements — no distinct dropdown component exists.",
+      "description": "Now a filled pill (22px radius, no border, tinted background) instead of a hairline-bordered transparent field.",
       "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"이메일로 초대\" />",
-      "css": ".ds-input { display: block; width: 100%; height: 32px; padding: 4px 10px; border-radius: 10px; border: 1px solid #e5e5e5; background: transparent; font-size: 14px; color: #0a0a0a; } .ds-input::placeholder { color: #737373; } .ds-input:focus-visible { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.5); } .ds-input:disabled { pointer-events: none; opacity: 0.5; background: rgba(229,229,229,0.5); }"
+      "css": ".ds-input { display: block; width: 100%; height: 36px; padding: 4px 12px; border-radius: 22px; border: 1px solid transparent; background: rgba(229,229,229,0.5); font-size: 14px; color: #0a0a0a; } .ds-input::placeholder { color: #737373; } .ds-input:focus-visible { outline: none; border-color: #171717; box-shadow: 0 0 0 3px rgba(23,23,23,0.3); } .ds-input:disabled { pointer-events: none; opacity: 0.5; }"
     },
     {
       "name": "Status Badges",
       "kind": "chip",
       "refersTo": "badge-status-open",
-      "description": "The Two-State Signal Rule in one snippet: open (blue) and closed (gray) are the only status colors; overdue is a separate, always-additional red badge.",
+      "description": "The Two-State Signal Rule, now in black instead of blue: open/closed are the only status colors; overdue is a separate, always-additional red badge.",
       "html": "<div class=\"ds-badge-row\"><span class=\"ds-badge ds-badge-open\">진행중</span><span class=\"ds-badge ds-badge-closed\">종료</span><span class=\"ds-badge ds-badge-overdue\">지연</span></div>",
-      "css": ".ds-badge-row { display: flex; gap: 6px; align-items: center; } .ds-badge { display: inline-flex; align-items: center; justify-content: center; height: 20px; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; white-space: nowrap; } .ds-badge-open { background: #2563eb; color: #ffffff; } .ds-badge-closed { background: #f5f5f5; color: #171717; } .ds-badge-overdue { background: #e7000b; color: #ffffff; }"
+      "css": ".ds-badge-row { display: flex; gap: 6px; align-items: center; } .ds-badge { display: inline-flex; align-items: center; justify-content: center; height: 20px; padding: 2px 8px; border-radius: 22px; font-size: 12px; font-weight: 500; white-space: nowrap; } .ds-badge-open { background: #171717; color: #ffffff; } .ds-badge-closed { background: #f5f5f5; color: #171717; } .ds-badge-overdue { background: #e7000b; color: #ffffff; }"
     },
     {
-      "name": "Task Card",
+      "name": "Floating Card (shadcn primitive)",
       "kind": "card",
-      "refersTo": "task-card",
-      "description": "Signature composite: hairline-bordered card, status/overdue badges, muted meta stack, optional tags — the primary unit every task view (list, kanban, status-group, canvas) renders.",
-      "html": "<button class=\"ds-task-card\"><div class=\"ds-task-card-top\"><h3 class=\"ds-task-card-title\">배포 준비</h3><span class=\"ds-badge ds-badge-outline\">공개</span></div><div class=\"ds-task-card-badges\"><span class=\"ds-badge ds-badge-open\">진행중</span><span class=\"ds-badge ds-badge-overdue\">지연</span></div><div class=\"ds-task-card-meta\"><p>master: 총관리자</p><p>참여자 0명 · 코멘트 0개</p><p>기한 2026. 8. 4.</p></div><div class=\"ds-task-card-tags\"><span class=\"ds-badge ds-badge-tag\">#배포</span><span class=\"ds-badge ds-badge-tag\">#급함</span></div></button>",
-      "css": ".ds-task-card { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; border-radius: 14px; border: 0.5px solid #e5e5e5; background: #ffffff; padding: 16px; cursor: pointer; transition: background-color 150ms ease; } .ds-task-card:hover { background: rgba(245,245,245,0.5); } .ds-task-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; } .ds-task-card-title { font-size: 14px; font-weight: 500; color: #0a0a0a; margin: 0; } .ds-badge-outline { background: transparent; border: 1px solid #e5e5e5; color: #0a0a0a; } .ds-task-card-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .ds-task-card-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #737373; } .ds-task-card-meta p { margin: 0; } .ds-task-card-tags { display: flex; flex-wrap: wrap; gap: 4px; } .ds-badge-tag { background: transparent; border: 1px solid #e5e5e5; color: #0a0a0a; font-size: 10px; }"
+      "refersTo": "card",
+      "description": "The new 'containers float' language: 26px radius, real shadow + subtle ring, generous padding. Used inside dialogs/detail panes — not the hand-built app-level cards below.",
+      "html": "<div class=\"ds-float-card\"><h3 class=\"ds-float-card-title\">카드 제목</h3><p class=\"ds-float-card-body\">카드 안 내용이 여기에 들어갑니다.</p></div>",
+      "css": ".ds-float-card { border-radius: 26px; background: #ffffff; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.06), 0 0 0 1px rgba(10,10,10,0.05); } .ds-float-card-title { font-size: 16px; font-weight: 500; color: #0a0a0a; margin: 0 0 8px; } .ds-float-card-body { font-size: 14px; color: #737373; margin: 0; }"
     },
     {
-      "name": "Project Card",
+      "name": "Task Card (hand-built, unchanged)",
       "kind": "card",
       "refersTo": "task-card",
-      "description": "The one card style that trades the hairline-border language for a flat neutral fill — the top-level entry point deliberately reads slightly heavier than the task cards nested inside it.",
-      "html": "<a href=\"#\" class=\"ds-project-card\"><div class=\"ds-project-card-top\"><h3 class=\"ds-project-card-title\">웹사이트 리뉴얼</h3><span class=\"ds-badge ds-project-card-visibility\">비공개</span></div><div class=\"ds-project-card-stats\"><p>업무 6개</p><p>진행중 3개</p></div></a>",
-      "css": ".ds-project-card { display: flex; flex-direction: column; justify-content: space-between; aspect-ratio: 4 / 3; border-radius: 18px; background: #f5f5f5; padding: 16px; text-decoration: none; transition: background-color 150ms ease; } .ds-project-card:hover { background: #ececec; } .ds-project-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; } .ds-project-card-title { font-size: 16px; font-weight: 700; color: #0a0a0a; margin: 0; } .ds-project-card-visibility { background: #ffffff; color: #0a0a0a; padding: 2px 12px; } .ds-project-card-stats { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: #737373; } .ds-project-card-stats p { margin: 0; }"
+      "description": "Still flat and hairline-bordered — the shadcn preset did not touch this file. Documents the current split identity between shadcn primitives and app-level surfaces.",
+      "html": "<button class=\"ds-task-card\"><div class=\"ds-task-card-top\"><h3 class=\"ds-task-card-title\">배포 준비</h3><span class=\"ds-badge ds-badge-outline\">공개</span></div><div class=\"ds-task-card-badges\"><span class=\"ds-badge ds-badge-open\">진행중</span><span class=\"ds-badge ds-badge-overdue\">지연</span></div><div class=\"ds-task-card-meta\"><p>master: 총관리자</p><p>참여자 0명 · 코멘트 0개</p></div></button>",
+      "css": ".ds-task-card { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; border-radius: 14px; border: 0.5px solid #e5e5e5; background: #ffffff; padding: 16px; cursor: pointer; } .ds-task-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; } .ds-task-card-title { font-size: 14px; font-weight: 500; color: #0a0a0a; margin: 0; } .ds-badge-outline { background: transparent; border: 1px solid #e5e5e5; color: #0a0a0a; } .ds-task-card-badges { display: flex; flex-wrap: wrap; gap: 6px; } .ds-task-card-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #737373; } .ds-task-card-meta p { margin: 0; }"
     },
     {
       "name": "Bottom Navigation",
       "kind": "nav",
       "refersTo": "badge-status-open",
-      "description": "Signature persistent nav, fixed on every authenticated screen. Not-yet-built tabs render dimmed and inert rather than being hidden, so the app's intended full shape is always visible.",
-      "html": "<nav class=\"ds-bottom-nav\"><ul class=\"ds-bottom-nav-list\"><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-active\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg>대시보드</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z\"/></svg>프로젝트</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 10h18M8 2v4M16 2v4\"/></svg>캘린더</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"6\" r=\"2\"/><path d=\"M6 16V9a2 2 0 0 1 2-2h8\"/></svg>캔버스</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z\"/></svg>설정</a></li></ul></nav>",
+      "description": "Unchanged layout, now with Tabler iconography app-wide (Lucide fully removed). Not-yet-built tabs render dimmed and inert rather than hidden.",
+      "html": "<nav class=\"ds-bottom-nav\"><ul class=\"ds-bottom-nav-list\"><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-active\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"4\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"14\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"4\" y=\"14\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" rx=\"1\"/></svg>대시보드</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z\"/></svg>프로젝트</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"6\" cy=\"17\" r=\"2\"/><circle cx=\"12\" cy=\"7\" r=\"2\"/><circle cx=\"18\" cy=\"17\" r=\"2\"/><path d=\"M12 9v4M8 15.5 10.5 11M16 15.5 13.5 11\"/></svg>캔버스</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z\"/></svg>설정</a></li></ul></nav>",
       "css": ".ds-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; border-top: 0.5px solid #e5e5e5; background: #ffffff; } .ds-bottom-nav-list { display: flex; align-items: stretch; justify-content: space-between; max-width: 768px; margin: 0 auto; list-style: none; padding: 0; } .ds-bottom-nav-item { flex: 1; } .ds-bottom-nav-link { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; font-size: 12px; color: #737373; text-decoration: none; } .ds-bottom-nav-link.ds-active { color: #0a0a0a; font-weight: 500; } .ds-bottom-nav-link.ds-disabled { color: rgba(115,115,115,0.4); cursor: not-allowed; } .ds-bottom-nav-icon { width: 20px; height: 20px; }"
     }
   ],
   "narrative": {
-    "northStar": "The Team Ledger",
-    "overview": "AR_PM is built for a small trusted team, not a public audience — the visual system behaves like a shared ledger, not a marketing surface. It stays out of the way of the work: one accent color, quiet neutrals, hairline dividers instead of shadows, and Korean sentence-style labels rather than shouty all-caps UI chrome. Nothing competes with the thing the product actually exists to show — the task-derivation tree — so every persistent surface (project cards, task cards, status groups) is flat and understated, and elevation is spent only where something is genuinely floating above the page (a dialog, a sheet, a popover). The system currently expresses exactly one point of color — Ledger Blue — for anything \"open\" or actionable; red is reserved exclusively for urgency (지연/overdue); everything else is graphite-on-white. This is a deliberate, confirmed constraint, not an oversight: the team explicitly wants this to stay minimal and neutral, with room to let end users pick their own accent color later.",
+    "northStar": "The Command Board",
+    "overview": "AR_PM reads less like a quiet ledger now and more like a control surface a team actually commands from: bold, tactile, confident. There is no colored brand hue anywhere in the system — the \"accent\" is simply the darkest point of one continuous black-to-white neutral ramp, so buttons, active status badges, and the logo mark are pure near-black rather than a tinted brand color. Containers — cards, dialogs, popovers, the task-detail sheet — now genuinely float: they carry real, soft shadows and generous rounding (22-26px), a deliberate move away from the earlier flat/hairline treatment. Controls — buttons, inputs, badges, checkboxes — stay flat and filled rather than shadowed, so the floating/flat distinction still tracks which components are \"surfaces\" versus \"instruments\" within them. Red is still the one true hue reserved exclusively for urgency; individual users can opt into a personal accent hue via Settings on top of the monochrome default.",
     "keyCharacteristics": [
-      "One accent color carries all \"active\" meaning; red is reserved for urgency alone.",
-      "Hairline (0.5px) borders and filled-neutral surfaces do the depth work at rest; real shadows appear only on floating overlays (Dialog/Sheet/Popover).",
-      "Pill-shaped badges and pill-shaped primary actions (the \"+\" add button) recur as a soft, rounded accent against otherwise squared-corner cards.",
-      "Sentence-style Korean copy throughout; no label-case, minimal bold."
+      "No brand hue at rest — the primary \"accent\" is the black end of the neutral scale, not a separate color.",
+      "Containers float (soft shadow + 22-26px rounding); controls stay flat and filled.",
+      "Red is reserved exclusively for the overdue signal; users may opt into a personal accent color in Settings.",
+      "Tabler iconography throughout (no more mixed icon libraries).",
+      "Korean-safe typography: Inter carries Latin/numeral text, falling through cleanly to the OS's own Korean UI font for Hangul."
     ],
     "rules": [
-      { "name": "The One Accent Rule", "body": "Ledger Blue is the only color that means \"this is active / do something here.\" Everything else is either neutral (structure) or the single reserved red (urgency). Do not introduce a second brand hue for emphasis — reach for weight, size, or the existing red before adding color.", "section": "colors" },
-      { "name": "The Two-State Signal Rule", "body": "Status badges only ever show two visual states: open (Ledger Blue — covers both 진행전 and 진행중, they are not visually distinguished from each other) and closed (Fog gray — 종료). Urgency is layered on separately via the standalone red 지연 badge; the status badge itself never turns red or green.", "section": "colors" },
-      { "name": "The No-Display-Face Rule", "body": "There is no distinct display/hero typeface anywhere in the system — even the dashboard's largest numerals (summary card counts) are the same face at a larger size/weight, not a different font. Consistent with the \"ledger, not marketing page\" north star.", "section": "typography" },
-      { "name": "The Hairline-Not-Shadow Rule", "body": "Any surface that is part of the page's permanent layout gets a 0.5px hairline border or a flat fill — never a shadow. A shadow appearing on a resting (non-floating) element is a bug, not a style choice.", "section": "elevation" }
+      { "name": "The No-Hue Accent Rule", "body": "The default \"brand color\" is not a color at all — it's black. Before adding an actual brand hue system-wide, add it through the existing per-user Settings override, not as a new hardcoded token.", "section": "colors" },
+      { "name": "The Two-State Signal Rule", "body": "Status badges show only two states: open (Console Black — covers both 진행전 and 진행중) and closed (Fog gray). Urgency is layered on separately via the standalone red 지연 badge.", "section": "colors" },
+      { "name": "The Explicit-Fallback Rule", "body": "Never let --font-sans resolve to a font-only stack without an explicit non-Latin fallback appended — this system shipped broken once already before this fix.", "section": "typography" },
+      { "name": "The Float-or-Flat Rule", "body": "Containers (Card/Dialog/Popover/Sheet) float with real shadow and generous rounding. Controls (Button/Input/Badge/Checkbox) stay flat — no shadow, ever. No in-between tier.", "section": "elevation" }
     ],
     "dos": [
-      "Do keep every persistent surface flat (hairline border or flat neutral fill) and save real box-shadow for Dialog/Sheet/Popover/canvas-node overlays only.",
-      "Do use Ledger Blue for exactly one meaning — \"open / active / do this\" — and reach for weight or the reserved red before adding a second hue.",
-      "Do keep destructive actions in the quieter tinted-red register, not solid Alert Red; solid red is reserved for the 지연 (overdue) signal alone.",
-      "Do use 0.5px borders, not the browser default 1px, on every hairline divider.",
-      "Do keep labels sentence-style Korean; avoid label-case/all-caps chrome."
+      "Do keep the default accent black — reach for the per-user Settings color override before hardcoding a new brand hue anywhere.",
+      "Do give containers real shadow + generous rounding; keep controls flat.",
+      "Do keep destructive actions in the quieter tinted-red register; solid Alert Red stays reserved for the 지연 signal alone.",
+      "Do use only @tabler/icons-react for icons — lucide-react was fully removed.",
+      "Do keep any font-stack change explicit about its non-Latin fallback."
     ],
     "donts": [
-      "Don't add a second brand accent color without deliberate confirmation — the team has explicitly flagged this as a future user-configurable setting (a point-color picker in Settings), not something to freelance today. Until that setting exists, #2563eb stays the one hardcoded accent.",
-      "Don't give 진행전 and 진행중 different status-badge colors — they intentionally share the \"open\" blue; only the separate overdue badge should ever turn red.",
-      "Don't introduce a shadow on a resting card, header, or nav bar — that visual weight is reserved for things that are actually floating above the page.",
-      "Don't assume Geist is what's rendering the type — until the --font-sans wiring gap is fixed, every face on screen is the visitor's OS default sans, not Geist."
+      "Don't give 진행전 and 진행중 different status-badge colors — they intentionally share the \"open\" black.",
+      "Don't add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.",
+      "Don't assume the whole app already matches this system: project-card.tsx, task-card.tsx, the dashboard summary cards, and the header/bottom-nav are hand-built and still use the earlier flat/hairline-border language. Reconciling the two is a deliberate future pass, not an oversight to silently fix."
     ]
   }
 }
