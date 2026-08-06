@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { LogoutButton } from "@/app/logout-button";
 import { WidthContainer } from "@/components/width-container";
 import { AccentColorForm } from "./accent-color-form";
@@ -8,11 +7,6 @@ import { AccentColorForm } from "./accent-color-form";
 export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: session.user.id },
-    select: { accentColor: true },
-  });
 
   return (
     <div className="flex flex-1 flex-col">
@@ -27,7 +21,7 @@ export default async function SettingsPage() {
           <p className="text-sm text-muted-foreground">
             앱 전체에서 강조색으로 쓰이는 색상입니다. 기본값으로 되돌리면 원래 파란색을 사용합니다.
           </p>
-          <AccentColorForm currentColor={user.accentColor} />
+          <AccentColorForm currentColor={session.user.accentColor} />
         </section>
       </WidthContainer>
     </div>

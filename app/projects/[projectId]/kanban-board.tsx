@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { updateTaskStatus, completeTask } from "@/app/actions/tasks";
 import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
 import { TaskCard } from "./task-card";
@@ -13,13 +12,12 @@ const COLUMNS = [
 ];
 
 export function KanbanBoard({ tasks }: { tasks: ProjectTaskSummary[] }) {
-  const router = useRouter();
-
+  // ponytail: updateTaskStatus/completeTask는 내부에서 revalidatePath를 호출하므로
+  // Next가 현재 페이지를 이미 자동 갱신한다. router.refresh()는 중복 새로고침이라 제거.
   async function handleDrop(taskId: string, target: "TODO" | "IN_PROGRESS" | "DONE") {
     try {
       if (target === "DONE") await completeTask(taskId);
       else await updateTaskStatus(taskId, target);
-      router.refresh();
     } catch {
       alert("상태를 변경할 수 없습니다. 권한을 확인하세요.");
     }

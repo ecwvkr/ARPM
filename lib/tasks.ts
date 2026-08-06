@@ -32,19 +32,28 @@ export function sortTasks<
 
 // 가장 가까운 조상의 grant가 우선한다: 전체 공유(true) 상속 도중 특정 가지에 false grant를
 // 두면 그 아래는 차단된다("공유 제외" — §Phase5). 조상에 grant가 전혀 없으면 다음 조상으로 계속.
-async function hasInheritedAccess(startParentId: string | null, userId: string): Promise<boolean> {
-  let currentId = startParentId;
-  while (currentId) {
-    const ancestor = await prisma.task.findUnique({
-      where: { id: currentId },
-      select: {
-        parentId: true,
-        participants: { where: { userId }, select: { includeSubtree: true } },
-      },
-    });
-    if (!ancestor) return false;
-    if (ancestor.participants.length > 0) return ancestor.participants[0].includeSubtree;
-    currentId = ancestor.parentId;
+// ponytail: 조상 단계마다 DB 왕복하는 대신 프로젝트의 트리를 한 번에 읽어 메모리에서 걷는다.
+async function hasInheritedAccess(
+  projectId: string,
+  startParentId: string | null,
+  userId: string,
+): Promise<boolean> {
+  if (!startParentId) return false;
+
+  const tasks = await prisma.task.findMany({
+    where: { projectId },
+    select: {
+      id: true,
+      parentId: true,
+      participants: { where: { userId }, select: { includeSubtree: true } },
+    },
+  });
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+
+  let current = byId.get(startParentId);
+  while (current) {
+    if (current.participants.length > 0) return current.participants[0].includeSubtree;
+    current = current.parentId ? byId.get(current.parentId) : undefined;
   }
   return false;
 }
@@ -78,13 +87,15 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
     };
   }
 
-  const { canView: canViewProject } = await getProjectAccess(task.projectId, userId, isSuperAdmin);
-
   const isMaster = task.masterId === userId;
   const ownGrant = task.participants.find((p) => p.userId === userId);
   // 조상이 이미 true로 포함하고 있는데 이 노드에 false grant가 있다면 "가지 제외"로 보고
   // 이 노드부터 차단한다. 조상 grant가 없다면(=단독 초대) false는 "이 업무만 공유"로 취급한다.
-  const inheritedWouldGrant = !isMaster ? await hasInheritedAccess(task.parentId, userId) : false;
+  // ponytail: 서로 의존하지 않는 두 조회를 병렬로 실행해 순차 왕복을 줄인다.
+  const [{ canView: canViewProject }, inheritedWouldGrant] = await Promise.all([
+    getProjectAccess(task.projectId, userId, isSuperAdmin),
+    isMaster ? Promise.resolve(false) : hasInheritedAccess(task.projectId, task.parentId, userId),
+  ]);
   const grantedAccess = ownGrant
     ? ownGrant.includeSubtree || !inheritedWouldGrant
     : inheritedWouldGrant;

@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { pickForeground } from "@/lib/color";
 import { BottomNav } from "@/components/bottom-nav";
 import "./globals.css";
@@ -17,17 +16,12 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = await auth();
-  const user = session?.user?.id
-    ? await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { accentColor: true },
-      })
-    : null;
-  const accentStyle = user?.accentColor
+  const accentColor = session?.user?.accentColor;
+  const accentStyle = accentColor
     ? ({
-        "--primary": user.accentColor,
-        "--ring": user.accentColor,
-        "--primary-foreground": pickForeground(user.accentColor),
+        "--primary": accentColor,
+        "--ring": accentColor,
+        "--primary-foreground": pickForeground(accentColor),
       } as CSSProperties)
     : undefined;
 

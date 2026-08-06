@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
@@ -30,21 +30,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           isSuperAdmin: user.isSuperAdmin,
+          accentColor: user.accentColor,
         };
       },
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id!;
         token.isSuperAdmin = user.isSuperAdmin;
+        token.accentColor = user.accentColor;
+      }
+      if (trigger === "update" && session?.user) {
+        token.accentColor = session.user.accentColor;
       }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id;
       session.user.isSuperAdmin = token.isSuperAdmin;
+      session.user.accentColor = token.accentColor;
       return session;
     },
   },

@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
   getTaskDetail,
   joinTask,
@@ -40,7 +39,6 @@ type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
 export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   const reload = () => {
     startTransition(async () => {
@@ -53,9 +51,10 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
+  // ponytail: 각 액션은 이미 revalidatePath를 호출하므로 Next가 페이지를 자동으로
+  // 갱신한다. 여기서 router.refresh()까지 또 부르면 같은 화면을 두 번 새로고침하게 되어 제거.
   const afterMutation = () => {
     reload();
-    router.refresh();
   };
 
   if (!detail || !detail.task) {

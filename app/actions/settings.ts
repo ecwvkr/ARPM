@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { auth, unstable_update } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -16,10 +16,17 @@ export async function updateAccentColor(_prevState: string | undefined, formData
 
   if (!reset && !HEX_COLOR.test(raw ?? "")) return "올바른 색상 값을 선택하세요.";
 
+  const accentColor = reset ? null : (raw ?? null);
+
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { accentColor: reset ? null : raw },
+    data: { accentColor },
   });
+  await unstable_update({ user: { accentColor } });
 
+  // ponytail: auth()는 요청 안에서 세션을 메모이즈하므로, 방금 갱신한 세션 쿠키는
+  // 같은 요청의 revalidatePath 재렌더에는 반영되지 않는다. redirect로 완전히 새
+  // 요청을 만들어야 즉시 반영된다(검증 완료).
   revalidatePath("/", "layout");
+  redirect("/settings");
 }
