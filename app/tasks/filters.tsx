@@ -15,7 +15,6 @@ export function TaskFilters({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tagInput, setTagInput] = useState(searchParams.get("tag") ?? "");
   const [queryInput, setQueryInput] = useState(searchParams.get("q") ?? "");
   const [isPending, startTransition] = useTransition();
 
@@ -74,19 +73,8 @@ export function TaskFilters({
         <option value="">전체 상태</option>
         <option value="TODO">진행전</option>
         <option value="IN_PROGRESS">진행중</option>
-        <option value="DONE">종료</option>
+        <option value="DONE">완료</option>
       </select>
-
-      <Input
-        value={tagInput}
-        onChange={(e) => setTagInput(e.target.value)}
-        onBlur={() => setParam("tag", tagInput.trim())}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") setParam("tag", tagInput.trim());
-        }}
-        placeholder="태그로 검색"
-        className="h-auto w-32 py-1.5 text-sm"
-      />
 
       <button
         type="button"

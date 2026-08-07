@@ -25,7 +25,6 @@ model User {
   priorities         TaskPriority[]
   comments           Comment[]
   notifications      Notification[]
-  taskLinks          TaskLink[]
   savedFilters       SavedFilter[]
   auditLogs          AuditLog[]
 }
@@ -33,7 +32,6 @@ model User {
 model Project {
   id         String     @id @default(cuid())
   name       String
-  goalDate   DateTime?
   visibility Visibility @default(PRIVATE)
   isArchived Boolean    @default(false) // 숨김(총관리자)
   deletedAt  DateTime? // 소프트 삭제(총관리자)
@@ -68,7 +66,6 @@ model Task {
   createdAt   DateTime   @default(now())
   dueDate     DateTime?
   completedAt DateTime?
-  tags        String[]   @default([]) // Phase5: 태그
   canvasX     Float?
   canvasY     Float? // 캔버스에서 드래그로 옮긴 위치. 없으면 dagre 자동배치 사용.
   recurrence  String? // "WEEKLY" | null. 완료 시 다음 회차를 자동 생성.
@@ -80,7 +77,6 @@ model Task {
   participants TaskParticipant[]
   priorities   TaskPriority[]
   comments     Comment[]
-  links        TaskLink[]
 }
 
 model TaskParticipant {
@@ -127,17 +123,6 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model TaskLink {
-  id        String   @id @default(cuid())
-  taskId    String
-  url       String
-  label     String?
-  authorId  String
-  createdAt DateTime @default(now())
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id])
-}
-
 model SavedFilter {
   id        String   @id @default(cuid())
   userId    String
@@ -179,7 +164,6 @@ enum TaskStatus {
 
 enum Priority {
   URGENT
-  HIGH
   NORMAL
-  LOW
+  HOLD
 }

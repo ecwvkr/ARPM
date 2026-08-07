@@ -13,15 +13,22 @@ import {
   collectDescendantIds,
 } from "@/lib/tasks";
 
-function parseTags(formData: FormData): string[] {
-  const raw = (formData.get("tags") as string | null) ?? "";
-  return Array.from(new Set(raw.split(",").map((t) => t.trim()).filter(Boolean)));
-}
-
 export async function getTaskDetail(taskId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  return getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  const access = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  return { ...access, currentUserId: session.user.id, isSuperAdmin: !!session.user.isSuperAdmin };
+}
+
+export async function listTaskOptionsForProject(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { canView } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!canView) return [];
+
+  const tasks = await listTasksForProject(projectId, session.user.id, !!session.user.isSuperAdmin);
+  return tasks.map((t) => ({ id: t.id, title: t.title }));
 }
 
 export async function createTask(
@@ -45,16 +52,32 @@ export async function createTask(
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   const recurrence = formData.get("recurrence") === "WEEKLY" ? "WEEKLY" : null;
 
+  const parentIdRaw = formData.get("parentId") as string | null;
+  let parentId: string | null = null;
+  if (parentIdRaw) {
+    const parent = await prisma.task.findUnique({ where: { id: parentIdRaw }, select: { projectId: true } });
+    if (!parent || parent.projectId !== projectId) return "잘못된 연계 업무입니다.";
+    parentId = parentIdRaw;
+  }
+
+  const participantIds = Array.from(
+    new Set([
+      session.user.id,
+      ...formData.getAll("userIds").filter((v): v is string => typeof v === "string"),
+    ]),
+  );
+
   await prisma.task.create({
     data: {
       projectId,
+      parentId,
       title,
       memo,
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
       visibility,
       masterId: session.user.id,
-      tags: parseTags(formData),
       recurrence,
+      participants: { create: participantIds.map((userId) => ({ userId })) },
     },
   });
 
@@ -89,7 +112,7 @@ export async function deriveTask(
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
       visibility,
       masterId: session.user.id,
-      tags: parseTags(formData),
+      participants: { create: { userId: session.user.id } },
     },
   });
 
@@ -123,7 +146,7 @@ export async function duplicateTask(taskId: string) {
       dueDate: task.dueDate,
       visibility: task.visibility,
       masterId: session.user.id,
-      tags: task.tags,
+      participants: { create: { userId: session.user.id } },
     },
   });
 
@@ -241,6 +264,18 @@ export async function leaveTask(taskId: string) {
   revalidatePath(`/projects/${task.projectId}`);
 }
 
+export async function removeParticipant(taskId: string, userId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canManage) throw new Error("master만 참여자를 제외할 수 있습니다.");
+  if (userId === task.masterId) throw new Error("master는 위임을 통해서만 변경할 수 있습니다.");
+
+  await prisma.taskParticipant.deleteMany({ where: { taskId, userId } });
+  revalidatePath(`/projects/${task.projectId}`);
+}
+
 export async function updateTaskStatus(taskId: string, status: "TODO" | "IN_PROGRESS") {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -276,8 +311,8 @@ export async function completeTask(taskId: string) {
         dueDate: nextDueDate,
         visibility: task.visibility,
         masterId: task.masterId,
-        tags: task.tags,
         recurrence: "WEEKLY",
+        participants: { create: { userId: task.masterId } },
       },
     });
   }
@@ -285,13 +320,12 @@ export async function completeTask(taskId: string) {
   revalidatePath(`/projects/${task.projectId}`);
 }
 
-export async function setMyPriority(taskId: string, level: "URGENT" | "HIGH" | "NORMAL" | "LOW") {
+export async function setMyPriority(taskId: string, level: "URGENT" | "NORMAL" | "HOLD") {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const { task, canParticipantAct } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
   if (!task || !canParticipantAct) throw new Error("권한이 없습니다.");
-  if (task.status !== "IN_PROGRESS") throw new Error("진행 중인 업무만 우선순위를 설정할 수 있습니다.");
 
   await prisma.taskPriority.upsert({
     where: { taskId_userId: { taskId, userId: session.user.id } },
@@ -337,7 +371,7 @@ export async function updateTaskInfo(
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { title, memo, tags: parseTags(formData) },
+    data: { title, memo },
   });
   revalidatePath(`/projects/${task.projectId}`);
 }
@@ -364,11 +398,20 @@ export async function transferMaster(taskId: string, formData: FormData) {
   const newMasterId = formData.get("userId") as string | null;
   if (!newMasterId) throw new Error("대상을 선택하세요.");
 
-  const newMaster = task.participants.find((p) => p.userId === newMasterId);
-  if (!newMaster) throw new Error("참여자에게만 위임할 수 있습니다.");
+  // 위임 대상은 원칙적으로 참여자여야 하지만, 미참여자를 선택하면 참여자로 자동 추가한다.
+  const existingParticipant = task.participants.find((p) => p.userId === newMasterId);
+  const newMasterUser =
+    existingParticipant?.user ??
+    (await prisma.user.findUnique({ where: { id: newMasterId }, select: { id: true, name: true } }));
+  if (!newMasterUser) throw new Error("존재하지 않는 사용자입니다.");
 
   await prisma.$transaction([
     prisma.task.update({ where: { id: taskId }, data: { masterId: newMasterId } }),
+    prisma.taskParticipant.upsert({
+      where: { taskId_userId: { taskId, userId: newMasterId } },
+      update: {},
+      create: { taskId, userId: newMasterId },
+    }),
     prisma.notification.create({
       data: {
         userId: newMasterId,
@@ -384,7 +427,7 @@ export async function transferMaster(taskId: string, formData: FormData) {
         targetType: "TASK",
         targetId: task.id,
         projectId: task.projectId,
-        message: `"${task.title}" 업무의 master를 ${newMaster.user.name}님에게 위임`,
+        message: `"${task.title}" 업무의 master를 ${newMasterUser.name}님에게 위임`,
       },
     }),
   ]);
@@ -477,39 +520,35 @@ export async function addComment(
   revalidatePath(`/projects/${task.projectId}`);
 }
 
-export async function addTaskLink(
-  taskId: string,
+export async function updateComment(
+  commentId: string,
   _prevState: string | undefined,
   formData: FormData,
 ) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { task, canComment } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
-  if (!task || !canComment) return "권한이 없습니다.";
+  const comment = await prisma.comment.findUnique({ where: { id: commentId }, include: { task: true } });
+  if (!comment) return "존재하지 않는 코멘트입니다.";
+  if (comment.authorId !== session.user.id && !session.user.isSuperAdmin) return "수정 권한이 없습니다.";
 
-  const url = (formData.get("url") as string | null)?.trim();
-  if (!url) return "URL을 입력하세요.";
-  if (!/^https?:\/\//.test(url)) return "http:// 또는 https://로 시작하는 URL을 입력하세요.";
+  const body = (formData.get("body") as string | null)?.trim();
+  if (!body) return "내용을 입력하세요.";
 
-  const label = (formData.get("label") as string | null)?.trim() || null;
-
-  await prisma.taskLink.create({ data: { taskId, url, label, authorId: session.user.id } });
-  revalidatePath(`/projects/${task.projectId}`);
+  await prisma.comment.update({ where: { id: commentId }, data: { body } });
+  revalidatePath(`/projects/${comment.task.projectId}`);
 }
 
-export async function deleteTaskLink(linkId: string) {
+export async function deleteComment(commentId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const link = await prisma.taskLink.findUnique({ where: { id: linkId }, include: { task: true } });
-  if (!link) return;
+  const comment = await prisma.comment.findUnique({ where: { id: commentId }, include: { task: true } });
+  if (!comment) return;
+  if (comment.authorId !== session.user.id && !session.user.isSuperAdmin) return;
 
-  const { canManage } = await getTaskAccess(link.taskId, session.user.id, !!session.user.isSuperAdmin);
-  if (!canManage) return;
-
-  await prisma.taskLink.delete({ where: { id: linkId } });
-  revalidatePath(`/projects/${link.task.projectId}`);
+  await prisma.comment.delete({ where: { id: commentId } });
+  revalidatePath(`/projects/${comment.task.projectId}`);
 }
 
 export async function deleteTask(

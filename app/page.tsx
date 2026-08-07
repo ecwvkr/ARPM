@@ -102,7 +102,7 @@ export default async function DashboardPage({
 
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-foreground">프로젝트</h2>
-          <NewProjectDialog />
+          <NewProjectDialog currentUserId={session!.user.id} />
         </div>
 
         {projects.length === 0 ? (

@@ -21,7 +21,7 @@ export async function TaskKanban({
       <p className="text-sm text-muted-foreground lg:hidden">
         칸반 뷰는 PC 화면(넓은 화면)에서만 사용할 수 있습니다.
       </p>
-      <KanbanBoard tasks={tasks} />
+      <KanbanBoard tasks={tasks} currentUserId={userId} />
     </>
   );
 }

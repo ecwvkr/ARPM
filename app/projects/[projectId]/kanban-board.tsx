@@ -1,7 +1,7 @@
 "use client";
 
 import { updateTaskStatus, completeTask } from "@/app/actions/tasks";
-import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
+import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { TaskCard } from "./task-card";
 import type { ProjectTaskSummary } from "./task-list";
 
@@ -11,7 +11,13 @@ const COLUMNS = [
   { status: "DONE" as const, label: STATUS_LABEL.DONE },
 ];
 
-export function KanbanBoard({ tasks }: { tasks: ProjectTaskSummary[] }) {
+export function KanbanBoard({
+  tasks,
+  currentUserId,
+}: {
+  tasks: ProjectTaskSummary[];
+  currentUserId: string;
+}) {
   // ponytail: updateTaskStatus/completeTask는 내부에서 revalidatePath를 호출하므로
   // Next가 현재 페이지를 이미 자동 갱신한다. router.refresh()는 중복 새로고침이라 제거.
   async function handleDrop(taskId: string, target: "TODO" | "IN_PROGRESS" | "DONE") {
@@ -50,16 +56,16 @@ export function KanbanBoard({ tasks }: { tasks: ProjectTaskSummary[] }) {
                 >
                   <TaskCard
                     taskId={task.id}
+                    projectId={task.projectId}
                     title={task.title}
                     statusLabel={col.label}
                     visibility={task.visibility}
                     overdue={isOverdue(task.dueDate, task.status)}
-                    masterName={task.master.name}
-                    participantCount={task.participants.length}
-                    commentCount={task._count.comments}
+                    createdAt={task.createdAt}
                     dueDate={task.dueDate}
-                    priorities={toPriorityBadges(task.priorities)}
-                    tags={task.tags}
+                    participants={buildParticipantChips(task)}
+                    commentCount={task._count.comments}
+                    currentUserId={currentUserId}
                   />
                 </div>
               ))}

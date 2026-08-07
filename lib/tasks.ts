@@ -4,7 +4,7 @@ import { listVisibleProjects } from "@/lib/projects";
 
 export { isOverdue } from "@/lib/priority";
 
-const PRIORITY_RANK: Record<string, number> = { URGENT: 4, HIGH: 3, NORMAL: 2, LOW: 1 };
+const PRIORITY_RANK: Record<string, number> = { URGENT: 3, NORMAL: 2, HOLD: 1 };
 
 export function getMaxPriority(priorities: { level: string }[]): string {
   if (priorities.length === 0) return "NORMAL";
@@ -67,7 +67,6 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
       participants: { include: { user: true } },
       priorities: { include: { user: true } },
       comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
-      links: { include: { author: true }, orderBy: { createdAt: "asc" } },
       project: true,
     },
   });
@@ -83,8 +82,6 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
       canComment: false,
       canJoin: false,
       canLeave: false,
-      canSetPriority: false,
-      myPriority: "NORMAL",
     };
   }
 
@@ -114,8 +111,6 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
   const locked = task.completedAt !== null;
   const canJoin = canView && !isMaster && !grantedAccess && !locked;
   const canLeave = isParticipant && !isMaster && !locked;
-  const canSetPriority = task.status === "IN_PROGRESS" && canParticipantAct;
-  const myPriority = task.priorities.find((p) => p.userId === userId)?.level ?? "NORMAL";
 
   return {
     task,
@@ -127,8 +122,6 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
     canComment,
     canJoin,
     canLeave,
-    canSetPriority,
-    myPriority,
   };
 }
 
@@ -200,7 +193,6 @@ export async function listAllTasksForUser(
     projectId?: string;
     status?: "TODO" | "IN_PROGRESS" | "DONE";
     mineOnly?: boolean;
-    tag?: string;
     q?: string;
   } = {},
 ) {
@@ -219,7 +211,6 @@ export async function listAllTasksForUser(
   let tasks = perProject.flat();
 
   if (filters.status) tasks = tasks.filter((t) => t.status === filters.status);
-  if (filters.tag) tasks = tasks.filter((t) => t.tags.includes(filters.tag!));
   if (filters.q) {
     const q = filters.q.toLowerCase();
     tasks = tasks.filter((t) => t.title.toLowerCase().includes(q));

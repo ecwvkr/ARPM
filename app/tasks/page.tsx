@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
 import { listAllTasksForUser } from "@/lib/tasks";
-import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
+import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
 import { TaskCard } from "@/app/projects/[projectId]/task-card";
@@ -19,7 +19,6 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
   const projectId = typeof params.projectId === "string" ? params.projectId : undefined;
   const status = typeof params.status === "string" ? params.status : undefined;
   const mineOnly = params.mine === "1";
-  const tag = typeof params.tag === "string" ? params.tag : undefined;
   const q = typeof params.q === "string" ? params.q : undefined;
 
   const isSuperAdmin = !!session.user.isSuperAdmin;
@@ -30,7 +29,6 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
     projectId,
     status: status as "TODO" | "IN_PROGRESS" | "DONE" | undefined,
     mineOnly,
-    tag,
     q,
   });
 
@@ -45,7 +43,10 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
             <h1 className="text-base font-bold">전체 업무</h1>
           </div>
           <div className="flex items-center gap-2">
-            <NewTaskDialog projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+            <NewTaskDialog
+              projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+              currentUserId={session.user.id}
+            />
             <NotificationBell />
             <LogoutButton />
           </div>
@@ -66,17 +67,17 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
               <TaskCard
                 key={task.id}
                 taskId={task.id}
+                projectId={task.projectId}
                 title={task.title}
                 statusLabel={STATUS_LABEL[task.status]}
                 visibility={task.visibility}
                 overdue={isOverdue(task.dueDate, task.status)}
-                masterName={task.master.name}
-                participantCount={task.participants.length}
-                commentCount={task._count.comments}
+                createdAt={task.createdAt}
                 dueDate={task.dueDate}
-                priorities={toPriorityBadges(task.priorities)}
+                participants={buildParticipantChips(task)}
+                commentCount={task._count.comments}
+                currentUserId={session.user.id}
                 projectName={task.projectName}
-                tags={task.tags}
               />
             ))}
           </div>

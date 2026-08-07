@@ -16,20 +16,35 @@ export async function createProject(
   const name = (formData.get("name") as string | null)?.trim();
   if (!name) return "프로젝트 이름을 입력하세요.";
 
-  const goalDateRaw = formData.get("goalDate") as string | null;
   const visibility = formData.get("visibility") === "PUBLIC" ? "PUBLIC" : "PRIVATE";
+  const memberIds = formData
+    .getAll("userIds")
+    .filter((v): v is string => typeof v === "string" && v !== session.user.id);
 
   const project = await prisma.project.create({
     data: {
       name,
-      goalDate: goalDateRaw ? new Date(goalDateRaw) : null,
       visibility,
       ownerId: session.user.id,
       members: {
-        create: { userId: session.user.id, role: "OWNER" },
+        create: [
+          { userId: session.user.id, role: "OWNER" },
+          ...memberIds.map((userId) => ({ userId, role: "MEMBER" as const })),
+        ],
       },
     },
   });
+
+  if (memberIds.length > 0) {
+    await prisma.notification.createMany({
+      data: memberIds.map((userId) => ({
+        userId,
+        type: "PROJECT_INVITED",
+        refId: project.id,
+        message: `"${project.name}" 프로젝트에 초대되었습니다.`,
+      })),
+    });
+  }
 
   revalidatePath("/");
   redirect(`/projects/${project.id}`);

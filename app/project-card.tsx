@@ -2,22 +2,17 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { VisibilityForm } from "@/app/projects/[projectId]/visibility-form";
-import { ProjectColorForm } from "@/app/projects/[projectId]/project-color-form";
-import { IconDotsVertical } from "@tabler/icons-react";
+import { ProjectSettingsDialog } from "@/app/projects/[projectId]/project-settings-dialog";
 
 type ProjectCardData = {
   id: string;
   name: string;
-  goalDate: Date | null;
   visibility: "PUBLIC" | "PRIVATE";
   isArchived: boolean;
   deletedAt: Date | null;
   color: string | null;
   ownerId: string;
-  members: { userId: string; user: { id: string; name: string } }[];
+  members: { userId: string; role: "OWNER" | "MEMBER"; user: { id: string; name: string } }[];
   tasks: { status: string }[];
 };
 
@@ -49,7 +44,9 @@ export function ProjectCard({
           >
             {project.visibility === "PUBLIC" ? "공개" : "비공개"}
           </Badge>
-          {isOwner && <ProjectSettingsDialog project={project} />}
+          {isOwner && (
+            <ProjectSettingsDialog project={project} isOwner={isOwner} triggerClassName="relative z-10 bg-background" />
+          )}
         </div>
       </div>
 
@@ -74,40 +71,5 @@ export function ProjectCard({
         </p>
       </div>
     </div>
-  );
-}
-
-function ProjectSettingsDialog({ project }: { project: ProjectCardData }) {
-  return (
-    <Dialog>
-      <DialogTrigger
-        render={
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            title="프로젝트 설정"
-            aria-label="프로젝트 설정"
-            className="relative z-10 bg-background"
-          >
-            <IconDotsVertical />
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{project.name} 설정</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <h4 className="text-sm font-bold text-foreground">공개 범위</h4>
-            <VisibilityForm projectId={project.id} visibility={project.visibility} />
-          </div>
-          <div className="space-y-1.5">
-            <h4 className="text-sm font-bold text-foreground">프로젝트 색상</h4>
-            <ProjectColorForm projectId={project.id} currentColor={project.color} />
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

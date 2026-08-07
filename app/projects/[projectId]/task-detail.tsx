@@ -12,22 +12,23 @@ import {
   updateTaskVisibility,
   transferMaster,
   inviteToTask,
+  removeParticipant,
   addComment,
-  addTaskLink,
-  deleteTaskLink,
+  updateComment,
+  deleteComment,
   deleteTask,
-  deriveTask,
   duplicateTask,
   moveTask,
   listMovableTargets,
-  setMyPriority,
 } from "@/app/actions/tasks";
-import { PRIORITY_LABEL, PRIORITY_COLOR, STATUS_LABEL, isOverdue } from "@/lib/priority";
+import { listAllUsers } from "@/app/actions/users";
+import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -35,17 +36,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { IconPlus, IconCopy, IconArrowsMove, IconTrash } from "@tabler/icons-react";
+import { IconCopy, IconArrowsMove, IconPencil, IconTrash, IconX, IconUserPlus } from "@tabler/icons-react";
 import { TaskTreePicker } from "./task-tree-picker";
 import { UserPicker } from "@/components/user-picker";
+import { DeriveDialog } from "./task-derive-dialog";
+import { DeleteDialog } from "./task-delete-dialog";
+import { ParticipantPriorityDot } from "./task-priority-picker";
 
 type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
+
+function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString("ko-KR");
+}
 
 export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [isPending, startTransition] = useTransition();
-  // ponytail: 공유 관리는 드로어를 열자마자가 아니라 실제로 펼쳤을 때만 불러온다
-  // (프로젝트 전체 업무 트리를 다시 조회하는 무거운 호출이라 미리 불러올 필요가 없음).
+  const [editingInfo, setEditingInfo] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
 
   const reload = () => {
@@ -69,35 +76,54 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
     return <p className="px-1 py-4 text-sm text-muted-foreground">불러오는 중...</p>;
   }
 
-  const { task, canManage, canParticipantAct, canComment, canJoin, canLeave } = detail;
+  const { task, canManage, canParticipantAct, canComment, canJoin, canLeave, currentUserId, isSuperAdmin } = detail;
   const overdue = isOverdue(task.dueDate, task.status);
   const locked = task.completedAt !== null;
+  const participantChips = buildParticipantChips(task);
 
   return (
     <div className="space-y-6 px-1 pb-8">
       <section className="space-y-2 border-b border-foreground/10 pb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-bold">{task.title}</h2>
-          <Badge variant={task.status === "DONE" ? "secondary" : "default"}>
-            {STATUS_LABEL[task.status]}
-          </Badge>
-          {overdue && <Badge variant="destructive">지연</Badge>}
-          <Badge variant={task.visibility === "PUBLIC" ? "secondary" : "outline"}>
-            {task.visibility === "PUBLIC" ? "공개" : "비공개"}
-          </Badge>
-          {task.recurrence === "WEEKLY" && <Badge variant="outline">매주 반복</Badge>}
-        </div>
-        {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
-        {task.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {task.tags.map((tag) => (
-              <Badge key={tag} variant="outline">
-                #{tag}
-              </Badge>
-            ))}
-          </div>
+        {editingInfo ? (
+          <EditInfoForm
+            taskId={taskId}
+            title={task.title}
+            memo={task.memo ?? ""}
+            onDone={() => {
+              setEditingInfo(false);
+              afterMutation();
+            }}
+            onCancel={() => setEditingInfo(false)}
+          />
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold">{task.title}</h2>
+                <Badge variant={task.status === "DONE" ? "secondary" : "default"}>
+                  {STATUS_LABEL[task.status]}
+                </Badge>
+                {overdue && <Badge variant="destructive">지연</Badge>}
+                <Badge variant={task.visibility === "PUBLIC" ? "secondary" : "outline"}>
+                  {task.visibility === "PUBLIC" ? "공개" : "비공개"}
+                </Badge>
+                {task.recurrence === "WEEKLY" && <Badge variant="outline">매주 반복</Badge>}
+              </div>
+              {canManage && (
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  title="수정"
+                  aria-label="업무 정보 수정"
+                  onClick={() => setEditingInfo(true)}
+                >
+                  <IconPencil />
+                </Button>
+              )}
+            </div>
+            {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
+          </>
         )}
-        <p className="text-xs text-muted-foreground">master: {task.master.name}</p>
         {task.parent && (
           <p className="text-xs text-muted-foreground">상위 업무: {task.parent.title}</p>
         )}
@@ -109,14 +135,14 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-bold text-foreground">관리</h3>
-        <div className="flex gap-2">
+        <h3 className="text-sm font-bold text-foreground">업무관리</h3>
+        <div className="flex flex-wrap gap-2">
           <DeriveDialog parentTaskId={taskId} onDone={afterMutation} />
           <Button
             size="icon-sm"
             variant="outline"
-            title="복제하기"
-            aria-label="복제하기"
+            title="업무 복제하기"
+            aria-label="업무 복제하기"
             disabled={isPending}
             onClick={() =>
               startTransition(async () => {
@@ -130,14 +156,9 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           {canManage && (
             <MoveDialog taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
           )}
-          {canManage && <DeleteDialog taskId={taskId} onDeleted={onDeleted} />}
         </div>
-      </section>
-
-      {canParticipantAct && !locked && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-bold text-foreground">상태</h3>
-          <div className="flex gap-2">
+        {canParticipantAct && !locked && (
+          <div className="flex flex-wrap gap-2 pt-1">
             <Button
               size="sm"
               variant={task.status === "TODO" ? "default" : "outline"}
@@ -164,59 +185,70 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             >
               진행중
             </Button>
-            <Button
-              size="sm"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  await completeTask(taskId);
-                  afterMutation();
-                })
-              }
-            >
-              완료하기
-            </Button>
+            <CompleteConfirmDialog taskId={taskId} onDone={afterMutation} />
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {canParticipantAct && (
         <section className="space-y-2">
-          <h3 className="text-sm font-bold text-foreground">기한 연장</h3>
-          <ExtendDueDateForm taskId={taskId} onDone={afterMutation} />
-        </section>
-      )}
-
-      {detail.canSetPriority && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-bold text-foreground">내 우선순위</h3>
-          <div className="flex gap-2">
-            {(["URGENT", "HIGH", "NORMAL", "LOW"] as const).map((level) => (
-              <Button
-                key={level}
-                size="sm"
-                variant={detail.myPriority === level ? "default" : "outline"}
-                disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await setMyPriority(taskId, level);
-                    afterMutation();
-                  })
-                }
-              >
-                <span
-                  className="mr-1.5 inline-block size-2 rounded-full"
-                  style={{ backgroundColor: PRIORITY_COLOR[level] }}
-                />
-                {PRIORITY_LABEL[level]}
-              </Button>
-            ))}
+          <h3 className="text-sm font-bold text-foreground">기한</h3>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              {task.dueDate ? `마감일 ${formatDate(task.dueDate)}` : "마감일이 설정되지 않았습니다."}
+            </p>
+            <ExtendDueDatePopover taskId={taskId} onDone={afterMutation} />
           </div>
         </section>
       )}
 
-      {(canJoin || canLeave) && (
-        <section>
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">참여자 ({participantChips.length})</h3>
+          {canManage && (
+            <Button size="icon-sm" variant="outline" title="참여자 추가" aria-label="참여자 추가" onClick={() => setShowInvite(true)}>
+              <IconUserPlus />
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {participantChips.map((p) => (
+            <span
+              key={p.userId}
+              className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+            >
+              <ParticipantPriorityDot
+                taskId={taskId}
+                userId={p.userId}
+                userName={p.userName}
+                level={p.level}
+                currentUserId={currentUserId}
+              />
+              {p.isMaster && canManage ? (
+                <MasterDelegatePopover taskId={taskId} currentMasterName={p.userName} onDone={afterMutation} />
+              ) : (
+                <span>
+                  {p.userName}
+                  {p.isMaster && " · master"}
+                </span>
+              )}
+              {canManage && !p.isMaster && (
+                <button
+                  type="button"
+                  aria-label={`${p.userName} 참여자 제외`}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await removeParticipant(taskId, p.userId);
+                      afterMutation();
+                    })
+                  }
+                  className="text-muted-foreground/60 hover:text-destructive"
+                >
+                  <IconX className="size-3" />
+                </button>
+              )}
+            </span>
+          ))}
           {canJoin && (
             <Button
               size="sm"
@@ -229,13 +261,12 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
                 })
               }
             >
-              참여하기
+              참가하기
             </Button>
           )}
           {canLeave && (
-            <Button
-              size="sm"
-              variant="outline"
+            <button
+              type="button"
               disabled={isPending}
               onClick={() =>
                 startTransition(async () => {
@@ -243,25 +274,29 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
                   afterMutation();
                 })
               }
+              className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground hover:text-destructive"
             >
-              이탈하기
-            </Button>
+              빠지기
+            </button>
           )}
-        </section>
-      )}
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-bold text-foreground">참여자 ({task.participants.length})</h3>
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          {task.participants.map((p) => (
-            <li key={p.userId}>
-              {p.user.name}
-              {p.userId === task.masterId ? " · master" : ""}
-              {!p.includeSubtree && " · 해당 업무만"}
-            </li>
-          ))}
-        </ul>
+        </div>
       </section>
+
+      <Dialog open={showInvite} onOpenChange={setShowInvite}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>참여자 추가</DialogTitle>
+          </DialogHeader>
+          <InviteForm
+            taskId={taskId}
+            onDone={() => {
+              setShowInvite(false);
+              afterMutation();
+            }}
+            excludeIds={[task.master.id, ...task.participants.map((p) => p.userId)]}
+          />
+        </DialogContent>
+      </Dialog>
 
       {canManage && (
         <>
@@ -269,17 +304,6 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">설정</p>
             <div className="h-px flex-1 bg-foreground/10" />
           </div>
-
-          <section className="space-y-2">
-            <h3 className="text-sm font-bold text-foreground">업무 정보 수정</h3>
-            <EditInfoForm
-              taskId={taskId}
-              title={task.title}
-              memo={task.memo ?? ""}
-              tags={task.tags}
-              onDone={afterMutation}
-            />
-          </section>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-foreground">공개 범위</h3>
@@ -306,55 +330,6 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
               </Button>
             </form>
           </section>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-foreground">참여자 초대 (공유 범위 지정)</h3>
-              {!showInvite && (
-                <Button size="sm" variant="outline" onClick={() => setShowInvite(true)}>
-                  열기
-                </Button>
-              )}
-            </div>
-            {showInvite && (
-              <InviteForm
-                taskId={taskId}
-                onDone={afterMutation}
-                excludeIds={[task.master.id, ...task.participants.map((p) => p.userId)]}
-              />
-            )}
-          </section>
-
-          {task.participants.length > 0 && (
-            <section className="space-y-2">
-              <h3 className="text-sm font-bold text-foreground">master 위임</h3>
-              <form
-                action={(formData) =>
-                  startTransition(async () => {
-                    await transferMaster(taskId, formData);
-                    afterMutation();
-                  })
-                }
-                className="flex items-center gap-2"
-              >
-                <select
-                  name="userId"
-                  aria-label="master 위임 대상"
-                  className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
-                >
-                  {task.participants.map((p) => (
-                    <option key={p.userId} value={p.userId}>
-                      {p.user.name}
-                    </option>
-                  ))}
-                </select>
-                <Button type="submit" size="sm" variant="outline" disabled={isPending}>
-                  위임
-                </Button>
-              </form>
-            </section>
-          )}
-
         </>
       )}
 
@@ -364,42 +339,15 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-bold text-foreground">관련 링크 ({task.links.length})</h3>
-        <ul className="space-y-1">
-          {task.links.map((l) => (
-            <li key={l.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 p-2 text-sm">
-              <a
-                href={l.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate underline underline-offset-2"
-              >
-                {l.label || l.url}
-              </a>
-              {canManage && (
-                <button
-                  type="button"
-                  aria-label="링크 삭제"
-                  onClick={() => deleteTaskLink(l.id).then(afterMutation)}
-                  className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-                >
-                  삭제
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        {canComment && <TaskLinkForm taskId={taskId} onDone={afterMutation} />}
-      </section>
-
-      <section className="space-y-2">
         <h3 className="text-sm font-bold text-foreground">코멘트 ({task.comments.length})</h3>
         <ul className="space-y-2">
           {task.comments.map((c) => (
-            <li key={c.id} className="rounded-md bg-muted/50 p-2 text-sm">
-              <p className="text-xs text-muted-foreground">{c.author.name}</p>
-              <p className="whitespace-pre-wrap">{c.body}</p>
-            </li>
+            <CommentItem
+              key={c.id}
+              comment={c}
+              canEdit={c.authorId === currentUserId || isSuperAdmin}
+              onDone={afterMutation}
+            />
           ))}
         </ul>
         {canComment && (
@@ -413,28 +361,17 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           />
         )}
       </section>
+
+      {canManage && <DangerZone taskId={taskId} onDeleted={onDeleted} />}
     </div>
   );
 }
 
-function ExtendDueDateForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
-  const action = extendDueDate.bind(null, taskId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-
+function DangerZone({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
   return (
-    <form
-      action={async (formData) => {
-        await formAction(formData);
-        onDone();
-      }}
-      className="flex items-center gap-2"
-    >
-      <Input name="dueDate" type="date" className="w-auto" />
-      <Button type="submit" size="sm" variant="outline" disabled={isPending}>
-        연장
-      </Button>
-      {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-    </form>
+    <div className="flex justify-end">
+      <DeleteDialog taskId={taskId} onDeleted={onDeleted} />
+    </div>
   );
 }
 
@@ -442,14 +379,14 @@ function EditInfoForm({
   taskId,
   title,
   memo,
-  tags,
   onDone,
+  onCancel,
 }: {
   taskId: string;
   title: string;
   memo: string;
-  tags: string[];
   onDone: () => void;
+  onCancel: () => void;
 }) {
   const action = updateTaskInfo.bind(null, taskId);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
@@ -464,12 +401,149 @@ function EditInfoForm({
     >
       <Input name="title" defaultValue={title} required />
       <Textarea name="memo" defaultValue={memo} placeholder="메모" rows={3} />
-      <Input name="tags" defaultValue={tags.join(", ")} placeholder="태그 (쉼표로 구분)" />
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-      <Button type="submit" size="sm" variant="outline" disabled={isPending}>
-        저장
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={isPending}>
+          저장
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          취소
+        </Button>
+      </div>
     </form>
+  );
+}
+
+function MasterDelegatePopover({
+  taskId,
+  currentMasterName,
+  onDone,
+}: {
+  taskId: string;
+  currentMasterName: string;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [users, setUsers] = useState<{ id: string; name: string }[] | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (open && !users) listAllUsers().then(setUsers);
+  }, [open, users]);
+
+  function delegate(userId: string) {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("userId", userId);
+      await transferMaster(taskId, formData);
+      setOpen(false);
+      onDone();
+    });
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button type="button" className="underline underline-offset-2">
+            {currentMasterName} · master
+          </button>
+        }
+      />
+      <PopoverContent className="w-48 gap-1 p-1.5">
+        <p className="px-2 pt-1 text-xs text-muted-foreground">master 위임</p>
+        {!users ? (
+          <p className="px-2 py-1.5 text-sm text-muted-foreground">불러오는 중...</p>
+        ) : (
+          users.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              disabled={isPending}
+              onClick={() => delegate(u.id)}
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+            >
+              {u.name}
+            </button>
+          ))
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ExtendDueDatePopover({ taskId, onDone }: { taskId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const action = extendDueDate.bind(null, taskId);
+  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const submitted = useRef(false);
+
+  useEffect(() => {
+    if (submitted.current && !isPending && !errorMessage) {
+      submitted.current = false;
+      setOpen(false);
+      onDone();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPending, errorMessage]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={<Button size="sm" variant="outline">연장</Button>} />
+      <PopoverContent className="w-auto gap-2 p-3">
+        <form
+          action={formAction}
+          onSubmit={() => {
+            submitted.current = true;
+          }}
+          className="flex items-center gap-2"
+        >
+          <Input name="dueDate" type="date" className="w-auto" required />
+          <Button type="submit" size="sm" disabled={isPending}>
+            연장
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setOpen(false)}>
+            취소
+          </Button>
+        </form>
+        {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function CompleteConfirmDialog({ taskId, onDone }: { taskId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm">완료하기</Button>} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>업무 완료</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">완료 시 수정이 불가능합니다. 완료하시겠습니까?</p>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
+            아니요
+          </Button>
+          <Button
+            size="sm"
+            disabled={isPending}
+            onClick={() =>
+              startTransition(async () => {
+                await completeTask(taskId);
+                setOpen(false);
+                onDone();
+              })
+            }
+          >
+            네
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -507,79 +581,6 @@ function InviteForm({
   );
 }
 
-function DeriveDialog({ parentTaskId, onDone }: { parentTaskId: string; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const action = deriveTask.bind(null, parentTaskId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const submitted = useRef(false);
-
-  useEffect(() => {
-    if (submitted.current && !isPending && !errorMessage) {
-      submitted.current = false;
-      setOpen(false);
-      onDone();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPending, errorMessage]);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button size="icon-sm" variant="outline" title="파생하기" aria-label="파생하기">
-            <IconPlus />
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>하위 업무 파생</DialogTitle>
-        </DialogHeader>
-        <form
-          action={formAction}
-          onSubmit={() => {
-            submitted.current = true;
-          }}
-          className="space-y-4"
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="derive-title">제목</Label>
-            <Input id="derive-title" name="title" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="derive-memo">메모</Label>
-            <Textarea id="derive-memo" name="memo" rows={3} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="derive-dueDate">기한</Label>
-            <Input id="derive-dueDate" name="dueDate" type="date" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="derive-tags">태그 (쉼표로 구분)</Label>
-            <Input id="derive-tags" name="tags" placeholder="예: 프론트엔드, 급함" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="derive-visibility">공개 범위</Label>
-            <select
-              id="derive-visibility"
-              name="visibility"
-              defaultValue="PUBLIC"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
-            >
-              <option value="PUBLIC">공개</option>
-              <option value="PRIVATE">비공개</option>
-            </select>
-          </div>
-          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-          <Button type="submit" disabled={isPending} className="w-full">
-            {isPending ? "생성 중..." : "파생하기"}
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function MoveDialog({
   taskId,
   currentParentId,
@@ -595,14 +596,14 @@ function MoveDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="icon-sm" variant="outline" title="이동하기" aria-label="이동하기">
+          <Button size="icon-sm" variant="outline" title="연계업무 수정" aria-label="연계업무 수정">
             <IconArrowsMove />
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>부모 변경</DialogTitle>
+          <DialogTitle>연계업무 수정</DialogTitle>
         </DialogHeader>
         <MoveForm
           taskId={taskId}
@@ -665,86 +666,79 @@ function MoveForm({
   );
 }
 
-function DeleteDialog({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button size="icon-sm" variant="destructive" title="삭제하기" aria-label="삭제하기">
-            <IconTrash />
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>업무 삭제</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          이 작업은 되돌릴 수 없습니다. 하위 업무는 상위 업무로 승격됩니다.
-        </p>
-        <DeleteForm taskId={taskId} onDeleted={onDeleted} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DeleteForm({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
-  const action = deleteTask.bind(null, taskId);
+function CommentItem({
+  comment,
+  canEdit,
+  onDone,
+}: {
+  comment: { id: string; body: string; author: { name: string } };
+  canEdit: boolean;
+  onDone: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const action = updateComment.bind(null, comment.id);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const submitted = useRef(false);
+  const [isDeleting, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (submitted.current && !isPending && !errorMessage) {
-      submitted.current = false;
-      onDeleted();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPending, errorMessage]);
-
-  return (
-    <form
-      action={formAction}
-      onSubmit={() => {
-        submitted.current = true;
-      }}
-      className="space-y-2"
-    >
-      <Label htmlFor="confirm" className="text-xs text-muted-foreground">
-        확인을 위해 &apos;삭제&apos;를 입력하세요.
-      </Label>
-      <Input id="confirm" name="confirm" required />
-      {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-      <Button type="submit" size="sm" variant="destructive" disabled={isPending}>
-        영구 삭제
-      </Button>
-    </form>
-  );
-}
-
-function TaskLinkForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
-  const action = addTaskLink.bind(null, taskId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
-  const formRef = useRef<HTMLFormElement>(null);
+  if (editing) {
+    return (
+      <li className="rounded-md bg-muted/50 p-2 text-sm">
+        <form
+          action={async (formData) => {
+            await formAction(formData);
+            setEditing(false);
+            onDone();
+          }}
+          className="space-y-1.5"
+        >
+          <Textarea name="body" defaultValue={comment.body} rows={2} required />
+          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={isPending}>
+              저장
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setEditing(false)}>
+              취소
+            </Button>
+          </div>
+        </form>
+      </li>
+    );
+  }
 
   return (
-    <form
-      ref={formRef}
-      action={async (formData) => {
-        await formAction(formData);
-        formRef.current?.reset();
-        onDone();
-      }}
-      className="flex flex-wrap items-center gap-2"
-    >
-      <Input name="url" placeholder="https://..." className="h-auto w-40 py-1.5 text-sm" required />
-      <Input name="label" placeholder="이름(선택)" className="h-auto w-28 py-1.5 text-sm" />
-      <Button type="submit" size="sm" variant="outline" disabled={isPending}>
-        추가
-      </Button>
-      {errorMessage && <p className="w-full text-sm text-destructive">{errorMessage}</p>}
-    </form>
+    <li className="rounded-md bg-muted/50 p-2 text-sm">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{comment.author.name}</p>
+        {canEdit && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              aria-label="코멘트 수정"
+              onClick={() => setEditing(true)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <IconPencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="코멘트 삭제"
+              disabled={isDeleting}
+              onClick={() =>
+                startTransition(async () => {
+                  await deleteComment(comment.id);
+                  onDone();
+                })
+              }
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <IconTrash className="size-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="whitespace-pre-wrap">{comment.body}</p>
+    </li>
   );
 }
 

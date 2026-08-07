@@ -4,9 +4,7 @@ import { auth } from "@/auth";
 import { getProjectAccess } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/app/notification-bell";
-import { VisibilityForm } from "./visibility-form";
-import { ProjectColorForm } from "./project-color-form";
-import { InviteForm } from "./invite-form";
+import { ProjectSettingsDialog } from "./project-settings-dialog";
 import { AdminControls } from "./admin-controls";
 import { listProjectAuditLog } from "@/app/actions/audit";
 import { TaskList } from "./task-list";
@@ -37,34 +35,36 @@ export default async function ProjectDetailPage({
   const hidden = project.isArchived || project.deletedAt !== null;
   const canViewAudit = isOwner || !!session.user.isSuperAdmin;
   const auditLog = canViewAudit ? await listProjectAuditLog(project.id) : [];
+  const members = project.members.map((m) => ({
+    userId: m.userId,
+    role: m.role,
+    user: { id: m.user.id, name: m.user.name },
+  }));
 
   return (
     <div className="flex flex-1 flex-col">
       <header className="px-6 py-4 shadow-sm">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <div className="space-y-1">
-            <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
-              ← 전체 프로젝트
-            </Link>
-            <div className="flex items-center gap-2">
-              {project.color && (
-                <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: project.color }}
-                />
-              )}
-              <h1 className="text-base font-bold">{project.name}</h1>
-              <Badge variant={project.visibility === "PUBLIC" ? "secondary" : "outline"}>
-                {project.visibility === "PUBLIC" ? "공개" : "비공개"}
-              </Badge>
-              {hidden && (
-                <Badge variant="destructive">{project.deletedAt ? "삭제됨" : "숨김"}</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">owner: {project.owner.name}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {project.color && (
+              <span
+                aria-hidden
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: project.color }}
+              />
+            )}
+            <h1 className="text-base font-bold">{project.name}</h1>
+            <span className="text-sm text-muted-foreground">owner: {project.owner.name}</span>
+            <Badge variant={project.visibility === "PUBLIC" ? "secondary" : "outline"}>
+              {project.visibility === "PUBLIC" ? "공개" : "비공개"}
+            </Badge>
+            {hidden && (
+              <Badge variant="destructive">{project.deletedAt ? "삭제됨" : "숨김"}</Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            <NewTaskDialog projectId={project.id} currentUserId={session.user.id} />
+            <ProjectSettingsDialog project={{ ...project, members }} isOwner={isOwner} />
             {session.user.isSuperAdmin && (
               <AdminControls projectId={project.id} isArchived={project.isArchived} />
             )}
@@ -74,81 +74,37 @@ export default async function ProjectDetailPage({
       </header>
 
       <WidthContainer mainClassName="space-y-8 px-6 py-6">
-        {isOwner && (
-          <section className="space-y-2">
-            <h2 className="text-sm font-bold text-foreground">공개 범위</h2>
-            <VisibilityForm projectId={project.id} visibility={project.visibility} />
-          </section>
-        )}
-
-        {isOwner && (
-          <section className="space-y-2">
-            <h2 className="text-sm font-bold text-foreground">프로젝트 색상</h2>
-            <p className="text-sm text-muted-foreground">
-              대시보드·캘린더·캔버스에서 이 프로젝트를 구분하는 색상입니다. 하위로 파생되는 업무에도 그대로 이어집니다.
-            </p>
-            <ProjectColorForm projectId={project.id} currentColor={project.color} />
-          </section>
-        )}
-
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-foreground">멤버 ({project.members.length})</h2>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            {project.members.map((m) => (
-              <li key={m.userId}>
-                {m.user.name} · {m.role === "OWNER" ? "owner" : "member"}
-              </li>
-            ))}
-          </ul>
-          {isOwner && (
-            <InviteForm projectId={project.id} excludeIds={project.members.map((m) => m.userId)} />
-          )}
-        </section>
-
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-bold text-foreground">업무</h2>
-              <div className="flex gap-1 text-xs">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className={!view ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
-                >
-                  대시보드
-                </Link>
-                <span className="text-muted-foreground">·</span>
-                <Link
-                  href={`/projects/${project.id}?view=status`}
-                  className={view === "status" ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
-                >
-                  상태그룹
-                </Link>
-                <span className="text-muted-foreground">·</span>
-                <Link
-                  href={`/projects/${project.id}?view=canvas`}
-                  className={view === "canvas" ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
-                >
-                  캔버스
-                </Link>
-                <span className="text-muted-foreground">·</span>
-                <Link
-                  href={`/projects/${project.id}?view=kanban`}
-                  className={view === "kanban" ? "font-medium underline underline-offset-2" : "text-muted-foreground underline underline-offset-2"}
-                >
-                  칸반
-                </Link>
-              </div>
-            </div>
-            <NewTaskDialog projectId={project.id} />
+          <div className="flex items-center gap-2 text-xs">
+            <Link
+              href={`/projects/${project.id}`}
+              className={
+                !view
+                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
+                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
+              }
+            >
+              대시보드
+            </Link>
+            <Link
+              href={`/projects/${project.id}?view=status`}
+              className={
+                view === "status"
+                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
+                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
+              }
+            >
+              상태그룹
+            </Link>
           </div>
-          {view === "canvas" ? (
-            <TaskCanvas projectId={project.id} color={project.color} />
-          ) : view === "status" ? (
+          {view === "status" ? (
             <TaskStatusGroups
               projectId={project.id}
               userId={session.user.id}
               isSuperAdmin={!!session.user.isSuperAdmin}
             />
+          ) : view === "canvas" ? (
+            <TaskCanvas projectId={project.id} color={project.color} />
           ) : view === "kanban" ? (
             <TaskKanban
               projectId={project.id}

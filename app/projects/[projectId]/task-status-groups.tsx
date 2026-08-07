@@ -1,5 +1,5 @@
 import { listTasksForProject } from "@/lib/tasks";
-import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
+import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { TaskCard } from "./task-card";
 
 const GROUPS = [
@@ -42,16 +42,16 @@ export async function TaskStatusGroups({
                   <TaskCard
                     key={task.id}
                     taskId={task.id}
+                    projectId={task.projectId}
                     title={task.title}
                     statusLabel={group.label}
                     visibility={task.visibility}
                     overdue={isOverdue(task.dueDate, task.status)}
-                    masterName={task.master.name}
-                    participantCount={task.participants.length}
-                    commentCount={task._count.comments}
+                    createdAt={task.createdAt}
                     dueDate={task.dueDate}
-                    priorities={toPriorityBadges(task.priorities)}
-                    tags={task.tags}
+                    participants={buildParticipantChips(task)}
+                    commentCount={task._count.comments}
+                    currentUserId={userId}
                   />
                 ))}
               </div>
