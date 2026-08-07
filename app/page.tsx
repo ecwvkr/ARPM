@@ -10,15 +10,6 @@ import { NotificationBell } from "./notification-bell";
 import { ProjectCard } from "./project-card";
 import { WidthContainer } from "@/components/width-container";
 
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
-
-function formatDate(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}.${m}.${d} ${WEEKDAY[date.getDay()]}`;
-}
-
 export default async function DashboardPage({
   searchParams,
 }: PageProps<"/">) {
@@ -51,22 +42,29 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between px-6 py-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-            AR
+      <header className="px-6 py-4 shadow-sm">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+              AR
+            </div>
+            <div>
+              <h1 className="text-base font-bold">AR_PM</h1>
+              <p className="text-sm text-muted-foreground">{session?.user?.name}님</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-bold">AR_PM</h1>
-            <p className="text-sm text-muted-foreground">{session?.user?.name}님</p>
+          <div className="flex items-center gap-3">
+            {session?.user?.isSuperAdmin && (
+              <Link
+                href={showHidden ? "/" : "/?hidden=1"}
+                className="hidden text-xs text-muted-foreground underline underline-offset-2 sm:inline"
+              >
+                {showHidden ? "숨김/삭제 프로젝트 숨기기" : "숨김/삭제 프로젝트 보기"}
+              </Link>
+            )}
+            <NotificationBell />
+            <LogoutButton />
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted-foreground sm:inline">
-            {formatDate(new Date())}
-          </span>
-          <NotificationBell />
-          <LogoutButton />
         </div>
       </header>
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
@@ -78,7 +76,7 @@ export default async function DashboardPage({
 
         {dueSoon.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-sm font-medium text-muted-foreground">오늘/이번주 마감</h2>
+            <h2 className="text-sm font-bold text-foreground">오늘/이번주 마감</h2>
             <div className="space-y-2">
               {dueSoon.map((t) => (
                 <Link
@@ -103,34 +101,18 @@ export default async function DashboardPage({
         )}
 
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-muted-foreground">프로젝트</h2>
-          <Link
-            href="/tasks"
-            className="text-sm text-muted-foreground underline underline-offset-2"
-          >
-            전체 업무
-          </Link>
+          <h2 className="text-sm font-bold text-foreground">프로젝트</h2>
+          <NewProjectDialog />
         </div>
-
-        <NewProjectDialog />
 
         {projects.length === 0 ? (
           <p className="text-sm text-muted-foreground">아직 프로젝트가 없습니다.</p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard key={project.id} project={project} currentUserId={session!.user.id} />
             ))}
           </div>
-        )}
-
-        {session?.user?.isSuperAdmin && (
-          <Link
-            href={showHidden ? "/" : "/?hidden=1"}
-            className="block text-center text-sm text-muted-foreground underline underline-offset-2"
-          >
-            {showHidden ? "숨김/삭제 프로젝트 숨기기" : "숨김/삭제 프로젝트 보기"}
-          </Link>
         )}
       </WidthContainer>
     </div>

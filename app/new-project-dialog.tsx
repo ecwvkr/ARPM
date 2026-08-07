@@ -25,11 +25,8 @@ export function NewProjectDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button
-            variant="outline"
-            className="w-full rounded-full border-[0.5px] py-6"
-          >
-            <IconPlus className="size-5" />
+          <Button size="icon-sm" variant="outline" title="새 프로젝트" aria-label="새 프로젝트">
+            <IconPlus />
           </Button>
         }
       />

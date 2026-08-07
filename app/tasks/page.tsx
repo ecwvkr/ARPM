@@ -6,6 +6,7 @@ import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
 import { TaskCard } from "@/app/projects/[projectId]/task-card";
+import { NewTaskDialog } from "@/app/projects/[projectId]/new-task-dialog";
 import { listSavedFilters } from "@/app/actions/filters";
 import { TaskFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
@@ -35,16 +36,19 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between px-6 py-4 shadow-sm">
-        <div className="space-y-1">
-          <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
-            ← 전체 프로젝트
-          </Link>
-          <h1 className="text-base font-bold">전체 업무</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          <LogoutButton />
+      <header className="px-6 py-4 shadow-sm">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
+          <div className="space-y-1">
+            <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
+              ← 전체 프로젝트
+            </Link>
+            <h1 className="text-base font-bold">전체 업무</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <NewTaskDialog projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+            <NotificationBell />
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createTask } from "@/app/actions/tasks";
+import { IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,10 +15,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function NewTaskDialog({ projectId }: { projectId: string }) {
+export function NewTaskDialog({
+  projectId,
+  projects,
+}: {
+  projectId?: string;
+  projects?: { id: string; name: string }[];
+}) {
   const [open, setOpen] = useState(false);
-  const action = createTask.bind(null, projectId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [errorMessage, formAction, isPending] = useActionState(createTask, undefined);
   const submitted = useRef(false);
 
   useEffect(() => {
@@ -29,7 +35,17 @@ export function NewTaskDialog({ projectId }: { projectId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm">새 업무</Button>} />
+      <DialogTrigger
+        render={
+          projectId ? (
+            <Button size="sm">새 업무</Button>
+          ) : (
+            <Button size="icon-sm" variant="outline" title="새 업무" aria-label="새 업무">
+              <IconPlus />
+            </Button>
+          )
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>새 업무</DialogTitle>
@@ -41,6 +57,25 @@ export function NewTaskDialog({ projectId }: { projectId: string }) {
           }}
           className="space-y-4"
         >
+          {projectId ? (
+            <input type="hidden" name="projectId" value={projectId} />
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="projectId">프로젝트</Label>
+              <select
+                id="projectId"
+                name="projectId"
+                required
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
+              >
+                {projects?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="title">제목</Label>
             <Input id="title" name="title" required />

@@ -25,12 +25,14 @@ export async function getTaskDetail(taskId: string) {
 }
 
 export async function createTask(
-  projectId: string,
   _prevState: string | undefined,
   formData: FormData,
 ) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  const projectId = formData.get("projectId") as string | null;
+  if (!projectId) return "프로젝트를 선택하세요.";
 
   const { canView } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   if (!canView) return "프로젝트에 접근할 수 없습니다.";
@@ -57,6 +59,7 @@ export async function createTask(
   });
 
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/tasks");
 }
 
 export async function deriveTask(

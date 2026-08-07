@@ -40,48 +40,50 @@ export default async function ProjectDetailPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between px-6 py-4 shadow-sm">
-        <div className="space-y-1">
-          <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
-            ← 전체 프로젝트
-          </Link>
-          <div className="flex items-center gap-2">
-            {project.color && (
-              <span
-                aria-hidden
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: project.color }}
-              />
-            )}
-            <h1 className="text-base font-bold">{project.name}</h1>
-            <Badge variant={project.visibility === "PUBLIC" ? "secondary" : "outline"}>
-              {project.visibility === "PUBLIC" ? "공개" : "비공개"}
-            </Badge>
-            {hidden && (
-              <Badge variant="destructive">{project.deletedAt ? "삭제됨" : "숨김"}</Badge>
-            )}
+      <header className="px-6 py-4 shadow-sm">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
+          <div className="space-y-1">
+            <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
+              ← 전체 프로젝트
+            </Link>
+            <div className="flex items-center gap-2">
+              {project.color && (
+                <span
+                  aria-hidden
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: project.color }}
+                />
+              )}
+              <h1 className="text-base font-bold">{project.name}</h1>
+              <Badge variant={project.visibility === "PUBLIC" ? "secondary" : "outline"}>
+                {project.visibility === "PUBLIC" ? "공개" : "비공개"}
+              </Badge>
+              {hidden && (
+                <Badge variant="destructive">{project.deletedAt ? "삭제됨" : "숨김"}</Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">owner: {project.owner.name}</p>
           </div>
-          <p className="text-sm text-muted-foreground">owner: {project.owner.name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {session.user.isSuperAdmin && (
-            <AdminControls projectId={project.id} isArchived={project.isArchived} />
-          )}
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            {session.user.isSuperAdmin && (
+              <AdminControls projectId={project.id} isArchived={project.isArchived} />
+            )}
+            <NotificationBell />
+          </div>
         </div>
       </header>
 
       <WidthContainer mainClassName="space-y-8 px-6 py-6">
         {isOwner && (
           <section className="space-y-2">
-            <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">공개 범위</h2>
+            <h2 className="text-sm font-bold text-foreground">공개 범위</h2>
             <VisibilityForm projectId={project.id} visibility={project.visibility} />
           </section>
         )}
 
         {isOwner && (
           <section className="space-y-2">
-            <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">프로젝트 색상</h2>
+            <h2 className="text-sm font-bold text-foreground">프로젝트 색상</h2>
             <p className="text-sm text-muted-foreground">
               대시보드·캘린더·캔버스에서 이 프로젝트를 구분하는 색상입니다. 하위로 파생되는 업무에도 그대로 이어집니다.
             </p>
@@ -90,7 +92,7 @@ export default async function ProjectDetailPage({
         )}
 
         <section className="space-y-2">
-          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">멤버 ({project.members.length})</h2>
+          <h2 className="text-sm font-bold text-foreground">멤버 ({project.members.length})</h2>
           <ul className="space-y-1 text-sm text-muted-foreground">
             {project.members.map((m) => (
               <li key={m.userId}>
@@ -106,7 +108,7 @@ export default async function ProjectDetailPage({
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">업무</h2>
+              <h2 className="text-sm font-bold text-foreground">업무</h2>
               <div className="flex gap-1 text-xs">
                 <Link
                   href={`/projects/${project.id}`}
@@ -164,7 +166,7 @@ export default async function ProjectDetailPage({
 
         {canViewAudit && auditLog.length > 0 && (
           <details className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
-            <summary className="cursor-pointer text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <summary className="cursor-pointer text-sm font-bold text-foreground">
             활동 로그
           </summary>
             <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">

@@ -109,7 +109,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">관리</h3>
+        <h3 className="text-sm font-bold text-foreground">관리</h3>
         <div className="flex gap-2">
           <DeriveDialog parentTaskId={taskId} onDone={afterMutation} />
           <Button
@@ -136,7 +136,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
       {canParticipantAct && !locked && (
         <section className="space-y-2">
-          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">상태</h3>
+          <h3 className="text-sm font-bold text-foreground">상태</h3>
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -182,14 +182,14 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
       {canParticipantAct && (
         <section className="space-y-2">
-          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">기한 연장</h3>
+          <h3 className="text-sm font-bold text-foreground">기한 연장</h3>
           <ExtendDueDateForm taskId={taskId} onDone={afterMutation} />
         </section>
       )}
 
       {detail.canSetPriority && (
         <section className="space-y-2">
-          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">내 우선순위</h3>
+          <h3 className="text-sm font-bold text-foreground">내 우선순위</h3>
           <div className="flex gap-2">
             {(["URGENT", "HIGH", "NORMAL", "LOW"] as const).map((level) => (
               <Button
@@ -251,7 +251,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       )}
 
       <section className="space-y-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">참여자 ({task.participants.length})</h3>
+        <h3 className="text-sm font-bold text-foreground">참여자 ({task.participants.length})</h3>
         <ul className="space-y-1 text-sm text-muted-foreground">
           {task.participants.map((p) => (
             <li key={p.userId}>
@@ -271,7 +271,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           </div>
 
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">업무 정보 수정</h3>
+            <h3 className="text-sm font-bold text-foreground">업무 정보 수정</h3>
             <EditInfoForm
               taskId={taskId}
               title={task.title}
@@ -282,7 +282,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           </section>
 
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">공개 범위</h3>
+            <h3 className="text-sm font-bold text-foreground">공개 범위</h3>
             <form
               action={(formData) =>
                 startTransition(async () => {
@@ -309,7 +309,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">참여자 초대 (공유 범위 지정)</h3>
+              <h3 className="text-sm font-bold text-foreground">참여자 초대 (공유 범위 지정)</h3>
               {!showInvite && (
                 <Button size="sm" variant="outline" onClick={() => setShowInvite(true)}>
                   열기
@@ -327,7 +327,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
           {task.participants.length > 0 && (
             <section className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">master 위임</h3>
+              <h3 className="text-sm font-bold text-foreground">master 위임</h3>
               <form
                 action={(formData) =>
                   startTransition(async () => {
@@ -364,7 +364,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">관련 링크 ({task.links.length})</h3>
+        <h3 className="text-sm font-bold text-foreground">관련 링크 ({task.links.length})</h3>
         <ul className="space-y-1">
           {task.links.map((l) => (
             <li key={l.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 p-2 text-sm">
@@ -393,7 +393,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">코멘트 ({task.comments.length})</h3>
+        <h3 className="text-sm font-bold text-foreground">코멘트 ({task.comments.length})</h3>
         <ul className="space-y-2">
           {task.comments.map((c) => (
             <li key={c.id} className="rounded-md bg-muted/50 p-2 text-sm">

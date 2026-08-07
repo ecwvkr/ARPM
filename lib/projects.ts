@@ -25,7 +25,7 @@ export function listVisibleProjects(
     where,
     include: {
       owner: true,
-      members: true,
+      members: { include: { user: { select: { id: true, name: true } } } },
       tasks: { select: { status: true } },
     },
     orderBy: { createdAt: "desc" },
