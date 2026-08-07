@@ -168,7 +168,19 @@ export async function getCanvasTasks(projectId: string) {
     status: t.status,
     visibility: t.visibility,
     dueDate: t.dueDate,
+    canvasX: t.canvasX,
+    canvasY: t.canvasY,
   }));
+}
+
+export async function updateTaskPosition(taskId: string, x: number, y: number) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canView } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canView) return;
+
+  await prisma.task.update({ where: { id: taskId }, data: { canvasX: x, canvasY: y } });
 }
 
 export async function joinTask(taskId: string) {

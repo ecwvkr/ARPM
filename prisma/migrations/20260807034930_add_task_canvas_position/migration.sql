@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Task" ADD COLUMN     "canvasX" DOUBLE PRECISION,
+ADD COLUMN     "canvasY" DOUBLE PRECISION;

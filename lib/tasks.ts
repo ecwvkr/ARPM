@@ -200,6 +200,7 @@ export async function listAllTasksForUser(
     status?: "TODO" | "IN_PROGRESS" | "DONE";
     mineOnly?: boolean;
     tag?: string;
+    q?: string;
   } = {},
 ) {
   const projects = await listVisibleProjects(userId, isSuperAdmin, false);
@@ -218,6 +219,10 @@ export async function listAllTasksForUser(
 
   if (filters.status) tasks = tasks.filter((t) => t.status === filters.status);
   if (filters.tag) tasks = tasks.filter((t) => t.tags.includes(filters.tag!));
+  if (filters.q) {
+    const q = filters.q.toLowerCase();
+    tasks = tasks.filter((t) => t.title.toLowerCase().includes(q));
+  }
   if (filters.mineOnly) {
     tasks = tasks.filter(
       (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),

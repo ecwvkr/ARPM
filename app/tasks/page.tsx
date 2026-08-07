@@ -18,6 +18,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
   const status = typeof params.status === "string" ? params.status : undefined;
   const mineOnly = params.mine === "1";
   const tag = typeof params.tag === "string" ? params.tag : undefined;
+  const q = typeof params.q === "string" ? params.q : undefined;
 
   const isSuperAdmin = !!session.user.isSuperAdmin;
   const projects = await listVisibleProjects(session.user.id, isSuperAdmin, false);
@@ -27,6 +28,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
     status: status as "TODO" | "IN_PROGRESS" | "DONE" | undefined,
     mineOnly,
     tag,
+    q,
   });
 
   return (

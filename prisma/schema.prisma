@@ -65,6 +65,8 @@ model Task {
   dueDate     DateTime?
   completedAt DateTime?
   tags        String[]   @default([]) // Phase5: 태그
+  canvasX     Float?
+  canvasY     Float? // 캔버스에서 드래그로 옮긴 위치. 없으면 dagre 자동배치 사용.
 
   project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent       Task?             @relation("TaskTree", fields: [parentId], references: [id], onDelete: SetNull)

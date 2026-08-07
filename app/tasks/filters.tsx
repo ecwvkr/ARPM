@@ -8,6 +8,7 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tagInput, setTagInput] = useState(searchParams.get("tag") ?? "");
+  const [queryInput, setQueryInput] = useState(searchParams.get("q") ?? "");
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -20,6 +21,18 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <Input
+        value={queryInput}
+        onChange={(e) => setQueryInput(e.target.value)}
+        onBlur={() => setParam("q", queryInput.trim())}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setParam("q", queryInput.trim());
+        }}
+        placeholder="업무명 검색"
+        aria-label="업무명 검색"
+        className="h-auto w-40 py-1.5 text-sm"
+      />
+
       <select
         value={searchParams.get("projectId") ?? ""}
         onChange={(e) => setParam("projectId", e.target.value)}

@@ -10,6 +10,8 @@ import {
   Position,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Node,
   type Edge,
   type NodeProps,
@@ -17,7 +19,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
-import { getCanvasTasks, moveTask } from "@/app/actions/tasks";
+import { getCanvasTasks, moveTask, updateTaskPosition } from "@/app/actions/tasks";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_LABEL, isOverdue } from "@/lib/priority";
@@ -30,6 +32,8 @@ type CanvasTask = {
   status: "TODO" | "IN_PROGRESS" | "DONE";
   visibility: "PUBLIC" | "PRIVATE";
   dueDate: Date | null;
+  canvasX: number | null;
+  canvasY: number | null;
 };
 
 const NODE_WIDTH = 200;
@@ -51,10 +55,14 @@ function buildGraph(tasks: CanvasTask[], onOpen: (id: string) => void) {
   const positions = layout(tasks);
   const nodes: Node[] = tasks.map((t) => {
     const pos = positions.get(t.id)!;
+    const position =
+      t.canvasX !== null && t.canvasY !== null
+        ? { x: t.canvasX, y: t.canvasY }
+        : { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
     return {
       id: t.id,
       type: "task",
-      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
+      position,
       data: { task: t, onOpen },
     };
   });
@@ -97,11 +105,20 @@ function CanvasNode({ data }: NodeProps<Node<{ task: CanvasTask; onOpen: (id: st
 
 const nodeTypes = { task: CanvasNode };
 
-export function TaskCanvas({ projectId, className = "h-[600px]" }: { projectId: string; className?: string }) {
+export function TaskCanvas(props: { projectId: string; className?: string }) {
+  return (
+    <ReactFlowProvider>
+      <TaskCanvasInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function TaskCanvasInner({ projectId, className = "h-[600px]" }: { projectId: string; className?: string }) {
   const [tasks, setTasks] = useState<CanvasTask[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const { fitView } = useReactFlow();
 
   const reload = useCallback(() => {
     getCanvasTasks(projectId).then((t) => setTasks(t as CanvasTask[]));
@@ -116,7 +133,11 @@ export function TaskCanvas({ projectId, className = "h-[600px]" }: { projectId: 
     const { nodes, edges } = buildGraph(tasks, setSelected);
     setNodes(nodes);
     setEdges(edges);
-  }, [tasks, setNodes, setEdges]);
+    // ponytail: fitView은 노드가 실제로 측정(ResizeObserver)된 다음에야 정확히 계산되므로
+    // rAF 한 틱으로는 부족할 때가 있어 짧은 지연을 둔다.
+    const id = setTimeout(() => fitView(), 50);
+    return () => clearTimeout(id);
+  }, [tasks, setNodes, setEdges, fitView]);
 
   const onConnect = useCallback(
     async (connection: Connection) => {
@@ -132,6 +153,10 @@ export function TaskCanvas({ projectId, className = "h-[600px]" }: { projectId: 
     [reload],
   );
 
+  const onNodeDragStop = useCallback((_event: unknown, node: Node) => {
+    updateTaskPosition(node.id, node.position.x, node.position.y);
+  }, []);
+
   if (!tasks) return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
   if (tasks.length === 0) return <p className="text-sm text-muted-foreground">아직 업무가 없습니다.</p>;
 
@@ -144,8 +169,8 @@ export function TaskCanvas({ projectId, className = "h-[600px]" }: { projectId: 
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
         connectionRadius={40}
-        fitView
         proOptions={{ hideAttribution: true }}
       >
         <Background />
