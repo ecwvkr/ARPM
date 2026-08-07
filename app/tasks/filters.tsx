@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { saveFilter, deleteSavedFilter } from "@/app/actions/filters";
 
-export function TaskFilters({ projects }: { projects: { id: string; name: string }[] }) {
+export function TaskFilters({
+  projects,
+  savedFilters,
+}: {
+  projects: { id: string; name: string }[];
+  savedFilters: { id: string; name: string; query: string }[];
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tagInput, setTagInput] = useState(searchParams.get("tag") ?? "");
   const [queryInput, setQueryInput] = useState(searchParams.get("q") ?? "");
+  const [isPending, startTransition] = useTransition();
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -19,7 +28,16 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
 
   const mine = searchParams.get("mine") === "1";
 
+  function handleSave() {
+    const name = window.prompt("즐겨찾기 이름");
+    if (!name) return;
+    startTransition(async () => {
+      await saveFilter(name, searchParams.toString());
+    });
+  }
+
   return (
+    <div className="space-y-2">
     <div className="flex flex-wrap items-center gap-2">
       <Input
         value={queryInput}
@@ -82,6 +100,32 @@ export function TaskFilters({ projects }: { projects: { id: string; name: string
       >
         내 업무
       </button>
+
+      <Button type="button" size="sm" variant="outline" onClick={handleSave} disabled={isPending}>
+        현재 필터 저장
+      </Button>
+    </div>
+
+    {savedFilters.length > 0 && (
+      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+        <span>즐겨찾기:</span>
+        {savedFilters.map((f) => (
+          <span key={f.id} className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
+            <button type="button" onClick={() => router.push(`/tasks?${f.query}`)}>
+              {f.name}
+            </button>
+            <button
+              type="button"
+              aria-label={`${f.name} 삭제`}
+              onClick={() => startTransition(async () => { await deleteSavedFilter(f.id); })}
+              className="text-muted-foreground/60 hover:text-destructive"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+    )}
     </div>
   );
 }

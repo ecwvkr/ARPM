@@ -13,6 +13,8 @@ import {
   transferMaster,
   inviteToTask,
   addComment,
+  addTaskLink,
+  deleteTaskLink,
   deleteTask,
   deriveTask,
   moveTask,
@@ -81,6 +83,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
           <Badge variant={task.visibility === "PUBLIC" ? "secondary" : "outline"}>
             {task.visibility === "PUBLIC" ? "공개" : "비공개"}
           </Badge>
+          {task.recurrence === "WEEKLY" && <Badge variant="outline">매주 반복</Badge>}
         </div>
         {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
         {task.tags.length > 0 && (
@@ -335,16 +338,54 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       )}
 
       <section className="space-y-2">
+        <h3 className="text-sm font-medium">관련 링크 ({task.links.length})</h3>
+        <ul className="space-y-1">
+          {task.links.map((l) => (
+            <li key={l.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 p-2 text-sm">
+              <a
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate underline underline-offset-2"
+              >
+                {l.label || l.url}
+              </a>
+              {canManage && (
+                <button
+                  type="button"
+                  aria-label="링크 삭제"
+                  onClick={() => deleteTaskLink(l.id).then(afterMutation)}
+                  className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  삭제
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {canComment && <TaskLinkForm taskId={taskId} onDone={afterMutation} />}
+      </section>
+
+      <section className="space-y-2">
         <h3 className="text-sm font-medium">코멘트 ({task.comments.length})</h3>
         <ul className="space-y-2">
           {task.comments.map((c) => (
-            <li key={c.id} className="rounded-md border-[0.5px] p-2 text-sm">
+            <li key={c.id} className="rounded-md bg-muted/50 p-2 text-sm">
               <p className="text-xs text-muted-foreground">{c.author.name}</p>
               <p className="whitespace-pre-wrap">{c.body}</p>
             </li>
           ))}
         </ul>
-        {canComment && <CommentForm taskId={taskId} onDone={afterMutation} />}
+        {canComment && (
+          <CommentForm
+            taskId={taskId}
+            onDone={afterMutation}
+            candidates={[
+              { userId: task.master.id, userName: task.master.name },
+              ...task.participants.map((p) => ({ userId: p.userId, userName: p.user.name })),
+            ].filter((c, i, arr) => arr.findIndex((x) => x.userId === c.userId) === i)}
+          />
+        )}
       </section>
     </div>
   );
@@ -578,19 +619,82 @@ function DeleteForm({ taskId, onDeleted }: { taskId: string; onDeleted: () => vo
   );
 }
 
-function CommentForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
+function TaskLinkForm({ taskId, onDone }: { taskId: string; onDone: () => void }) {
+  const action = addTaskLink.bind(null, taskId);
+  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  return (
+    <form
+      ref={formRef}
+      action={async (formData) => {
+        await formAction(formData);
+        formRef.current?.reset();
+        onDone();
+      }}
+      className="flex flex-wrap items-center gap-2"
+    >
+      <Input name="url" placeholder="https://..." className="h-auto w-40 py-1.5 text-sm" required />
+      <Input name="label" placeholder="이름(선택)" className="h-auto w-28 py-1.5 text-sm" />
+      <Button type="submit" size="sm" variant="outline" disabled={isPending}>
+        추가
+      </Button>
+      {errorMessage && <p className="w-full text-sm text-destructive">{errorMessage}</p>}
+    </form>
+  );
+}
+
+function CommentForm({
+  taskId,
+  onDone,
+  candidates,
+}: {
+  taskId: string;
+  onDone: () => void;
+  candidates: { userId: string; userName: string }[];
+}) {
   const action = addComment.bind(null, taskId);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [notify, setNotify] = useState<string[]>([]);
 
   return (
     <form
       action={async (formData) => {
+        notify.forEach((userId) => formData.append("notify", userId));
         await formAction(formData);
+        setNotify([]);
         onDone();
       }}
       className="space-y-2"
     >
       <Textarea name="body" placeholder="코멘트를 입력하세요" rows={2} required />
+      {candidates.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <span>알릴 사람:</span>
+          {candidates.map((c) => {
+            const active = notify.includes(c.userId);
+            return (
+              <button
+                key={c.userId}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setNotify((prev) =>
+                    prev.includes(c.userId) ? prev.filter((id) => id !== c.userId) : [...prev, c.userId],
+                  )
+                }
+                className={
+                  active
+                    ? "rounded-full bg-primary px-2 py-0.5 text-primary-foreground"
+                    : "rounded-full bg-muted px-2 py-0.5"
+                }
+              >
+                @{c.userName}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
       <Button type="submit" size="sm" variant="outline" disabled={isPending}>
         등록

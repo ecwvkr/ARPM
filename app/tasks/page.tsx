@@ -6,6 +6,7 @@ import { STATUS_LABEL, isOverdue, toPriorityBadges } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
 import { TaskCard } from "@/app/projects/[projectId]/task-card";
+import { listSavedFilters } from "@/app/actions/filters";
 import { TaskFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
 
@@ -22,6 +23,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
 
   const isSuperAdmin = !!session.user.isSuperAdmin;
   const projects = await listVisibleProjects(session.user.id, isSuperAdmin, false);
+  const savedFilters = await listSavedFilters();
 
   const tasks = await listAllTasksForUser(session.user.id, isSuperAdmin, {
     projectId,
@@ -47,7 +49,10 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
       </header>
 
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
-        <TaskFilters projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+        <TaskFilters
+          projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+          savedFilters={savedFilters.map((f) => ({ id: f.id, name: f.name, query: f.query }))}
+        />
 
         {tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground">조건에 맞는 업무가 없습니다.</p>

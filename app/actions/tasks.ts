@@ -41,6 +41,7 @@ export async function createTask(
   const memo = (formData.get("memo") as string | null)?.trim() || null;
   const dueDateRaw = formData.get("dueDate") as string | null;
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+  const recurrence = formData.get("recurrence") === "WEEKLY" ? "WEEKLY" : null;
 
   await prisma.task.create({
     data: {
@@ -51,6 +52,7 @@ export async function createTask(
       visibility,
       masterId: session.user.id,
       tags: parseTags(formData),
+      recurrence,
     },
   });
 
@@ -237,6 +239,23 @@ export async function completeTask(taskId: string) {
     data: { status: "DONE", completedAt: new Date() },
   });
 
+  if (task.recurrence === "WEEKLY") {
+    const base = task.dueDate ?? new Date();
+    const nextDueDate = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.task.create({
+      data: {
+        projectId: task.projectId,
+        title: task.title,
+        memo: task.memo,
+        dueDate: nextDueDate,
+        visibility: task.visibility,
+        masterId: task.masterId,
+        tags: task.tags,
+        recurrence: "WEEKLY",
+      },
+    });
+  }
+
   revalidatePath(`/projects/${task.projectId}`);
 }
 
@@ -319,8 +338,8 @@ export async function transferMaster(taskId: string, formData: FormData) {
   const newMasterId = formData.get("userId") as string | null;
   if (!newMasterId) throw new Error("대상을 선택하세요.");
 
-  const isEligible = task.participants.some((p) => p.userId === newMasterId);
-  if (!isEligible) throw new Error("참여자에게만 위임할 수 있습니다.");
+  const newMaster = task.participants.find((p) => p.userId === newMasterId);
+  if (!newMaster) throw new Error("참여자에게만 위임할 수 있습니다.");
 
   await prisma.$transaction([
     prisma.task.update({ where: { id: taskId }, data: { masterId: newMasterId } }),
@@ -330,6 +349,16 @@ export async function transferMaster(taskId: string, formData: FormData) {
         type: "MASTER_DELEGATED",
         refId: task.id,
         message: `"${task.title}" 업무의 master로 위임되었습니다.`,
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        action: "TRANSFER_MASTER",
+        targetType: "TASK",
+        targetId: task.id,
+        projectId: task.projectId,
+        message: `"${task.title}" 업무의 master를 ${newMaster.user.name}님에게 위임`,
       },
     }),
   ]);
@@ -406,7 +435,56 @@ export async function addComment(
   if (!body) return "내용을 입력하세요.";
 
   await prisma.comment.create({ data: { taskId, authorId: session.user.id, body } });
+
+  const notifyUserIds = formData.getAll("notify").filter((v): v is string => typeof v === "string" && v !== session.user.id);
+  if (notifyUserIds.length > 0) {
+    const snippet = body.length > 40 ? `${body.slice(0, 40)}...` : body;
+    await prisma.notification.createMany({
+      data: notifyUserIds.map((userId) => ({
+        userId,
+        type: "COMMENT_MENTION",
+        refId: taskId,
+        message: `${session.user.name}님이 "${task.title}" 업무 코멘트에서 회원님을 언급했습니다: "${snippet}"`,
+      })),
+    });
+  }
+
   revalidatePath(`/projects/${task.projectId}`);
+}
+
+export async function addTaskLink(
+  taskId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canComment } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canComment) return "권한이 없습니다.";
+
+  const url = (formData.get("url") as string | null)?.trim();
+  if (!url) return "URL을 입력하세요.";
+  if (!/^https?:\/\//.test(url)) return "http:// 또는 https://로 시작하는 URL을 입력하세요.";
+
+  const label = (formData.get("label") as string | null)?.trim() || null;
+
+  await prisma.taskLink.create({ data: { taskId, url, label, authorId: session.user.id } });
+  revalidatePath(`/projects/${task.projectId}`);
+}
+
+export async function deleteTaskLink(linkId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const link = await prisma.taskLink.findUnique({ where: { id: linkId }, include: { task: true } });
+  if (!link) return;
+
+  const { canManage } = await getTaskAccess(link.taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!canManage) return;
+
+  await prisma.taskLink.delete({ where: { id: linkId } });
+  revalidatePath(`/projects/${link.task.projectId}`);
 }
 
 export async function deleteTask(
@@ -442,6 +520,16 @@ export async function deleteTask(
         refId: task.projectId,
         message: `"${task.title}" 업무가 삭제되었습니다.`,
       })),
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        action: "DELETE_TASK",
+        targetType: "TASK",
+        targetId: task.id,
+        projectId: task.projectId,
+        message: `"${task.title}" 업무를 영구 삭제`,
+      },
     }),
   ]);
 

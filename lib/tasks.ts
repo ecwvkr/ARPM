@@ -67,6 +67,7 @@ export async function getTaskAccess(taskId: string, userId: string, isSuperAdmin
       participants: { include: { user: true } },
       priorities: { include: { user: true } },
       comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
+      links: { include: { author: true }, orderBy: { createdAt: "asc" } },
       project: true,
     },
   });

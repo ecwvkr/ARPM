@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
+import { listAllTasksForUser } from "@/lib/tasks";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
+import { isOverdue } from "@/lib/priority";
 import { LogoutButton } from "./logout-button";
 import { NewProjectDialog } from "./new-project-dialog";
 import { NotificationBell } from "./notification-bell";
@@ -37,6 +39,16 @@ export default async function DashboardPage({
     p.tasks.some((t) => t.status === "IN_PROGRESS"),
   ).length;
 
+  const weekFromNow = new Date();
+  weekFromNow.setDate(weekFromNow.getDate() + 7);
+  const myTasks = await listAllTasksForUser(session!.user.id, !!session?.user?.isSuperAdmin, {
+    mineOnly: true,
+  });
+  const dueSoon = myTasks
+    .filter((t) => t.status !== "DONE" && t.dueDate && t.dueDate <= weekFromNow)
+    .sort((a, b) => a.dueDate!.getTime() - b.dueDate!.getTime())
+    .slice(0, 5);
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between px-6 py-4 shadow-sm">
@@ -63,6 +75,32 @@ export default async function DashboardPage({
           <SummaryCard label="나의 프로젝트" value={ownedCount} />
           <SummaryCard label="진행중인 프로젝트" value={inProgressCount} />
         </div>
+
+        {dueSoon.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="text-sm font-medium text-muted-foreground">오늘/이번주 마감</h2>
+            <div className="space-y-2">
+              {dueSoon.map((t) => (
+                <Link
+                  key={t.id}
+                  href={`/projects/${t.projectId}?task=${t.id}`}
+                  className="flex items-center justify-between rounded-4xl bg-card p-3 text-sm shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10"
+                >
+                  <span className="truncate">{t.title}</span>
+                  <span
+                    className={
+                      isOverdue(t.dueDate, t.status)
+                        ? "shrink-0 text-xs font-medium text-destructive"
+                        : "shrink-0 text-xs text-muted-foreground"
+                    }
+                  >
+                    {dueLabel(t.dueDate!, t.status)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">프로젝트</h2>
@@ -97,6 +135,18 @@ export default async function DashboardPage({
       </WidthContainer>
     </div>
   );
+}
+
+function dueLabel(dueDate: Date, status: string) {
+  if (isOverdue(dueDate, status)) return "지연";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dueDate);
+  d.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86400000);
+  if (diffDays === 0) return "오늘";
+  if (diffDays === 1) return "내일";
+  return `D-${diffDays}`;
 }
 
 function SummaryCard({ label, value }: { label: string; value: number }) {

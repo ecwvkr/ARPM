@@ -7,6 +7,7 @@ import { NotificationBell } from "@/app/notification-bell";
 import { VisibilityForm } from "./visibility-form";
 import { InviteForm } from "./invite-form";
 import { AdminControls } from "./admin-controls";
+import { listProjectAuditLog } from "@/app/actions/audit";
 import { TaskList } from "./task-list";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCanvas } from "./canvas-loader";
@@ -33,6 +34,8 @@ export default async function ProjectDetailPage({
   if (!project || !canView) notFound();
 
   const hidden = project.isArchived || project.deletedAt !== null;
+  const canViewAudit = isOwner || !!session.user.isSuperAdmin;
+  const auditLog = canViewAudit ? await listProjectAuditLog(project.id) : [];
 
   return (
     <div className="flex flex-1 flex-col">
@@ -138,6 +141,20 @@ export default async function ProjectDetailPage({
             />
           )}
         </section>
+
+        {canViewAudit && auditLog.length > 0 && (
+          <details className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
+            <summary className="cursor-pointer text-sm font-medium">활동 로그</summary>
+            <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+              {auditLog.map((l) => (
+                <li key={l.id}>
+                  <span className="text-foreground">{l.actorName}</span> · {l.message} ·{" "}
+                  {new Date(l.createdAt).toLocaleString("ko-KR")}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </WidthContainer>
 
       <TaskDeepLink />

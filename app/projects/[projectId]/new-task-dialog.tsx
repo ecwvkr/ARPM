@@ -57,6 +57,10 @@ export function NewTaskDialog({ projectId }: { projectId: string }) {
             <Label htmlFor="tags">태그 (쉼표로 구분)</Label>
             <Input id="tags" name="tags" placeholder="예: 프론트엔드, 급함" />
           </div>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input type="checkbox" name="recurrence" value="WEEKLY" className="size-4" />
+            매주 반복 (완료 시 다음 회차 자동 생성)
+          </label>
           <div className="space-y-1.5">
             <Label htmlFor="visibility">공개 범위</Label>
             <select
