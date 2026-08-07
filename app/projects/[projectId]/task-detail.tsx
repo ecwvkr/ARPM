@@ -103,7 +103,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </section>
 
       <div className="flex items-center gap-2">
-        <p className="text-[11px] font-bold tracking-wider text-muted-foreground/70 uppercase">진행 관리</p>
+        <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">진행 관리</p>
         <div className="h-px flex-1 bg-foreground/10" />
       </div>
 
@@ -244,7 +244,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       {canManage && (
         <>
           <div className="flex items-center gap-2 pt-2">
-            <p className="text-[11px] font-bold tracking-wider text-muted-foreground/70 uppercase">설정</p>
+            <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">설정</p>
             <div className="h-px flex-1 bg-foreground/10" />
           </div>
 
@@ -355,7 +355,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       )}
 
       <div className="flex items-center gap-2 pt-2">
-        <p className="text-[11px] font-bold tracking-wider text-muted-foreground/70 uppercase">협업</p>
+        <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">협업</p>
         <div className="h-px flex-1 bg-foreground/10" />
       </div>
 
