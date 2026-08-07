@@ -17,6 +17,7 @@ import {
   deleteTaskLink,
   deleteTask,
   deriveTask,
+  duplicateTask,
   moveTask,
   listMovableTargets,
   setMyPriority,
@@ -34,6 +35,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { IconPlus, IconCopy, IconArrowsMove, IconTrash } from "@tabler/icons-react";
 import { TaskTreePicker } from "./task-tree-picker";
 import { UserPicker } from "@/components/user-picker";
 
@@ -42,10 +44,9 @@ type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
 export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [isPending, startTransition] = useTransition();
-  // ponytail: 공유 관리/부모 변경은 드로어를 열자마자가 아니라 실제로 펼쳤을 때만 불러온다
-  // (각각 프로젝트 전체 업무 트리를 다시 조회하는 무거운 호출이라 미리 불러올 필요가 없음).
+  // ponytail: 공유 관리는 드로어를 열자마자가 아니라 실제로 펼쳤을 때만 불러온다
+  // (프로젝트 전체 업무 트리를 다시 조회하는 무거운 호출이라 미리 불러올 필요가 없음).
   const [showInvite, setShowInvite] = useState(false);
-  const [showMove, setShowMove] = useState(false);
 
   const reload = () => {
     startTransition(async () => {
@@ -108,8 +109,29 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">파생</h3>
-        <DeriveDialog parentTaskId={taskId} onDone={afterMutation} />
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">관리</h3>
+        <div className="flex gap-2">
+          <DeriveDialog parentTaskId={taskId} onDone={afterMutation} />
+          <Button
+            size="icon-sm"
+            variant="outline"
+            title="복제하기"
+            aria-label="복제하기"
+            disabled={isPending}
+            onClick={() =>
+              startTransition(async () => {
+                await duplicateTask(taskId);
+                afterMutation();
+              })
+            }
+          >
+            <IconCopy />
+          </Button>
+          {canManage && (
+            <MoveDialog taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
+          )}
+          {canManage && <DeleteDialog taskId={taskId} onDeleted={onDeleted} />}
+        </div>
       </section>
 
       {canParticipantAct && !locked && (
@@ -303,20 +325,6 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             )}
           </section>
 
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">부모 변경</h3>
-              {!showMove && (
-                <Button size="sm" variant="outline" onClick={() => setShowMove(true)}>
-                  열기
-                </Button>
-              )}
-            </div>
-            {showMove && (
-              <MoveForm taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
-            )}
-          </section>
-
           {task.participants.length > 0 && (
             <section className="space-y-2">
               <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">master 위임</h3>
@@ -347,10 +355,6 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             </section>
           )}
 
-          <section className="space-y-2 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
-            <h3 className="text-xs font-semibold tracking-wide text-destructive uppercase">위험 작업 · 업무 삭제</h3>
-            <DeleteForm taskId={taskId} onDeleted={onDeleted} />
-          </section>
         </>
       )}
 
@@ -520,7 +524,13 @@ function DeriveDialog({ parentTaskId, onDone }: { parentTaskId: string; onDone: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline">파생하기</Button>} />
+      <DialogTrigger
+        render={
+          <Button size="icon-sm" variant="outline" title="파생하기" aria-label="파생하기">
+            <IconPlus />
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>하위 업무 파생</DialogTitle>
@@ -565,6 +575,43 @@ function DeriveDialog({ parentTaskId, onDone }: { parentTaskId: string; onDone: 
             {isPending ? "생성 중..." : "파생하기"}
           </Button>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MoveDialog({
+  taskId,
+  currentParentId,
+  onDone,
+}: {
+  taskId: string;
+  currentParentId: string | null;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button size="icon-sm" variant="outline" title="이동하기" aria-label="이동하기">
+            <IconArrowsMove />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>부모 변경</DialogTitle>
+        </DialogHeader>
+        <MoveForm
+          taskId={taskId}
+          currentParentId={currentParentId}
+          onDone={() => {
+            setOpen(false);
+            onDone();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -615,6 +662,31 @@ function MoveForm({
         이동
       </Button>
     </form>
+  );
+}
+
+function DeleteDialog({ taskId, onDeleted }: { taskId: string; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button size="icon-sm" variant="destructive" title="삭제하기" aria-label="삭제하기">
+            <IconTrash />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>업무 삭제</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          이 작업은 되돌릴 수 없습니다. 하위 업무는 상위 업무로 승격됩니다.
+        </p>
+        <DeleteForm taskId={taskId} onDeleted={onDeleted} />
+      </DialogContent>
+    </Dialog>
   );
 }
 

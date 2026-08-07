@@ -104,6 +104,29 @@ export async function deriveTask(
   revalidatePath(`/projects/${parent.projectId}`);
 }
 
+export async function duplicateTask(taskId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canView } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canView) throw new Error("접근할 수 없습니다.");
+
+  await prisma.task.create({
+    data: {
+      projectId: task.projectId,
+      parentId: task.parentId,
+      title: `${task.title} 복사본`,
+      memo: task.memo,
+      dueDate: task.dueDate,
+      visibility: task.visibility,
+      masterId: session.user.id,
+      tags: task.tags,
+    },
+  });
+
+  revalidatePath(`/projects/${task.projectId}`);
+}
+
 export async function moveTask(taskId: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
