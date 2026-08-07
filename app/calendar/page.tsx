@@ -105,12 +105,15 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
                       <Link
                         key={t.id}
                         href={`/projects/${t.projectId}?task=${t.id}`}
+                        style={t.projectColor ? { borderLeftColor: t.projectColor } : undefined}
                         className={`block truncate rounded-md px-1 py-0.5 text-xs ${
+                          t.projectColor ? "border-l-2" : ""
+                        } ${
                           isOverdue(t.dueDate, t.status)
                             ? "bg-destructive/15 text-destructive"
                             : "bg-secondary text-secondary-foreground"
                         }`}
-                        title={`${t.title} · ${STATUS_LABEL[t.status]}`}
+                        title={`${t.title} · ${t.projectName} · ${STATUS_LABEL[t.status]}`}
                       >
                         {t.title}
                       </Link>

@@ -212,7 +212,7 @@ export async function listAllTasksForUser(
   const perProject = await Promise.all(
     targetProjects.map(async (p) => {
       const tasks = await listTasksForProject(p.id, userId, isSuperAdmin);
-      return tasks.map((t) => ({ ...t, projectName: p.name }));
+      return tasks.map((t) => ({ ...t, projectName: p.name, projectColor: p.color }));
     }),
   );
 

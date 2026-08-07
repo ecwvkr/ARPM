@@ -30,22 +30,29 @@ export default async function CanvasPage({ searchParams }: PageProps<"/canvas">)
           <p className="text-sm text-muted-foreground">아직 프로젝트가 없습니다.</p>
         ) : (
           <>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               {projects.map((p) => (
                 <Link
                   key={p.id}
                   href={`/canvas?projectId=${p.id}`}
-                  className={
+                  className={`flex items-center gap-1.5 ${
                     p.id === selected.id
                       ? "font-medium underline underline-offset-2"
                       : "text-muted-foreground underline underline-offset-2"
-                  }
+                  }`}
                 >
+                  {p.color && (
+                    <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: p.color }} />
+                  )}
                   {p.name}
                 </Link>
               ))}
             </div>
-            <TaskCanvas projectId={selected.id} className="h-[calc(100dvh-11rem)] min-h-[420px]" />
+            <TaskCanvas
+              projectId={selected.id}
+              color={selected.color}
+              className="h-[calc(100dvh-11rem)] min-h-[420px]"
+            />
           </>
         )}
       </WidthContainer>

@@ -35,6 +35,30 @@ export async function createProject(
   redirect(`/projects/${project.id}`);
 }
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export async function updateProjectColor(
+  projectId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { isOwner } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!isOwner) return "프로젝트 owner만 색상을 변경할 수 있습니다.";
+
+  const reset = formData.get("reset") === "1";
+  const raw = (formData.get("color") as string | null)?.trim();
+  if (!reset && !HEX_COLOR.test(raw ?? "")) return "올바른 색상 값을 선택하세요.";
+
+  await prisma.project.update({ where: { id: projectId }, data: { color: reset ? null : raw } });
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  revalidatePath("/canvas");
+}
+
 export async function updateProjectVisibility(projectId: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");

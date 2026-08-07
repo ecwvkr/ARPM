@@ -8,6 +8,7 @@ type ProjectCardData = {
   visibility: "PUBLIC" | "PRIVATE";
   isArchived: boolean;
   deletedAt: Date | null;
+  color: string | null;
   tasks: { status: string }[];
 };
 
@@ -18,7 +19,10 @@ export function ProjectCard({ project }: { project: ProjectCardData }) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="flex aspect-4/3 flex-col justify-between rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10"
+      style={project.color ? { borderLeftColor: project.color } : undefined}
+      className={`flex aspect-4/3 flex-col justify-between rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10 ${
+        project.color ? "border-l-4" : ""
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-bold">{project.name}</h3>

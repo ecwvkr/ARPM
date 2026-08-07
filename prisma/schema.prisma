@@ -37,6 +37,7 @@ model Project {
   visibility Visibility @default(PRIVATE)
   isArchived Boolean    @default(false) // 숨김(총관리자)
   deletedAt  DateTime? // 소프트 삭제(총관리자)
+  color      String? // 대시보드/캘린더/캔버스에서 프로젝트를 구분하는 색상
   ownerId    String
   owner      User       @relation("ProjectOwner", fields: [ownerId], references: [id])
   createdAt  DateTime   @default(now())

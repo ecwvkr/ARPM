@@ -51,7 +51,7 @@ function layout(tasks: CanvasTask[]) {
   return new Map(tasks.map((t) => [t.id, g.node(t.id)]));
 }
 
-function buildGraph(tasks: CanvasTask[], onOpen: (id: string) => void) {
+function buildGraph(tasks: CanvasTask[], onOpen: (id: string) => void, color: string | null) {
   const positions = layout(tasks);
   const nodes: Node[] = tasks.map((t) => {
     const pos = positions.get(t.id)!;
@@ -63,7 +63,7 @@ function buildGraph(tasks: CanvasTask[], onOpen: (id: string) => void) {
       id: t.id,
       type: "task",
       position,
-      data: { task: t, onOpen },
+      data: { task: t, onOpen, color },
     };
   });
   const edges: Edge[] = tasks
@@ -77,15 +77,19 @@ function buildGraph(tasks: CanvasTask[], onOpen: (id: string) => void) {
   return { nodes, edges };
 }
 
-function CanvasNode({ data }: NodeProps<Node<{ task: CanvasTask; onOpen: (id: string) => void }>>) {
-  const { task, onOpen } = data;
+function CanvasNode({
+  data,
+}: NodeProps<Node<{ task: CanvasTask; onOpen: (id: string) => void; color: string | null }>>) {
+  const { task, onOpen, color } = data;
   const overdue = isOverdue(task.dueDate, task.status);
 
   return (
     <div
       onClick={() => onOpen(task.id)}
-      className="cursor-pointer rounded-2xl bg-card px-3 py-2 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10"
-      style={{ width: NODE_WIDTH }}
+      style={{ width: NODE_WIDTH, ...(color ? { borderLeftColor: color } : {}) }}
+      className={`cursor-pointer rounded-2xl bg-card px-3 py-2 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10 ${
+        color ? "border-l-4" : ""
+      }`}
     >
       <Handle type="target" position={Position.Top} className="!size-3.5 !border-2 !border-background !bg-primary" />
       <p className="truncate text-sm font-medium">{task.title}</p>
@@ -105,7 +109,7 @@ function CanvasNode({ data }: NodeProps<Node<{ task: CanvasTask; onOpen: (id: st
 
 const nodeTypes = { task: CanvasNode };
 
-export function TaskCanvas(props: { projectId: string; className?: string }) {
+export function TaskCanvas(props: { projectId: string; className?: string; color?: string | null }) {
   return (
     <ReactFlowProvider>
       <TaskCanvasInner {...props} />
@@ -113,7 +117,15 @@ export function TaskCanvas(props: { projectId: string; className?: string }) {
   );
 }
 
-function TaskCanvasInner({ projectId, className = "h-[600px]" }: { projectId: string; className?: string }) {
+function TaskCanvasInner({
+  projectId,
+  className = "h-[600px]",
+  color = null,
+}: {
+  projectId: string;
+  className?: string;
+  color?: string | null;
+}) {
   const [tasks, setTasks] = useState<CanvasTask[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -130,14 +142,14 @@ function TaskCanvasInner({ projectId, className = "h-[600px]" }: { projectId: st
 
   useEffect(() => {
     if (!tasks) return;
-    const { nodes, edges } = buildGraph(tasks, setSelected);
+    const { nodes, edges } = buildGraph(tasks, setSelected, color);
     setNodes(nodes);
     setEdges(edges);
     // ponytail: fitView은 노드가 실제로 측정(ResizeObserver)된 다음에야 정확히 계산되므로
     // rAF 한 틱으로는 부족할 때가 있어 짧은 지연을 둔다.
     const id = setTimeout(() => fitView(), 50);
     return () => clearTimeout(id);
-  }, [tasks, setNodes, setEdges, fitView]);
+  }, [tasks, setNodes, setEdges, fitView, color]);
 
   const onConnect = useCallback(
     async (connection: Connection) => {
