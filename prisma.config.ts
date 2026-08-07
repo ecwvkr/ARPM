@@ -9,7 +9,10 @@ export default defineConfig({
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
+  // 마이그레이션/스키마 작업은 세션 모드(직접 연결)를 쓴다. 트랜잭션 풀러는
+  // 어드바이저리 락 등 마이그레이션이 필요로 하는 세션 단위 동작을 지원하지 않는다.
+  // 앱 런타임 커넥션(lib/prisma.ts)은 별도로 DATABASE_URL(트랜잭션 풀러)을 사용한다.
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DIRECT_URL"],
   },
 });
