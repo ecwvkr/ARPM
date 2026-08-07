@@ -376,11 +376,8 @@ export async function inviteToTask(
   const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
   if (!task || !canManage) return "master만 초대할 수 있습니다.";
 
-  const email = (formData.get("email") as string | null)?.trim();
-  if (!email) return "이메일을 입력하세요.";
-
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return "해당 이메일의 유저를 찾을 수 없습니다.";
+  const userIds = formData.getAll("userIds").filter((v): v is string => typeof v === "string");
+  if (userIds.length === 0) return "초대할 계정을 선택하세요.";
 
   const grantsRaw = formData.get("grants") as string | null;
   let grants: { taskId: string; includeSubtree: boolean }[];
@@ -399,23 +396,25 @@ export async function inviteToTask(
     if (!validIds.has(g.taskId)) return "잘못된 요청입니다.";
   }
 
-  await prisma.$transaction([
-    ...grants.map((g) =>
-      prisma.taskParticipant.upsert({
-        where: { taskId_userId: { taskId: g.taskId, userId: user.id } },
-        update: { includeSubtree: g.includeSubtree },
-        create: { taskId: g.taskId, userId: user.id, includeSubtree: g.includeSubtree },
+  await prisma.$transaction(
+    userIds.flatMap((userId) => [
+      ...grants.map((g) =>
+        prisma.taskParticipant.upsert({
+          where: { taskId_userId: { taskId: g.taskId, userId } },
+          update: { includeSubtree: g.includeSubtree },
+          create: { taskId: g.taskId, userId, includeSubtree: g.includeSubtree },
+        }),
+      ),
+      prisma.notification.create({
+        data: {
+          userId,
+          type: "TASK_INVITED",
+          refId: task.id,
+          message: `"${task.title}" 업무에 초대되었습니다.`,
+        },
       }),
-    ),
-    prisma.notification.create({
-      data: {
-        userId: user.id,
-        type: "TASK_INVITED",
-        refId: task.id,
-        message: `"${task.title}" 업무에 초대되었습니다.`,
-      },
-    }),
-  ]);
+    ]),
+  );
 
   revalidatePath(`/projects/${task.projectId}`);
 }

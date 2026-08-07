@@ -83,29 +83,28 @@ export async function inviteMember(
   const { isOwner } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   if (!isOwner) return "프로젝트 owner만 멤버를 초대할 수 있습니다.";
 
-  const email = (formData.get("email") as string | null)?.trim();
-  if (!email) return "이메일을 입력하세요.";
-
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return "해당 이메일의 유저를 찾을 수 없습니다.";
+  const userIds = formData.getAll("userIds").filter((v): v is string => typeof v === "string");
+  if (userIds.length === 0) return "초대할 계정을 선택하세요.";
 
   const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId }, select: { name: true } });
 
-  await prisma.$transaction([
-    prisma.projectMember.upsert({
-      where: { projectId_userId: { projectId, userId: user.id } },
-      update: {},
-      create: { projectId, userId: user.id, role: "MEMBER" },
-    }),
-    prisma.notification.create({
-      data: {
-        userId: user.id,
-        type: "PROJECT_INVITED",
-        refId: projectId,
-        message: `"${project.name}" 프로젝트에 초대되었습니다.`,
-      },
-    }),
-  ]);
+  await prisma.$transaction(
+    userIds.flatMap((userId) => [
+      prisma.projectMember.upsert({
+        where: { projectId_userId: { projectId, userId } },
+        update: {},
+        create: { projectId, userId, role: "MEMBER" },
+      }),
+      prisma.notification.create({
+        data: {
+          userId,
+          type: "PROJECT_INVITED",
+          refId: projectId,
+          message: `"${project.name}" 프로젝트에 초대되었습니다.`,
+        },
+      }),
+    ]),
+  );
 
   revalidatePath(`/projects/${projectId}`);
 }

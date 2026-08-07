@@ -40,7 +40,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
           <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
             ← 전체 프로젝트
           </Link>
-          <h1 className="text-base font-medium">전체 업무</h1>
+          <h1 className="text-base font-bold">전체 업무</h1>
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell />

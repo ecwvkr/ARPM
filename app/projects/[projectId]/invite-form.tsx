@@ -1,21 +1,28 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { inviteMember } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { UserPicker } from "@/components/user-picker";
 
-export function InviteForm({ projectId }: { projectId: string }) {
+export function InviteForm({ projectId, excludeIds }: { projectId: string; excludeIds: string[] }) {
   const action = inviteMember.bind(null, projectId);
   const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const [selected, setSelected] = useState<string[]>([]);
 
   return (
-    <form action={formAction} className="flex items-start gap-2">
-      <Input name="email" type="email" placeholder="이메일로 초대" required />
-      <Button type="submit" size="sm" disabled={isPending}>
+    <form
+      action={(formData) => {
+        selected.forEach((userId) => formData.append("userIds", userId));
+        return formAction(formData);
+      }}
+      className="space-y-2"
+    >
+      <UserPicker excludeIds={excludeIds} selected={selected} onChange={setSelected} label="초대할 멤버" />
+      {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+      <Button type="submit" size="sm" disabled={isPending || selected.length === 0}>
         초대
       </Button>
-      {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
     </form>
   );
 }

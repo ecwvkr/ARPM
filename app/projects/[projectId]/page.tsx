@@ -53,7 +53,7 @@ export default async function ProjectDetailPage({
                 style={{ backgroundColor: project.color }}
               />
             )}
-            <h1 className="text-base font-medium">{project.name}</h1>
+            <h1 className="text-base font-bold">{project.name}</h1>
             <Badge variant={project.visibility === "PUBLIC" ? "secondary" : "outline"}>
               {project.visibility === "PUBLIC" ? "공개" : "비공개"}
             </Badge>
@@ -74,14 +74,14 @@ export default async function ProjectDetailPage({
       <WidthContainer mainClassName="space-y-8 px-6 py-6">
         {isOwner && (
           <section className="space-y-2">
-            <h2 className="text-sm font-medium">공개 범위</h2>
+            <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">공개 범위</h2>
             <VisibilityForm projectId={project.id} visibility={project.visibility} />
           </section>
         )}
 
         {isOwner && (
           <section className="space-y-2">
-            <h2 className="text-sm font-medium">프로젝트 색상</h2>
+            <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">프로젝트 색상</h2>
             <p className="text-sm text-muted-foreground">
               대시보드·캘린더·캔버스에서 이 프로젝트를 구분하는 색상입니다. 하위로 파생되는 업무에도 그대로 이어집니다.
             </p>
@@ -90,7 +90,7 @@ export default async function ProjectDetailPage({
         )}
 
         <section className="space-y-2">
-          <h2 className="text-sm font-medium">멤버 ({project.members.length})</h2>
+          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">멤버 ({project.members.length})</h2>
           <ul className="space-y-1 text-sm text-muted-foreground">
             {project.members.map((m) => (
               <li key={m.userId}>
@@ -98,13 +98,15 @@ export default async function ProjectDetailPage({
               </li>
             ))}
           </ul>
-          {isOwner && <InviteForm projectId={project.id} />}
+          {isOwner && (
+            <InviteForm projectId={project.id} excludeIds={project.members.map((m) => m.userId)} />
+          )}
         </section>
 
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h2 className="text-sm font-medium">업무</h2>
+              <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">업무</h2>
               <div className="flex gap-1 text-xs">
                 <Link
                   href={`/projects/${project.id}`}
@@ -162,7 +164,9 @@ export default async function ProjectDetailPage({
 
         {canViewAudit && auditLog.length > 0 && (
           <details className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
-            <summary className="cursor-pointer text-sm font-medium">활동 로그</summary>
+            <summary className="cursor-pointer text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            활동 로그
+          </summary>
             <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
               {auditLog.map((l) => (
                 <li key={l.id}>

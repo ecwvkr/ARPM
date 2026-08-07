@@ -18,7 +18,7 @@ export default async function CanvasPage({ searchParams }: PageProps<"/canvas">)
   return (
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between px-6 py-4 shadow-sm">
-        <h1 className="text-base font-medium">캔버스</h1>
+        <h1 className="text-base font-bold">캔버스</h1>
         <div className="flex items-center gap-2">
           <NotificationBell />
           <LogoutButton />
