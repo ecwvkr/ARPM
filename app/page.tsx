@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { listVisibleProjectsWithUnread } from "@/lib/projects";
 import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
@@ -14,19 +15,24 @@ export default async function DashboardPage({
   searchParams,
 }: PageProps<"/">) {
   const session = await auth();
+  // 다른 페이지와 달리 여기만 가드가 없어, 세션이 비거나 토큰에 id가 없으면
+  // session!.user.id 단언이 그대로 터져 로그인 리다이렉트 대신 500이 났다.
+  if (!session?.user?.id) redirect("/login");
+
+  const userId = session.user.id;
   const params = await searchParams;
-  const showHidden = session?.user?.isSuperAdmin && params.hidden === "1";
-  const isSuperAdmin = !!session?.user?.isSuperAdmin;
+  const isSuperAdmin = !!session.user.isSuperAdmin;
+  const showHidden = isSuperAdmin && params.hidden === "1";
 
   // ponytail: 서로 의존하지 않는 세 조회(알림 점검·프로젝트 목록·내 업무)를 순차 대기
   // 대신 한 번에 날려 왕복 시간을 줄인다.
   const [, projects, myTasks] = await Promise.all([
-    session?.user?.id ? ensureDeadlineNotifications(session.user.id) : Promise.resolve(),
-    listVisibleProjectsWithUnread(session!.user.id, isSuperAdmin, !!showHidden),
-    listAllTasksForUser(session!.user.id, isSuperAdmin, { mineOnly: true }),
+    ensureDeadlineNotifications(userId),
+    listVisibleProjectsWithUnread(userId, isSuperAdmin, showHidden),
+    listAllTasksForUser(userId, isSuperAdmin, { mineOnly: true }),
   ]);
 
-  const ownedCount = projects.filter((p) => p.ownerId === session!.user.id).length;
+  const ownedCount = projects.filter((p) => p.ownerId === userId).length;
   const inProgressCount = projects.filter((p) =>
     p.tasks.some((t) => t.status === "IN_PROGRESS"),
   ).length;
@@ -67,7 +73,7 @@ export default async function DashboardPage({
               {showHidden ? "숨김/삭제 프로젝트 숨기기" : "숨김/삭제 프로젝트 보기"}
             </Link>
           )}
-          <NewProjectDialog currentUserId={session!.user.id} />
+          <NewProjectDialog currentUserId={userId} />
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -112,8 +118,8 @@ export default async function DashboardPage({
               <ProjectCard
                 key={project.id}
                 project={project}
-                currentUserId={session!.user.id}
-                hasUnread={project.tasks.some((t) => isTaskUnread(t, session!.user.id))}
+                currentUserId={userId}
+                hasUnread={project.tasks.some((t) => isTaskUnread(t, userId))}
               />
             ))}
           </div>

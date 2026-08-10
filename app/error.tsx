@@ -20,8 +20,13 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           <Button size="sm" onClick={reset}>
             다시 시도
           </Button>
-          <Button size="sm" variant="outline" render={<Link href="/">대시보드로</Link>} />
+          <Button size="sm" variant="outline" render={<Link href="/login">다시 로그인</Link>} />
         </div>
+        {/* 프로덕션 빌드는 에러 메시지를 숨기므로(React #441), 서버 로그와 대조할 수 있는
+            digest만이라도 보여준다. 문의 시 이 값이 있으면 원인 추적이 가능하다. */}
+        {error.digest && (
+          <p className="pt-1 font-mono text-xs text-muted-foreground/70">오류 코드: {error.digest}</p>
+        )}
       </div>
     </div>
   );
