@@ -1,6 +1,9 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../lib/generated/prisma"
+  // relationJoins: include를 관계별 개별 쿼리 대신 LATERAL JOIN 한 번으로 처리한다.
+  // 서버 함수와 DB가 같은 리전이라도 왕복 횟수가 줄면 그만큼 응답이 빨라진다.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -45,6 +48,8 @@ model Project {
 
   members ProjectMember[]
   tasks   Task[]
+
+  @@index([ownerId])
 }
 
 model ProjectMember {
@@ -55,6 +60,8 @@ model ProjectMember {
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([projectId, userId])
+  // PK가 (projectId, userId)라 userId 단독 조회(내가 속한 프로젝트 찾기)는 PK를 쓸 수 없다.
+  @@index([userId])
 }
 
 model Task {
@@ -82,6 +89,11 @@ model Task {
   priorities   TaskPriority[]
   comments     Comment[]
   reads        TaskRead[]
+
+  // 목록 조회는 항상 projectId로 좁힌 뒤 createdAt으로 정렬하므로 복합 인덱스로 둘 다 태운다.
+  @@index([projectId, createdAt])
+  @@index([parentId])
+  @@index([masterId])
 }
 
 model TaskParticipant {
@@ -93,6 +105,7 @@ model TaskParticipant {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
+  @@index([userId])
 }
 
 model TaskPriority {
@@ -105,6 +118,7 @@ model TaskPriority {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
+  @@index([userId])
 }
 
 // 사용자별로 업무를 마지막으로 본 시각. 카드의 "미확인" 빨간 점 판정에 쓴다.
@@ -116,6 +130,7 @@ model TaskRead {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
+  @@index([userId])
 }
 
 model Comment {
@@ -126,6 +141,10 @@ model Comment {
   createdAt DateTime @default(now())
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id])
+
+  // 코멘트 수 집계와 "최신 1건" 조회가 업무 목록마다 돌므로 정렬 컬럼까지 묶는다.
+  @@index([taskId, createdAt])
+  @@index([authorId])
 }
 
 model Notification {
@@ -137,6 +156,9 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 알림 목록은 내 것만 최신순 20건을 읽는다.
+  @@index([userId, createdAt])
 }
 
 model SavedFilter {
@@ -146,6 +168,8 @@ model SavedFilter {
   query     String // 쿼리스트링 그대로 저장 (예: "projectId=...&status=IN_PROGRESS")
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // 되돌리기 어려운 조작(master 위임, 하드 삭제)만 기록. 대상이 삭제돼도 로그는 남아야 하므로
@@ -160,6 +184,9 @@ model AuditLog {
   message    String
   createdAt  DateTime @default(now())
   actor      User     @relation(fields: [actorId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([actorId])
 }
 
 // 시스템 전역 설정. 항상 단일 행만 존재한다(없으면 코드에서 기본값 사용).

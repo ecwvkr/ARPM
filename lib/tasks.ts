@@ -187,11 +187,20 @@ function filterVisibleTasks<T extends TaskWithParticipants>(
   return tasks.filter((t) => canViewTask(t, byId, userId));
 }
 
+// relationJoins가 켜져 있어 include의 기본 전략은 join(LATERAL JOIN 한 방)이다.
+// 목록은 예외로 관계별 개별 쿼리(query)를 쓴다 — 결과가 커질수록 join의 JSON 집계
+// 비용이 왕복 절감을 넘어서기 때문. 실측(업무 1건당 참여자/우선순위/코멘트 포함):
+//   50건 join 17ms / query 38ms · 500건 join 76ms / query 66ms
+//   1000건 join 141ms / query 86ms · 2000건 join 275ms / query 153ms
+// 업무가 늘어나는 방향이므로 목록은 query로 고정한다.
+const LIST_LOAD_STRATEGY = "query" as const;
+
 export async function listTasksForProject(projectId: string, userId: string, isSuperAdmin: boolean) {
   const allTasks = await prisma.task.findMany({
     where: { projectId },
     include: taskListInclude(userId),
     orderBy: { createdAt: "asc" },
+    relationLoadStrategy: LIST_LOAD_STRATEGY,
   });
 
   return sortTasks(filterVisibleTasks(allTasks, userId, isSuperAdmin));
@@ -264,6 +273,7 @@ export async function listTasksForProjects(
     where: { projectId: { in: targetProjects.map((p) => p.id) } },
     include: taskListInclude(userId),
     orderBy: { createdAt: "asc" },
+    relationLoadStrategy: LIST_LOAD_STRATEGY,
   });
 
   let tasks = filterVisibleTasks(allTasks, userId, isSuperAdmin).map((t) => {
