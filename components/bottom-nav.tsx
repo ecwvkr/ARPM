@@ -13,7 +13,7 @@ function getServerSnapshot() {
 const BASE_ITEMS = [
   { label: "대시보드", href: "/", icon: IconLayoutGrid, disabled: false },
   { label: "캘린더", href: "/calendar", icon: IconCalendar, disabled: true },
-  { label: "캔버스", href: "/canvas", icon: IconSitemap, disabled: true },
+  { label: "캔버스", href: "/canvas", icon: IconSitemap, disabled: false },
   { label: "설정", href: "/settings", icon: IconSettings, disabled: false },
 ] as const;
 

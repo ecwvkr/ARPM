@@ -9,6 +9,7 @@ import { getCommentVisibleCount } from "@/lib/settings";
 import {
   getTaskAccess,
   listTasksForProject,
+  listCanvasTasksForProject,
   buildSubtree,
   collectSubtreeIds,
   collectDescendantIds,
@@ -227,7 +228,7 @@ export async function getCanvasTasks(projectId: string) {
   const { canView } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   if (!canView) return [];
 
-  const tasks = await listTasksForProject(projectId, session.user.id, !!session.user.isSuperAdmin);
+  const tasks = await listCanvasTasksForProject(projectId, session.user.id, !!session.user.isSuperAdmin);
   return tasks.map((t) => ({
     id: t.id,
     parentId: t.parentId,

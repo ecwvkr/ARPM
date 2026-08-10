@@ -101,6 +101,16 @@ export default async function ProjectDetailPage({
             >
               상태그룹
             </Link>
+            <Link
+              href={`/projects/${project.id}?view=canvas`}
+              className={
+                view === "canvas"
+                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
+                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
+              }
+            >
+              캔버스
+            </Link>
           </div>
           {view === "status" ? (
             <TaskStatusGroups
