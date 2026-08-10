@@ -15,6 +15,7 @@ model User {
   avatarUrl    String?
   passwordHash String
   isSuperAdmin Boolean  @default(false)
+  isActive     Boolean  @default(true) // false = 비활성화(퇴사 등) — 로그인 불가, 참여자 선택 목록에서 제외
   accentColor  String?
   createdAt    DateTime @default(now())
 
@@ -144,6 +145,12 @@ model AuditLog {
   message    String
   createdAt  DateTime @default(now())
   actor      User     @relation(fields: [actorId], references: [id])
+}
+
+// 시스템 전역 설정. 항상 단일 행만 존재한다(없으면 코드에서 기본값 사용).
+model AppSetting {
+  id                  String @id @default(cuid())
+  commentVisibleCount Int    @default(5)
 }
 
 enum Visibility {

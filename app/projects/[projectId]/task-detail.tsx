@@ -56,6 +56,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
   const [isPending, startTransition] = useTransition();
   const [editingInfo, setEditingInfo] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showAllComments, setShowAllComments] = useState(false);
   const { toast, trigger: showSavedToast } = useSavedToast();
 
   const reload = () => {
@@ -87,7 +88,17 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
     );
   }
 
-  const { task, canManage, canParticipantAct, canComment, canJoin, canLeave, currentUserId, isSuperAdmin } = detail;
+  const {
+    task,
+    canManage,
+    canParticipantAct,
+    canComment,
+    canJoin,
+    canLeave,
+    currentUserId,
+    isSuperAdmin,
+    commentVisibleCount,
+  } = detail;
   const overdue = isOverdue(task.dueDate, task.status);
   const locked = task.completedAt !== null;
   const participantChips = buildParticipantChips(task);
@@ -372,8 +383,17 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
       <section className="space-y-2">
         <h3 className="text-sm font-bold text-foreground">코멘트 ({task.comments.length})</h3>
+        {!showAllComments && task.comments.length > commentVisibleCount && (
+          <button
+            type="button"
+            onClick={() => setShowAllComments(true)}
+            className="text-xs text-muted-foreground underline underline-offset-2"
+          >
+            ... 이전 코멘트 {task.comments.length - commentVisibleCount}개 더보기
+          </button>
+        )}
         <ul className="space-y-2">
-          {task.comments.map((c) => (
+          {(showAllComments ? task.comments : task.comments.slice(-commentVisibleCount)).map((c) => (
             <CommentItem
               key={c.id}
               comment={c}

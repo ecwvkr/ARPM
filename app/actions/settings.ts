@@ -30,3 +30,19 @@ export async function updateAccentColor(_prevState: string | undefined, formData
   revalidatePath("/", "layout");
   redirect("/settings");
 }
+
+export async function updateCommentVisibleCount(_prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.isSuperAdmin) return "총관리자만 변경할 수 있습니다.";
+
+  const count = Number(formData.get("commentVisibleCount"));
+  if (!Number.isInteger(count) || count < 1) return "1 이상의 정수를 입력하세요.";
+
+  const existing = await prisma.appSetting.findFirst();
+  if (existing) {
+    await prisma.appSetting.update({ where: { id: existing.id }, data: { commentVisibleCount: count } });
+  } else {
+    await prisma.appSetting.create({ data: { commentVisibleCount: count } });
+  }
+  revalidatePath("/settings");
+}

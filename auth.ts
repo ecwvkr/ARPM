@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
+import { normalizeEmail } from "@/lib/normalize";
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   session: { strategy: "jwt" },
@@ -13,14 +14,15 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         password: { label: "비밀번호", type: "password" },
       },
       authorize: async (credentials) => {
-        const email = credentials?.email;
+        const rawEmail = credentials?.email;
         const password = credentials?.password;
-        if (typeof email !== "string" || typeof password !== "string") {
+        if (typeof rawEmail !== "string" || typeof password !== "string") {
           return null;
         }
+        const email = normalizeEmail(rawEmail);
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user || !user.isActive) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
@@ -43,7 +45,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.accentColor = user.accentColor;
       }
       if (trigger === "update" && session?.user) {
-        token.accentColor = session.user.accentColor;
+        if (session.user.accentColor !== undefined) token.accentColor = session.user.accentColor;
+        if (session.user.name !== undefined) token.name = session.user.name;
       }
       return token;
     },

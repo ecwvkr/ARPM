@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
 import { revalidateTaskViews } from "@/lib/revalidate";
+import { getCommentVisibleCount } from "@/lib/settings";
 import {
   getTaskAccess,
   listTasksForProject,
@@ -17,7 +18,13 @@ export async function getTaskDetail(taskId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const access = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
-  return { ...access, currentUserId: session.user.id, isSuperAdmin: !!session.user.isSuperAdmin };
+  const commentVisibleCount = await getCommentVisibleCount();
+  return {
+    ...access,
+    currentUserId: session.user.id,
+    isSuperAdmin: !!session.user.isSuperAdmin,
+    commentVisibleCount,
+  };
 }
 
 export async function listTaskOptionsForProject(projectId: string) {

@@ -9,6 +9,7 @@ export async function listAllUsers() {
   if (!session?.user?.id) redirect("/login");
 
   return prisma.user.findMany({
+    where: { isActive: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
