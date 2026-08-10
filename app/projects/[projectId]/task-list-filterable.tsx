@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { STATUS_LABEL, STATUS_ORDER, isOverdue, buildParticipantChips } from "@/lib/priority";
+import { STATUS_LABEL, STATUS_ORDER, isOverdue, buildParticipantChips, isTaskUnread } from "@/lib/priority";
 import { TaskCard } from "./task-card";
 import type { ProjectTaskSummary } from "./task-list";
 
@@ -66,6 +66,7 @@ export function TaskListFilterable({
               participants={buildParticipantChips(task)}
               commentCount={task._count.comments}
               currentUserId={currentUserId}
+              unread={isTaskUnread(task, currentUserId)}
             />
           ))}
         </div>

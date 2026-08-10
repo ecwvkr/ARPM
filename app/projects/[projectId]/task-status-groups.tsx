@@ -1,4 +1,4 @@
-import { listTasksForProject } from "@/lib/tasks";
+import { listTasksForProject, isTaskUnread } from "@/lib/tasks";
 import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { TaskCard } from "./task-card";
 
@@ -52,6 +52,7 @@ export async function TaskStatusGroups({
                     participants={buildParticipantChips(task)}
                     commentCount={task._count.comments}
                     currentUserId={userId}
+                    unread={isTaskUnread(task, userId)}
                   />
                 ))}
               </div>

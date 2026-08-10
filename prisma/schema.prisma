@@ -25,6 +25,7 @@ model User {
   taskParticipations TaskParticipant[]
   priorities         TaskPriority[]
   comments           Comment[]
+  taskReads          TaskRead[]
   notifications      Notification[]
   savedFilters       SavedFilter[]
   auditLogs          AuditLog[]
@@ -65,6 +66,7 @@ model Task {
   visibility  Visibility @default(PUBLIC)
   masterId    String
   createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt // 미확인 표시 판정 기준(제목/메모/기한 등 수정 감지)
   dueDate     DateTime?
   completedAt DateTime?
   canvasX     Float?
@@ -78,6 +80,7 @@ model Task {
   participants TaskParticipant[]
   priorities   TaskPriority[]
   comments     Comment[]
+  reads        TaskRead[]
 }
 
 model TaskParticipant {
@@ -99,6 +102,17 @@ model TaskPriority {
   updatedAt DateTime @updatedAt
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+}
+
+// 사용자별로 업무를 마지막으로 본 시각. 카드의 "미확인" 빨간 점 판정에 쓴다.
+model TaskRead {
+  taskId     String
+  userId     String
+  lastReadAt DateTime @updatedAt
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
 }

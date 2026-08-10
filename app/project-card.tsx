@@ -19,9 +19,11 @@ type ProjectCardData = {
 export function ProjectCard({
   project,
   currentUserId,
+  hasUnread,
 }: {
   project: ProjectCardData;
   currentUserId: string;
+  hasUnread?: boolean;
 }) {
   const hidden = project.isArchived || project.deletedAt !== null;
   const isOwner = project.ownerId === currentUserId;
@@ -34,6 +36,14 @@ export function ProjectCard({
       className="relative flex aspect-4/3 flex-col justify-between rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10"
     >
       <Link href={`/projects/${project.id}`} className="absolute inset-0 z-0 rounded-4xl" aria-label={project.name} />
+
+      {hasUnread && (
+        <span
+          aria-label="읽지 않은 내용이 있습니다"
+          title="읽지 않은 내용이 있습니다"
+          className="absolute top-3 right-3 z-10 size-2.5 rounded-full bg-destructive ring-2 ring-card"
+        />
+      )}
 
       <div className="relative z-10 flex items-start justify-between gap-2">
         <h3 className="pointer-events-none text-base font-bold">{project.name}</h3>

@@ -34,6 +34,30 @@ export function isOverdue(dueDate: Date | null, status: string) {
   return dueDate.getTime() + KST_DUE_DAY_END_OFFSET_MS < Date.now();
 }
 
+// 내가 참여(마스터 포함) 중인 업무에 한해, 마지막으로 읽은 시각 이후 코멘트가 달렸거나
+// 내용이 수정됐으면 "미확인"으로 본다. 관여하지 않는 업무는 항상 false.
+export function isTaskUnread(
+  task: {
+    masterId: string;
+    updatedAt: Date;
+    participants: { userId: string }[];
+    reads: { lastReadAt: Date }[];
+    comments: { createdAt: Date }[];
+  },
+  userId: string,
+): boolean {
+  const isInvolved = task.masterId === userId || task.participants.some((p) => p.userId === userId);
+  if (!isInvolved) return false;
+
+  const lastRead = task.reads[0]?.lastReadAt;
+  if (!lastRead) return true;
+
+  const latestCommentAt = task.comments[0]?.createdAt;
+  const latestActivity =
+    latestCommentAt && latestCommentAt > task.updatedAt ? latestCommentAt : task.updatedAt;
+  return lastRead < latestActivity;
+}
+
 export type ParticipantChipData = {
   userId: string;
   userName: string;

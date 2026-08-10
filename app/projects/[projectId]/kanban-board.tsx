@@ -1,7 +1,7 @@
 "use client";
 
 import { updateTaskStatus, completeTask } from "@/app/actions/tasks";
-import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
+import { STATUS_LABEL, isOverdue, buildParticipantChips, isTaskUnread } from "@/lib/priority";
 import { TaskCard } from "./task-card";
 import type { ProjectTaskSummary } from "./task-list";
 
@@ -66,6 +66,7 @@ export function KanbanBoard({
                     participants={buildParticipantChips(task)}
                     commentCount={task._count.comments}
                     currentUserId={currentUserId}
+                    unread={isTaskUnread(task, currentUserId)}
                   />
                 </div>
               ))}

@@ -19,6 +19,16 @@ export async function getTaskDetail(taskId: string) {
   if (!session?.user?.id) redirect("/login");
   const access = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
   const commentVisibleCount = await getCommentVisibleCount();
+
+  if (access.task) {
+    await prisma.taskRead.upsert({
+      where: { taskId_userId: { taskId, userId: session.user.id } },
+      update: {},
+      create: { taskId, userId: session.user.id },
+    });
+    revalidateTaskViews(access.task.projectId);
+  }
+
   return {
     ...access,
     currentUserId: session.user.id,

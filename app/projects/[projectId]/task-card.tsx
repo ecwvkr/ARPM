@@ -32,6 +32,7 @@ export function TaskCard({
   currentUserId,
   projectName,
   projectColor,
+  unread,
 }: {
   taskId: string;
   projectId: string;
@@ -46,6 +47,7 @@ export function TaskCard({
   currentUserId: string;
   projectName?: string;
   projectColor?: string | null;
+  unread?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -69,6 +71,14 @@ export function TaskCard({
           className="absolute inset-0 z-0 rounded-4xl text-left"
           aria-label={title}
         />
+
+        {unread && (
+          <span
+            aria-label="읽지 않은 내용이 있습니다"
+            title="읽지 않은 내용이 있습니다"
+            className="absolute top-3 right-3 z-10 size-2.5 rounded-full bg-destructive ring-2 ring-card"
+          />
+        )}
 
         {/* pointer-events-none은 하위로 상속되므로, 실제 클릭이 필요한 요소만
             아래에서 각각 pointer-events-auto로 되돌린다. 그 외 영역은 클릭이

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
-import { listAllTasksForUser } from "@/lib/tasks";
+import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { isOverdue } from "@/lib/priority";
 import { LogoutButton } from "./logout-button";
@@ -111,7 +111,12 @@ export default async function DashboardPage({
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} currentUserId={session!.user.id} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                currentUserId={session!.user.id}
+                hasUnread={project.tasks.some((t) => isTaskUnread(t, session!.user.id))}
+              />
             ))}
           </div>
         )}

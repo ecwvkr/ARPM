@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
-import { listAllTasksForUser } from "@/lib/tasks";
+import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
 import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
@@ -85,6 +85,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
                 currentUserId={session.user.id}
                 projectName={task.projectName}
                 projectColor={task.projectColor}
+                unread={isTaskUnread(task, session.user.id)}
               />
             ))}
           </div>

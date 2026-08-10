@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
 import { listVisibleProjects } from "@/lib/projects";
 
-export { isOverdue } from "@/lib/priority";
+export { isOverdue, isTaskUnread } from "@/lib/priority";
 
 const PRIORITY_RANK: Record<string, number> = { URGENT: 3, NORMAL: 2, HOLD: 1 };
 
@@ -172,6 +172,8 @@ export async function listTasksForProject(projectId: string, userId: string, isS
       participants: { include: { user: true } },
       priorities: { include: { user: true } },
       _count: { select: { comments: true } },
+      comments: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+      reads: { where: { userId }, select: { lastReadAt: true } },
     },
     orderBy: { createdAt: "asc" },
   });
