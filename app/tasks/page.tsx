@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisibleProjects } from "@/lib/projects";
-import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
+import { listTasksForProjects, isTaskUnread } from "@/lib/tasks";
 import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
@@ -23,15 +23,17 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
 
   const isSuperAdmin = !!session.user.isSuperAdmin;
   const projects = await listVisibleProjects(session.user.id, isSuperAdmin, false);
-  const savedFilters = await listSavedFilters();
   const activeProject = projectId ? projects.find((p) => p.id === projectId) : undefined;
 
-  const tasks = await listAllTasksForUser(session.user.id, isSuperAdmin, {
-    projectId,
-    status: status as "TODO" | "IN_PROGRESS" | "DONE" | undefined,
-    mineOnly,
-    q,
-  });
+  const [savedFilters, tasks] = await Promise.all([
+    listSavedFilters(),
+    listTasksForProjects(projects, session.user.id, isSuperAdmin, {
+      projectId,
+      status: status as "TODO" | "IN_PROGRESS" | "DONE" | undefined,
+      mineOnly,
+      q,
+    }),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col">

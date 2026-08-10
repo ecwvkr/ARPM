@@ -208,6 +208,23 @@ export async function listAllTasksForUser(
   } = {},
 ) {
   const projects = await listVisibleProjects(userId, isSuperAdmin, false);
+  return listTasksForProjects(projects, userId, isSuperAdmin, filters);
+}
+
+// listAllTasksForUser에서 프로젝트 조회 부분만 뽑아낸 버전. 호출 측이 이미
+// listVisibleProjects를 한 번 가져온 경우(대시보드, 전체 업무 화면) 여기로 그대로
+// 넘겨서 같은 프로젝트 쿼리를 중복 실행하지 않는다.
+export async function listTasksForProjects(
+  projects: { id: string; name: string; color: string | null }[],
+  userId: string,
+  isSuperAdmin: boolean,
+  filters: {
+    projectId?: string;
+    status?: "TODO" | "IN_PROGRESS" | "DONE";
+    mineOnly?: boolean;
+    q?: string;
+  } = {},
+) {
   const targetProjects = filters.projectId
     ? projects.filter((p) => p.id === filters.projectId)
     : projects;

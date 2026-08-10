@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
-import { listVisibleProjects } from "@/lib/projects";
+import { listVisibleProjectsWithUnread } from "@/lib/projects";
 import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { isOverdue } from "@/lib/priority";
@@ -16,14 +16,15 @@ export default async function DashboardPage({
   const session = await auth();
   const params = await searchParams;
   const showHidden = session?.user?.isSuperAdmin && params.hidden === "1";
+  const isSuperAdmin = !!session?.user?.isSuperAdmin;
 
-  if (session?.user?.id) await ensureDeadlineNotifications(session.user.id);
-
-  const projects = await listVisibleProjects(
-    session!.user.id,
-    !!session?.user?.isSuperAdmin,
-    !!showHidden,
-  );
+  // ponytail: 서로 의존하지 않는 세 조회(알림 점검·프로젝트 목록·내 업무)를 순차 대기
+  // 대신 한 번에 날려 왕복 시간을 줄인다.
+  const [, projects, myTasks] = await Promise.all([
+    session?.user?.id ? ensureDeadlineNotifications(session.user.id) : Promise.resolve(),
+    listVisibleProjectsWithUnread(session!.user.id, isSuperAdmin, !!showHidden),
+    listAllTasksForUser(session!.user.id, isSuperAdmin, { mineOnly: true }),
+  ]);
 
   const ownedCount = projects.filter((p) => p.ownerId === session!.user.id).length;
   const inProgressCount = projects.filter((p) =>
@@ -32,9 +33,6 @@ export default async function DashboardPage({
 
   const weekFromNow = new Date();
   weekFromNow.setDate(weekFromNow.getDate() + 7);
-  const myTasks = await listAllTasksForUser(session!.user.id, !!session?.user?.isSuperAdmin, {
-    mineOnly: true,
-  });
   const dueSoon = myTasks
     .filter((t) => t.status !== "DONE" && t.dueDate && t.dueDate <= weekFromNow)
     .sort((a, b) => a.dueDate!.getTime() - b.dueDate!.getTime())
