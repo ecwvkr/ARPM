@@ -244,8 +244,8 @@ export async function updateTaskPosition(taskId: string, x: number, y: number) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { task, canView } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
-  if (!task || !canView) return;
+  const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task || !canManage) return;
 
   await prisma.task.update({ where: { id: taskId }, data: { canvasX: x, canvasY: y } });
 }

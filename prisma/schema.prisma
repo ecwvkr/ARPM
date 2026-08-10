@@ -8,16 +8,17 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String?
-  avatarUrl    String?
-  passwordHash String
-  isSuperAdmin Boolean  @default(false)
-  isActive     Boolean  @default(true) // false = 비활성화(퇴사 등) — 로그인 불가, 참여자 선택 목록에서 제외
-  accentColor  String?
-  createdAt    DateTime @default(now())
+  id                  String    @id @default(cuid())
+  name                String
+  email               String    @unique
+  phone               String?
+  avatarUrl           String?
+  passwordHash        String
+  isSuperAdmin        Boolean   @default(false)
+  isActive            Boolean   @default(true) // false = 비활성화(퇴사 등) — 로그인 불가, 참여자 선택 목록에서 제외
+  accentColor         String?
+  createdAt           DateTime  @default(now())
+  lastDeadlineCheckAt DateTime? // 마감 임박/지연 알림 점검을 마지막으로 실행한 시각(대시보드 로드마다 재점검하지 않기 위한 쓰로틀)
 
   ownedProjects      Project[]         @relation("ProjectOwner")
   projectMemberships ProjectMember[]

@@ -53,3 +53,10 @@ export async function markAllNotificationsRead() {
     data: { isRead: true },
   });
 }
+
+export async function deleteNotification(id: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await prisma.notification.deleteMany({ where: { id, userId: session.user.id } });
+}

@@ -164,28 +164,37 @@ function canViewTask<T extends TaskWithParticipants>(
   return inheritedWouldGrant;
 }
 
+function taskListInclude(userId: string) {
+  return {
+    master: true,
+    participants: { include: { user: true } },
+    priorities: { include: { user: true } },
+    _count: { select: { comments: true } },
+    comments: { orderBy: { createdAt: "desc" as const }, take: 1, select: { createdAt: true } },
+    reads: { where: { userId }, select: { lastReadAt: true } },
+  };
+}
+
+// parentId는 항상 같은 프로젝트 내 업무만 가리키므로(스키마 제약), 여러 프로젝트의
+// 업무를 한 배열에 섞어 넣어도 조상 추적(byId)이 다른 프로젝트로 새지 않는다.
+function filterVisibleTasks<T extends TaskWithParticipants>(
+  tasks: T[],
+  userId: string,
+  isSuperAdmin: boolean,
+): T[] {
+  if (isSuperAdmin) return tasks;
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  return tasks.filter((t) => canViewTask(t, byId, userId));
+}
+
 export async function listTasksForProject(projectId: string, userId: string, isSuperAdmin: boolean) {
   const allTasks = await prisma.task.findMany({
     where: { projectId },
-    include: {
-      master: true,
-      participants: { include: { user: true } },
-      priorities: { include: { user: true } },
-      _count: { select: { comments: true } },
-      comments: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
-      reads: { where: { userId }, select: { lastReadAt: true } },
-    },
+    include: taskListInclude(userId),
     orderBy: { createdAt: "asc" },
   });
 
-  const visible = isSuperAdmin
-    ? allTasks
-    : (() => {
-        const byId = new Map(allTasks.map((t) => [t.id, t]));
-        return allTasks.filter((t) => canViewTask(t, byId, userId));
-      })();
-
-  return sortTasks(visible);
+  return sortTasks(filterVisibleTasks(allTasks, userId, isSuperAdmin));
 }
 
 export async function listAllTasksForUser(
@@ -202,15 +211,20 @@ export async function listAllTasksForUser(
   const targetProjects = filters.projectId
     ? projects.filter((p) => p.id === filters.projectId)
     : projects;
+  const projectMeta = new Map(targetProjects.map((p) => [p.id, { name: p.name, color: p.color }]));
 
-  const perProject = await Promise.all(
-    targetProjects.map(async (p) => {
-      const tasks = await listTasksForProject(p.id, userId, isSuperAdmin);
-      return tasks.map((t) => ({ ...t, projectName: p.name, projectColor: p.color }));
-    }),
-  );
+  // ponytail: 프로젝트마다 따로 조회하던 N+1을 projectId IN 배열 한 방 쿼리로 바꾸고,
+  // 가시성 필터링은 메모리에서 처리한다.
+  const allTasks = await prisma.task.findMany({
+    where: { projectId: { in: targetProjects.map((p) => p.id) } },
+    include: taskListInclude(userId),
+    orderBy: { createdAt: "asc" },
+  });
 
-  let tasks = perProject.flat();
+  let tasks = filterVisibleTasks(allTasks, userId, isSuperAdmin).map((t) => {
+    const meta = projectMeta.get(t.projectId)!;
+    return { ...t, projectName: meta.name, projectColor: meta.color };
+  });
 
   if (filters.status) tasks = tasks.filter((t) => t.status === filters.status);
   if (filters.q) {

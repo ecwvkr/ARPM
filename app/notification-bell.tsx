@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { IconBell } from "@tabler/icons-react";
-import { listMyNotifications, markAllNotificationsRead } from "@/app/actions/notifications";
+import { IconBell, IconX } from "@tabler/icons-react";
+import { listMyNotifications, markAllNotificationsRead, deleteNotification } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -75,7 +75,7 @@ export function NotificationBell() {
             <p className="px-1 py-2 text-sm text-muted-foreground">알림이 없습니다.</p>
           )}
           {notifications.map((n) => {
-            const className = `block rounded-md px-2 py-1.5 text-sm ${n.isRead ? "text-muted-foreground" : "bg-accent"}`;
+            const className = `block rounded-md px-2 py-1.5 pr-7 text-sm ${n.isRead ? "text-muted-foreground" : "bg-accent"}`;
             const body = (
               <>
                 {n.message}
@@ -84,13 +84,29 @@ export function NotificationBell() {
                 </div>
               </>
             );
-            return n.href ? (
-              <Link key={n.id} href={n.href} className={`${className} hover:bg-muted`} onClick={() => setOpen(false)}>
-                {body}
-              </Link>
-            ) : (
-              <div key={n.id} className={className}>
-                {body}
+            return (
+              <div key={n.id} className="group relative">
+                {n.href ? (
+                  <Link href={n.href} className={`${className} hover:bg-muted`} onClick={() => setOpen(false)}>
+                    {body}
+                  </Link>
+                ) : (
+                  <div className={className}>{body}</div>
+                )}
+                <button
+                  type="button"
+                  aria-label="알림 삭제"
+                  title="알림 삭제"
+                  onClick={() =>
+                    startTransition(async () => {
+                      await deleteNotification(n.id);
+                      load();
+                    })
+                  }
+                  className="absolute top-1.5 right-1.5 text-muted-foreground/60 opacity-0 hover:text-destructive group-hover:opacity-100"
+                >
+                  <IconX className="size-3.5" />
+                </button>
               </div>
             );
           })}

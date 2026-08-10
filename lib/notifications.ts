@@ -1,9 +1,23 @@
 import { prisma } from "@/lib/prisma";
 import { KST_DUE_DAY_END_OFFSET_MS } from "@/lib/priority";
 
+const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1시간에 한 번만 점검
+const NOTIFICATION_RETENTION_DAYS = 30;
+
 // 기한 임박(D-1)·지연 알림 — 별도 스케줄러 없이 로그인 사용자가 대시보드를 볼 때
 // 본인 업무만 lazy하게 점검한다. 동일 타입+업무당 한 번만 생성(중복 방지).
+// 매 로드마다 다시 훑지 않도록 User.lastDeadlineCheckAt으로 쓰로틀하고, 같은 주기에
+// 읽은 지 오래된 알림도 함께 정리한다.
 export async function ensureDeadlineNotifications(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { lastDeadlineCheckAt: true },
+  });
+  const now = Date.now();
+  if (user?.lastDeadlineCheckAt && now - user.lastDeadlineCheckAt.getTime() < CHECK_INTERVAL_MS) {
+    return;
+  }
+
   const tasks = await prisma.task.findMany({
     where: {
       status: { not: "DONE" },
@@ -12,10 +26,6 @@ export async function ensureDeadlineNotifications(userId: string) {
     },
     select: { id: true, title: true, dueDate: true },
   });
-
-  if (tasks.length === 0) return;
-
-  const now = Date.now();
 
   const candidates = tasks
     .map((t) => {
@@ -27,27 +37,34 @@ export async function ensureDeadlineNotifications(userId: string) {
     })
     .filter((c) => c !== null);
 
-  if (candidates.length === 0) return;
+  if (candidates.length > 0) {
+    const existing = await prisma.notification.findMany({
+      where: {
+        userId,
+        refId: { in: candidates.map((c) => c.task.id) },
+        type: { in: ["OVERDUE", "DUE_SOON"] },
+      },
+      select: { refId: true, type: true },
+    });
+    const existingKeys = new Set(existing.map((n) => `${n.type}:${n.refId}`));
 
-  const existing = await prisma.notification.findMany({
-    where: {
-      userId,
-      refId: { in: candidates.map((c) => c.task.id) },
-      type: { in: ["OVERDUE", "DUE_SOON"] },
-    },
-    select: { refId: true, type: true },
+    const toCreate = candidates.filter((c) => !existingKeys.has(`${c.type}:${c.task.id}`));
+    if (toCreate.length > 0) {
+      await prisma.notification.createMany({
+        data: toCreate.map((c) => ({
+          userId,
+          type: c.type,
+          refId: c.task.id,
+          message: c.message,
+        })),
+      });
+    }
+  }
+
+  const retentionCutoff = new Date(now - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  await prisma.notification.deleteMany({
+    where: { userId, isRead: true, createdAt: { lt: retentionCutoff } },
   });
-  const existingKeys = new Set(existing.map((n) => `${n.type}:${n.refId}`));
 
-  const toCreate = candidates.filter((c) => !existingKeys.has(`${c.type}:${c.task.id}`));
-  if (toCreate.length === 0) return;
-
-  await prisma.notification.createMany({
-    data: toCreate.map((c) => ({
-      userId,
-      type: c.type,
-      refId: c.task.id,
-      message: c.message,
-    })),
-  });
+  await prisma.user.update({ where: { id: userId }, data: { lastDeadlineCheckAt: new Date(now) } });
 }
