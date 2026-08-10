@@ -94,7 +94,7 @@ model TaskPriority {
   // 참여자별 우선순위
   taskId    String
   userId    String
-  level     Priority @default(NORMAL)
+  level     Priority @default(HOLD)
   updatedAt DateTime @updatedAt
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -1,0 +1,1 @@
+ALTER TABLE "TaskPriority" ALTER COLUMN "level" SET DEFAULT 'HOLD';

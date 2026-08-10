@@ -20,7 +20,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { getCanvasTasks, moveTask, updateTaskPosition } from "@/app/actions/tasks";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_LABEL, isOverdue } from "@/lib/priority";
 import { TaskDetail } from "./task-detail";
@@ -189,7 +189,7 @@ function TaskCanvasInner({
         <Controls />
       </ReactFlow>
 
-      <Sheet
+      <Dialog
         open={!!selected}
         onOpenChange={(o) => {
           if (!o) {
@@ -198,10 +198,10 @@ function TaskCanvasInner({
           }
         }}
       >
-        <SheetContent side="bottom">
-          <SheetHeader>
-            <SheetTitle>업무 상세</SheetTitle>
-          </SheetHeader>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>업무 상세</DialogTitle>
+          </DialogHeader>
           {selected && (
             <TaskDetail
               taskId={selected}
@@ -211,8 +211,8 @@ function TaskCanvasInner({
               }}
             />
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

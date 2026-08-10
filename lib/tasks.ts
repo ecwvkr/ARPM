@@ -7,10 +7,10 @@ export { isOverdue } from "@/lib/priority";
 const PRIORITY_RANK: Record<string, number> = { URGENT: 3, NORMAL: 2, HOLD: 1 };
 
 export function getMaxPriority(priorities: { level: string }[]): string {
-  if (priorities.length === 0) return "NORMAL";
+  if (priorities.length === 0) return "HOLD";
   return priorities.reduce(
     (max, p) => (PRIORITY_RANK[p.level] > PRIORITY_RANK[max] ? p.level : max),
-    "NORMAL",
+    "HOLD",
   );
 }
 

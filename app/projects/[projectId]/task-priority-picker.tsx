@@ -7,11 +7,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const LEVELS = ["URGENT", "NORMAL", "HOLD"] as const;
 
+// 색만으로 구분하지 않도록 보류는 점선 테두리의 빈 원으로 그린다(색각 이상 대응).
 export function PriorityDot({ level, className = "" }: { level: string; className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-block size-2.5 shrink-0 rounded-full border border-foreground/20 ${className}`}
+      className={`inline-block size-2.5 shrink-0 rounded-full border ${
+        level === "HOLD" ? "border-dashed border-foreground/40" : "border-foreground/20"
+      } ${className}`}
       style={{ backgroundColor: PRIORITY_COLOR[level] }}
     />
   );
@@ -35,7 +38,11 @@ export function ParticipantPriorityDot({
   const [isPending, startTransition] = useTransition();
 
   if (userId !== currentUserId) {
-    return <PriorityDot level={level} className="translate-y-px" />;
+    return (
+      <span title={`${userName}: ${PRIORITY_LABEL[level]}`} className="inline-flex">
+        <PriorityDot level={level} className="translate-y-px" />
+      </span>
+    );
   }
 
   return (

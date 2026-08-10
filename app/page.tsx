@@ -54,20 +54,24 @@ export default async function DashboardPage({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {session?.user?.isSuperAdmin && (
-              <Link
-                href={showHidden ? "/" : "/?hidden=1"}
-                className="hidden text-xs text-muted-foreground underline underline-offset-2 sm:inline"
-              >
-                {showHidden ? "숨김/삭제 프로젝트 숨기기" : "숨김/삭제 프로젝트 보기"}
-              </Link>
-            )}
             <NotificationBell />
             <LogoutButton />
           </div>
         </div>
       </header>
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
+        <div className="flex items-center justify-end gap-3">
+          {session?.user?.isSuperAdmin && (
+            <Link
+              href={showHidden ? "/" : "/?hidden=1"}
+              className="text-xs text-muted-foreground underline underline-offset-2"
+            >
+              {showHidden ? "숨김/삭제 프로젝트 숨기기" : "숨김/삭제 프로젝트 보기"}
+            </Link>
+          )}
+          <NewProjectDialog currentUserId={session!.user.id} />
+        </div>
+
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <SummaryCard label="전체 프로젝트" value={projects.length} />
           <SummaryCard label="나의 프로젝트" value={ownedCount} />
@@ -100,10 +104,7 @@ export default async function DashboardPage({
           </section>
         )}
 
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-foreground">프로젝트</h2>
-          <NewProjectDialog currentUserId={session!.user.id} />
-        </div>
+        <h2 className="text-sm font-bold text-foreground">프로젝트</h2>
 
         {projects.length === 0 ? (
           <p className="text-sm text-muted-foreground">아직 프로젝트가 없습니다.</p>

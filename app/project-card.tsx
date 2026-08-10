@@ -51,12 +51,18 @@ export function ProjectCard({
       </div>
 
       {project.members.length > 0 && (
-        <div className="pointer-events-none relative z-10 flex flex-wrap gap-1">
-          {project.members.map((m) => (
-            <span key={m.userId} className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+        <div className="pointer-events-none relative z-10 flex flex-wrap items-center gap-1.5">
+          {project.members.slice(0, 4).map((m) => (
+            <span key={m.userId} className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="flex size-4 items-center justify-center rounded-full bg-background text-[9px] font-bold text-foreground">
+                {m.user.name.slice(0, 1)}
+              </span>
               {m.user.name}
             </span>
           ))}
+          {project.members.length > 4 && (
+            <span className="text-xs text-muted-foreground">+{project.members.length - 4}</span>
+          )}
         </div>
       )}
 
@@ -66,7 +72,7 @@ export function ProjectCard({
             {project.deletedAt ? "삭제됨" : "숨김"}
           </Badge>
         )}
-        <p>
+        <p className="break-keep text-xs">
           업무 {project.tasks.length}개 · 진행전 {todoCount}개 · 진행중 {inProgressCount}개
         </p>
       </div>

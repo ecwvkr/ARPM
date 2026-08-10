@@ -41,7 +41,7 @@ export type ParticipantChipData = {
   isMaster: boolean;
 };
 
-// 참여자 이름칩용 데이터: 우선순위가 없으면 기본값 '보통'. master가 아직 참여자로
+// 참여자 이름칩용 데이터: 우선순위가 없으면 기본값 '보류'. master가 아직 참여자로
 // 기록되지 않은 과거 데이터도 항상 첫 칩으로 노출한다.
 export function buildParticipantChips(task: {
   masterId: string;
@@ -53,14 +53,14 @@ export function buildParticipantChips(task: {
   const chips = task.participants.map((p) => ({
     userId: p.userId,
     userName: p.user.name,
-    level: priorityByUser.get(p.userId) ?? "NORMAL",
+    level: priorityByUser.get(p.userId) ?? "HOLD",
     isMaster: p.userId === task.masterId,
   }));
   if (!chips.some((c) => c.userId === task.masterId)) {
     chips.unshift({
       userId: task.masterId,
       userName: task.master.name,
-      level: priorityByUser.get(task.masterId) ?? "NORMAL",
+      level: priorityByUser.get(task.masterId) ?? "HOLD",
       isMaster: true,
     });
   }

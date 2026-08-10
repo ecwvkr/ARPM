@@ -78,6 +78,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
                 commentCount={task._count.comments}
                 currentUserId={session.user.id}
                 projectName={task.projectName}
+                projectColor={task.projectColor}
               />
             ))}
           </div>

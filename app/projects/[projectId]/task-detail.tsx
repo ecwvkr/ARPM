@@ -37,12 +37,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { IconCopy, IconArrowsMove, IconPencil, IconTrash, IconX, IconUserPlus } from "@tabler/icons-react";
+import { IconCopy, IconArrowsMove, IconPencil, IconTrash, IconX, IconPlus } from "@tabler/icons-react";
 import { TaskTreePicker } from "./task-tree-picker";
 import { UserPicker } from "@/components/user-picker";
 import { DeriveDialog } from "./task-derive-dialog";
 import { DeleteDialog } from "./task-delete-dialog";
 import { ParticipantPriorityDot } from "./task-priority-picker";
+import { useSavedToast } from "@/components/ui/saved-toast";
 
 type Detail = Awaited<ReturnType<typeof getTaskDetail>>;
 
@@ -55,6 +56,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
   const [isPending, startTransition] = useTransition();
   const [editingInfo, setEditingInfo] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const { toast, trigger: showSavedToast } = useSavedToast();
 
   const reload = () => {
     startTransition(async () => {
@@ -91,7 +93,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
   const participantChips = buildParticipantChips(task);
 
   return (
-    <div className="space-y-6 px-1 pb-8">
+    <div className="space-y-9 px-1 pb-8">
       <section className="space-y-2 border-b border-foreground/10 pb-4">
         {editingInfo ? (
           <EditInfoForm
@@ -138,105 +140,101 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
         )}
       </section>
 
-      <div className="flex items-center gap-2">
-        <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">진행 관리</p>
-        <div className="h-px flex-1 bg-foreground/10" />
-      </div>
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-bold text-foreground">업무관리</h3>
-        <div className="flex flex-wrap gap-2">
-          <DeriveDialog parentTaskId={taskId} onDone={afterMutation} />
-          <Button
-            size="icon-sm"
-            variant="outline"
-            title="업무 복제하기"
-            aria-label="업무 복제하기"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                await duplicateTask(taskId);
-                afterMutation();
-              })
-            }
-          >
-            <IconCopy />
-          </Button>
-          {canManage && (
-            <MoveDialog taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
-          )}
-        </div>
-        {canParticipantAct && !locked && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button
-              size="sm"
-              variant={task.status === "TODO" ? "default" : "outline"}
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  await updateTaskStatus(taskId, "TODO");
-                  afterMutation();
-                })
-              }
-            >
-              진행전
-            </Button>
-            <Button
-              size="sm"
-              variant={task.status === "IN_PROGRESS" ? "default" : "outline"}
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  await updateTaskStatus(taskId, "IN_PROGRESS");
-                  afterMutation();
-                })
-              }
-            >
-              진행중
-            </Button>
-            <CompleteConfirmDialog taskId={taskId} onDone={afterMutation} />
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {canParticipantAct && !locked && (
+              <>
+                <Button
+                  size="sm"
+                  variant={task.status === "TODO" ? "default" : "outline"}
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await updateTaskStatus(taskId, "TODO");
+                      afterMutation();
+                    })
+                  }
+                >
+                  진행전
+                </Button>
+                <Button
+                  size="sm"
+                  variant={task.status === "IN_PROGRESS" ? "default" : "outline"}
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await updateTaskStatus(taskId, "IN_PROGRESS");
+                      afterMutation();
+                    })
+                  }
+                >
+                  진행중
+                </Button>
+                <CompleteConfirmDialog taskId={taskId} onDone={afterMutation} />
+              </>
+            )}
+            {locked && (canManage || isSuperAdmin) && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await reopenTask(taskId);
+                    afterMutation();
+                  })
+                }
+              >
+                완료 취소
+              </Button>
+            )}
           </div>
-        )}
-        {locked && (canManage || isSuperAdmin) && (
-          <div className="flex flex-wrap gap-2 pt-1">
+
+          <div className="flex flex-wrap gap-1.5">
+            <DeriveDialog
+              parentTaskId={taskId}
+              onDone={afterMutation}
+              trigger={
+                <Button size="sm" variant="outline" title="이 업무의 하위 연계 업무를 새로 만듭니다">
+                  <IconPlus className="size-4" />
+                  연계업무
+                </Button>
+              }
+            />
             <Button
               size="sm"
               variant="outline"
+              title="현재 업무를 그대로 복제합니다"
               disabled={isPending}
               onClick={() =>
                 startTransition(async () => {
-                  await reopenTask(taskId);
+                  await duplicateTask(taskId);
                   afterMutation();
                 })
               }
             >
-              완료 취소
+              <IconCopy className="size-4" />
+              업무 복제
             </Button>
+            {canManage && (
+              <MoveDialog taskId={taskId} currentParentId={task.parentId} onDone={afterMutation} />
+            )}
+          </div>
+        </div>
+
+        {canParticipantAct && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              {task.dueDate ? `마감일 ${formatDate(task.dueDate)}` : "마감일이 설정되지 않았습니다."}
+            </span>
+            <ExtendDueDatePopover taskId={taskId} onDone={afterMutation} />
           </div>
         )}
       </section>
 
-      {canParticipantAct && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-bold text-foreground">기한</h3>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-muted-foreground">
-              {task.dueDate ? `마감일 ${formatDate(task.dueDate)}` : "마감일이 설정되지 않았습니다."}
-            </p>
-            <ExtendDueDatePopover taskId={taskId} onDone={afterMutation} />
-          </div>
-        </section>
-      )}
-
       <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground">참여자 ({participantChips.length})</h3>
-          {canManage && (
-            <Button size="icon-sm" variant="outline" title="참여자 추가" aria-label="참여자 추가" onClick={() => setShowInvite(true)}>
-              <IconUserPlus />
-            </Button>
-          )}
-        </div>
+        <h3 className="text-sm font-bold text-foreground">참여자 ({participantChips.length})</h3>
         <div className="flex flex-wrap items-center gap-1.5">
           {participantChips.map((p) => (
             <span
@@ -275,6 +273,17 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
               )}
             </span>
           ))}
+          {canManage && (
+            <Button
+              size="icon-sm"
+              variant="outline"
+              title="참여자 추가"
+              aria-label="참여자 추가"
+              onClick={() => setShowInvite(true)}
+            >
+              <IconPlus className="size-4" />
+            </Button>
+          )}
           {canJoin && (
             <Button
               size="sm"
@@ -326,40 +335,37 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
 
       {canManage && (
         <>
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2">
             <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">설정</p>
             <div className="h-px flex-1 bg-foreground/10" />
           </div>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-foreground">공개 범위</h3>
-            <form
-              action={(formData) =>
+            <select
+              name="visibility"
+              aria-label="공개 범위"
+              defaultValue={task.visibility}
+              disabled={isPending}
+              onChange={(e) => {
+                const formData = new FormData();
+                formData.set("visibility", e.target.value);
                 startTransition(async () => {
                   await updateTaskVisibility(taskId, formData);
                   afterMutation();
-                })
-              }
-              className="flex items-center gap-2"
+                  showSavedToast();
+                });
+              }}
+              className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
             >
-              <select
-                name="visibility"
-                aria-label="공개 범위"
-                defaultValue={task.visibility}
-                className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
-              >
-                <option value="PUBLIC">공개</option>
-                <option value="PRIVATE">비공개</option>
-              </select>
-              <Button type="submit" size="sm" variant="outline" disabled={isPending}>
-                저장
-              </Button>
-            </form>
+              <option value="PUBLIC">공개</option>
+              <option value="PRIVATE">비공개</option>
+            </select>
           </section>
         </>
       )}
 
-      <div className="flex items-center gap-2 pt-2">
+      <div className="flex items-center gap-2">
         <p className="text-xs font-bold tracking-wider text-muted-foreground/70 uppercase">협업</p>
         <div className="h-px flex-1 bg-foreground/10" />
       </div>
@@ -389,6 +395,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
       </section>
 
       {canManage && <DangerZone taskId={taskId} onDeleted={onDeleted} />}
+      {toast}
     </div>
   );
 }
@@ -544,7 +551,7 @@ function CompleteConfirmDialog({ taskId, onDone }: { taskId: string; onDone: () 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm">완료하기</Button>} />
+      <DialogTrigger render={<Button size="sm" variant="outline">완료하기</Button>} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>업무 완료</DialogTitle>
@@ -622,8 +629,9 @@ function MoveDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="icon-sm" variant="outline" title="연계업무 수정" aria-label="연계업무 수정">
-            <IconArrowsMove />
+          <Button size="sm" variant="outline" title="이 업무의 상위 연계 업무를 변경합니다">
+            <IconArrowsMove className="size-4" />
+            연계업무 수정
           </Button>
         }
       />
