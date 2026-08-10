@@ -7,6 +7,7 @@ import {
   leaveTask,
   updateTaskStatus,
   completeTask,
+  reopenTask,
   extendDueDate,
   updateTaskInfo,
   updateTaskVisibility,
@@ -72,8 +73,16 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
     reload();
   };
 
-  if (!detail || !detail.task) {
+  if (detail === null) {
     return <p className="px-1 py-4 text-sm text-muted-foreground">불러오는 중...</p>;
+  }
+
+  if (!detail.task) {
+    return (
+      <p className="px-1 py-4 text-sm text-muted-foreground">
+        업무를 찾을 수 없거나 접근 권한이 없습니다.
+      </p>
+    );
   }
 
   const { task, canManage, canParticipantAct, canComment, canJoin, canLeave, currentUserId, isSuperAdmin } = detail;
@@ -109,7 +118,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
                 </Badge>
                 {task.recurrence === "WEEKLY" && <Badge variant="outline">매주 반복</Badge>}
               </div>
-              {canManage && (
+              {canManage && !locked && (
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -186,6 +195,23 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
               진행중
             </Button>
             <CompleteConfirmDialog taskId={taskId} onDone={afterMutation} />
+          </div>
+        )}
+        {locked && (canManage || isSuperAdmin) && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  await reopenTask(taskId);
+                  afterMutation();
+                })
+              }
+            >
+              완료 취소
+            </Button>
           </div>
         )}
       </section>

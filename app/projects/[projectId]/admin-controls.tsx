@@ -1,15 +1,27 @@
 "use client";
 
-import { toggleProjectArchive, softDeleteProject } from "@/app/actions/projects";
+import { toggleProjectArchive, softDeleteProject, restoreProject } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
 
 export function AdminControls({
   projectId,
   isArchived,
+  isDeleted,
 }: {
   projectId: string;
   isArchived: boolean;
+  isDeleted: boolean;
 }) {
+  if (isDeleted) {
+    return (
+      <form action={restoreProject.bind(null, projectId)}>
+        <Button type="submit" size="sm" variant="outline">
+          복구
+        </Button>
+      </form>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2">
       <form action={toggleProjectArchive.bind(null, projectId)}>

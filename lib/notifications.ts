@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { KST_DUE_DAY_END_OFFSET_MS } from "@/lib/priority";
 
 // 기한 임박(D-1)·지연 알림 — 별도 스케줄러 없이 로그인 사용자가 대시보드를 볼 때
 // 본인 업무만 lazy하게 점검한다. 동일 타입+업무당 한 번만 생성(중복 방지).
@@ -14,14 +15,14 @@ export async function ensureDeadlineNotifications(userId: string) {
 
   if (tasks.length === 0) return;
 
-  const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const now = Date.now();
 
   const candidates = tasks
     .map((t) => {
       if (!t.dueDate) return null;
-      if (t.dueDate < now) return { task: t, type: "OVERDUE", message: `"${t.title}" 업무가 지연되었습니다.` };
-      if (t.dueDate <= tomorrow) return { task: t, type: "DUE_SOON", message: `"${t.title}" 업무 기한이 임박했습니다(D-1).` };
+      const dueEnd = t.dueDate.getTime() + KST_DUE_DAY_END_OFFSET_MS;
+      if (dueEnd < now) return { task: t, type: "OVERDUE", message: `"${t.title}" 업무가 지연되었습니다.` };
+      if (dueEnd - now <= 24 * 60 * 60 * 1000) return { task: t, type: "DUE_SOON", message: `"${t.title}" 업무 기한이 임박했습니다(D-1).` };
       return null;
     })
     .filter((c) => c !== null);

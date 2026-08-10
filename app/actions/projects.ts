@@ -50,6 +50,27 @@ export async function createProject(
   redirect(`/projects/${project.id}`);
 }
 
+export async function updateProjectName(
+  projectId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { isOwner } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!isOwner) return "프로젝트 owner만 이름을 변경할 수 있습니다.";
+
+  const name = (formData.get("name") as string | null)?.trim();
+  if (!name) return "프로젝트 이름을 입력하세요.";
+
+  await prisma.project.update({ where: { id: projectId }, data: { name } });
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
+  revalidatePath("/tasks");
+  revalidatePath("/calendar");
+}
+
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export async function updateProjectColor(
@@ -122,6 +143,20 @@ export async function inviteMember(
   );
 
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
+}
+
+export async function removeMember(projectId: string, userId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { project, isOwner } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!project || !isOwner) throw new Error("프로젝트 owner만 멤버를 제외할 수 있습니다.");
+  if (userId === project.ownerId) throw new Error("owner는 제외할 수 없습니다.");
+
+  await prisma.projectMember.deleteMany({ where: { projectId, userId } });
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
 }
 
 export async function toggleProjectArchive(projectId: string) {
@@ -149,4 +184,17 @@ export async function softDeleteProject(projectId: string) {
 
   revalidatePath("/");
   redirect("/");
+}
+
+export async function restoreProject(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.isSuperAdmin) throw new Error("총관리자만 복구할 수 있습니다.");
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { deletedAt: null },
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/");
 }

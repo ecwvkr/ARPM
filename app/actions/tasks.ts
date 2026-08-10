@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
+import { revalidateTaskViews } from "@/lib/revalidate";
 import {
   getTaskAccess,
   listTasksForProject,
@@ -81,8 +81,7 @@ export async function createTask(
     },
   });
 
-  revalidatePath(`/projects/${projectId}`);
-  revalidatePath("/tasks");
+  revalidateTaskViews(projectId);
 }
 
 export async function deriveTask(
@@ -127,7 +126,7 @@ export async function deriveTask(
     });
   }
 
-  revalidatePath(`/projects/${parent.projectId}`);
+  revalidateTaskViews(parent.projectId);
 }
 
 export async function duplicateTask(taskId: string) {
@@ -150,7 +149,7 @@ export async function duplicateTask(taskId: string) {
     },
   });
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function moveTask(taskId: string, formData: FormData) {
@@ -166,7 +165,7 @@ export async function moveTask(taskId: string, formData: FormData) {
   if (newParentId) {
     if (newParentId === taskId) throw new Error("자기 자신을 부모로 지정할 수 없습니다.");
 
-    const projectTasks = await listTasksForProject(task.projectId, session.user.id, true);
+    const projectTasks = await listTasksForProject(task.projectId, session.user.id, !!session.user.isSuperAdmin);
     const target = projectTasks.find((t) => t.id === newParentId);
     if (!target) throw new Error("같은 프로젝트 내에서만 이동할 수 있습니다.");
 
@@ -175,7 +174,7 @@ export async function moveTask(taskId: string, formData: FormData) {
   }
 
   await prisma.task.update({ where: { id: taskId }, data: { parentId: newParentId } });
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function listMovableTargets(taskId: string) {
@@ -247,7 +246,7 @@ export async function joinTask(taskId: string) {
     create: { taskId, userId: session.user.id },
   });
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function leaveTask(taskId: string) {
@@ -261,7 +260,7 @@ export async function leaveTask(taskId: string) {
     where: { taskId_userId: { taskId, userId: session.user.id } },
   });
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function removeParticipant(taskId: string, userId: string) {
@@ -273,7 +272,7 @@ export async function removeParticipant(taskId: string, userId: string) {
   if (userId === task.masterId) throw new Error("master는 위임을 통해서만 변경할 수 있습니다.");
 
   await prisma.taskParticipant.deleteMany({ where: { taskId, userId } });
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function updateTaskStatus(taskId: string, status: "TODO" | "IN_PROGRESS") {
@@ -285,7 +284,7 @@ export async function updateTaskStatus(taskId: string, status: "TODO" | "IN_PROG
   if (task.completedAt) throw new Error("완료된 업무는 상태를 변경할 수 없습니다.");
 
   await prisma.task.update({ where: { id: taskId }, data: { status } });
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function completeTask(taskId: string) {
@@ -294,6 +293,7 @@ export async function completeTask(taskId: string) {
 
   const { task, canParticipantAct } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
   if (!task || !canParticipantAct) throw new Error("권한이 없습니다.");
+  if (task.completedAt) return;
 
   await prisma.task.update({
     where: { id: taskId },
@@ -317,7 +317,36 @@ export async function completeTask(taskId: string) {
     });
   }
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
+}
+
+export async function reopenTask(taskId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
+  if (!task) throw new Error("업무를 찾을 수 없습니다.");
+  if (!canManage && !session.user.isSuperAdmin) throw new Error("master 또는 총관리자만 완료를 취소할 수 있습니다.");
+  if (!task.completedAt) return;
+
+  await prisma.$transaction([
+    prisma.task.update({
+      where: { id: taskId },
+      data: { status: "IN_PROGRESS", completedAt: null },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        action: "REOPEN_TASK",
+        targetType: "TASK",
+        targetId: task.id,
+        projectId: task.projectId,
+        message: `"${task.title}" 업무 완료를 취소함`,
+      },
+    }),
+  ]);
+
+  revalidateTaskViews(task.projectId);
 }
 
 export async function setMyPriority(taskId: string, level: "URGENT" | "NORMAL" | "HOLD") {
@@ -333,7 +362,7 @@ export async function setMyPriority(taskId: string, level: "URGENT" | "NORMAL" |
     create: { taskId, userId: session.user.id, level },
   });
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function extendDueDate(
@@ -351,7 +380,7 @@ export async function extendDueDate(
   if (!dueDateRaw) return "날짜를 입력하세요.";
 
   await prisma.task.update({ where: { id: taskId }, data: { dueDate: new Date(dueDateRaw) } });
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function updateTaskInfo(
@@ -364,6 +393,7 @@ export async function updateTaskInfo(
 
   const { task, canManage } = await getTaskAccess(taskId, session.user.id, !!session.user.isSuperAdmin);
   if (!task || !canManage) return "master만 수정할 수 있습니다.";
+  if (task.completedAt) return "완료된 업무는 수정할 수 없습니다.";
 
   const title = (formData.get("title") as string | null)?.trim();
   if (!title) return "제목을 입력하세요.";
@@ -373,7 +403,7 @@ export async function updateTaskInfo(
     where: { id: taskId },
     data: { title, memo },
   });
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function updateTaskVisibility(taskId: string, formData: FormData) {
@@ -385,7 +415,7 @@ export async function updateTaskVisibility(taskId: string, formData: FormData) {
 
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   await prisma.task.update({ where: { id: taskId }, data: { visibility } });
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function transferMaster(taskId: string, formData: FormData) {
@@ -431,7 +461,7 @@ export async function transferMaster(taskId: string, formData: FormData) {
       },
     }),
   ]);
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function inviteToTask(
@@ -485,7 +515,7 @@ export async function inviteToTask(
     ]),
   );
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function addComment(
@@ -517,7 +547,7 @@ export async function addComment(
     });
   }
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }
 
 export async function updateComment(
@@ -536,7 +566,7 @@ export async function updateComment(
   if (!body) return "내용을 입력하세요.";
 
   await prisma.comment.update({ where: { id: commentId }, data: { body } });
-  revalidatePath(`/projects/${comment.task.projectId}`);
+  revalidateTaskViews(comment.task.projectId);
 }
 
 export async function deleteComment(commentId: string) {
@@ -548,7 +578,7 @@ export async function deleteComment(commentId: string) {
   if (comment.authorId !== session.user.id && !session.user.isSuperAdmin) return;
 
   await prisma.comment.delete({ where: { id: commentId } });
-  revalidatePath(`/projects/${comment.task.projectId}`);
+  revalidateTaskViews(comment.task.projectId);
 }
 
 export async function deleteTask(
@@ -597,5 +627,5 @@ export async function deleteTask(
     }),
   ]);
 
-  revalidatePath(`/projects/${task.projectId}`);
+  revalidateTaskViews(task.projectId);
 }

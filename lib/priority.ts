@@ -23,8 +23,15 @@ export const STATUS_ORDER: Record<string, number> = {
   DONE: 2,
 };
 
+// dueDate는 <input type="date">에서 해당 날짜의 UTC 자정으로 저장된다
+// (예: "2026-08-07" -> 2026-08-07T00:00:00Z). 이는 한국시간 기준 그 날짜를
+// 의미하므로, "마감을 넘겼다"는 판정은 서버 타임존과 무관하게 한국시간 기준
+// 그 날의 23:59:59.999를 기준으로 계산한다.
+export const KST_DUE_DAY_END_OFFSET_MS = 53_999_999;
+
 export function isOverdue(dueDate: Date | null, status: string) {
-  return !!dueDate && dueDate < new Date() && status !== "DONE";
+  if (!dueDate || status === "DONE") return false;
+  return dueDate.getTime() + KST_DUE_DAY_END_OFFSET_MS < Date.now();
 }
 
 export type ParticipantChipData = {

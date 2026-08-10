@@ -66,7 +66,11 @@ export default async function ProjectDetailPage({
             <NewTaskDialog projectId={project.id} currentUserId={session.user.id} />
             <ProjectSettingsDialog project={{ ...project, members }} isOwner={isOwner} />
             {session.user.isSuperAdmin && (
-              <AdminControls projectId={project.id} isArchived={project.isArchived} />
+              <AdminControls
+                projectId={project.id}
+                isArchived={project.isArchived}
+                isDeleted={project.deletedAt !== null}
+              />
             )}
             <NotificationBell />
           </div>
