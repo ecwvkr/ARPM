@@ -24,6 +24,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
   const isSuperAdmin = !!session.user.isSuperAdmin;
   const projects = await listVisibleProjects(session.user.id, isSuperAdmin, false);
   const savedFilters = await listSavedFilters();
+  const activeProject = projectId ? projects.find((p) => p.id === projectId) : undefined;
 
   const tasks = await listAllTasksForUser(session.user.id, isSuperAdmin, {
     projectId,
@@ -40,7 +41,12 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
             <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
               ← 전체 프로젝트
             </Link>
-            <h1 className="text-base font-bold">전체 업무</h1>
+            <h1 className="text-base font-bold">{activeProject ? `${activeProject.name} 업무` : "전체 업무"}</h1>
+            {activeProject && (
+              <Link href="/tasks" className="block text-xs text-muted-foreground underline underline-offset-2">
+                ← 전체 업무 보기
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <NewTaskDialog

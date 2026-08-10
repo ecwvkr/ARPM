@@ -13,6 +13,7 @@ import { TaskCanvas } from "./canvas-loader";
 import { TaskStatusGroups } from "./task-status-groups";
 import { TaskKanban } from "./task-kanban";
 import { TaskDeepLink } from "./task-deep-link";
+import { RecentProjectTracker } from "./recent-project-tracker";
 import { WidthContainer } from "@/components/width-container";
 
 export default async function ProjectDetailPage({
@@ -142,6 +143,7 @@ export default async function ProjectDetailPage({
       </WidthContainer>
 
       <TaskDeepLink />
+      <RecentProjectTracker id={project.id} name={project.name} />
     </div>
   );
 }

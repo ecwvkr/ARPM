@@ -55,6 +55,10 @@ export function TaskCard({
   return (
     <>
       <div
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuOpen(true);
+        }}
         className={`relative flex flex-col gap-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10 ${
           done ? "opacity-60 grayscale" : ""
         }`}
