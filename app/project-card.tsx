@@ -54,7 +54,7 @@ export function ProjectCard({
         <div className="pointer-events-none relative z-10 flex flex-wrap items-center gap-1.5">
           {project.members.slice(0, 4).map((m) => (
             <span key={m.userId} className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span className="flex size-4 items-center justify-center rounded-full bg-background text-[9px] font-bold text-foreground">
+              <span className="flex size-5 items-center justify-center rounded-full bg-background text-xs font-bold text-foreground">
                 {m.user.name.slice(0, 1)}
               </span>
               {m.user.name}
