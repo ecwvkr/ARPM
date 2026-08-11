@@ -92,7 +92,6 @@ export async function updateProjectColor(
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/");
   revalidatePath("/calendar");
-  revalidatePath("/canvas");
 }
 
 export async function updateProjectVisibility(projectId: string, formData: FormData) {
@@ -175,7 +174,13 @@ export async function toggleProjectArchive(projectId: string) {
 
 export async function softDeleteProject(projectId: string) {
   const session = await auth();
-  if (!session?.user?.isSuperAdmin) throw new Error("총관리자만 삭제할 수 있습니다.");
+  if (!session?.user?.id) redirect("/login");
+
+  // 소프트 삭제라 총관리자가 언제든 복구할 수 있으므로 owner에게도 연다.
+  const { isOwner } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!isOwner && !session.user.isSuperAdmin) {
+    throw new Error("프로젝트 owner 또는 총관리자만 삭제할 수 있습니다.");
+  }
 
   await prisma.project.update({
     where: { id: projectId },

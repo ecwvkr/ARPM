@@ -209,17 +209,18 @@ export async function listTasksForProject(projectId: string, userId: string, isS
 // 캔버스는 노드를 그리는 데 필요한 스칼라 필드와, 가시성 판정에 필요한 participants만
 // 있으면 된다. 목록용 조회(taskListInclude)는 master·우선순위·코멘트·읽음까지 끌어오는데
 // 캔버스에서는 전부 버려지므로 쓰지 않는다.
-export async function listCanvasTasksForProject(
-  projectId: string,
+export async function listCanvasTasksForProjects(
+  projectIds: string[],
   userId: string,
   isSuperAdmin: boolean,
 ) {
   const tasks = await prisma.task.findMany({
-    where: { projectId },
+    where: { projectId: { in: projectIds } },
     select: {
       id: true,
       parentId: true,
       masterId: true,
+      projectId: true,
       title: true,
       status: true,
       visibility: true,
@@ -232,6 +233,10 @@ export async function listCanvasTasksForProject(
   });
 
   return filterVisibleTasks(tasks, userId, isSuperAdmin);
+}
+
+export function listCanvasTasksForProject(projectId: string, userId: string, isSuperAdmin: boolean) {
+  return listCanvasTasksForProjects([projectId], userId, isSuperAdmin);
 }
 
 export async function listAllTasksForUser(

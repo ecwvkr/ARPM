@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { IconLayoutGrid, IconChecklist, IconCalendar, IconSitemap, IconSettings } from "@tabler/icons-react";
+import { IconLayoutGrid, IconChecklist, IconCalendar, IconSettings } from "@tabler/icons-react";
 import { getRecentProject, subscribeRecentProject } from "@/lib/recent-project";
 
 function getServerSnapshot() {
@@ -12,8 +12,7 @@ function getServerSnapshot() {
 
 const BASE_ITEMS = [
   { label: "대시보드", href: "/", icon: IconLayoutGrid, disabled: false },
-  { label: "캘린더", href: "/calendar", icon: IconCalendar, disabled: true },
-  { label: "캔버스", href: "/canvas", icon: IconSitemap, disabled: false },
+  { label: "캘린더", href: "/calendar", icon: IconCalendar, disabled: false },
   { label: "설정", href: "/settings", icon: IconSettings, disabled: false },
 ] as const;
 
@@ -21,9 +20,12 @@ export function BottomNav() {
   const pathname = usePathname();
   const recentProject = useSyncExternalStore(subscribeRecentProject, getRecentProject, getServerSnapshot);
 
-  const tasksItem = recentProject
-    ? { label: `업무 (${recentProject.name})`, href: `/tasks?projectId=${recentProject.id}` }
-    : { label: "업무", href: "/tasks" };
+  // 탭은 항상 전체 업무로 간다. 프로젝트명은 "마지막으로 보던 프로젝트"를 알려주는
+  // 표시일 뿐, 필터가 아니다(프로젝트별 업무는 프로젝트 상세에서 본다).
+  const tasksItem = {
+    label: recentProject ? `업무 (${recentProject.name})` : "업무",
+    href: "/tasks",
+  };
 
   const items = [
     BASE_ITEMS[0],

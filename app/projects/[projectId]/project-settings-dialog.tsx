@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { removeMember } from "@/app/actions/projects";
+import { removeMember, softDeleteProject } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProjectNameForm } from "./project-name-form";
@@ -21,10 +21,12 @@ type ProjectSettingsData = {
 export function ProjectSettingsDialog({
   project,
   isOwner,
+  canDelete = false,
   triggerClassName = "",
 }: {
   project: ProjectSettingsData;
   isOwner: boolean;
+  canDelete?: boolean;
   triggerClassName?: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -97,6 +99,24 @@ export function ProjectSettingsDialog({
               <InviteForm projectId={project.id} excludeIds={project.members.map((m) => m.userId)} />
             )}
           </div>
+          {canDelete && (
+            <div className="space-y-1.5 border-t border-foreground/10 pt-4">
+              <h4 className="text-sm font-bold text-destructive">프로젝트 삭제</h4>
+              <p className="text-xs text-muted-foreground">
+                목록에서 사라지지만 데이터는 남아 있어 총관리자가 복구할 수 있습니다.
+              </p>
+              <form
+                action={softDeleteProject.bind(null, project.id)}
+                onSubmit={(e) => {
+                  if (!confirm(`"${project.name}" 프로젝트를 삭제하시겠습니까?`)) e.preventDefault();
+                }}
+              >
+                <Button type="submit" size="sm" variant="destructive">
+                  프로젝트 삭제
+                </Button>
+              </form>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

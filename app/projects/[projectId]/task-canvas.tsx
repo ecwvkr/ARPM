@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   ReactFlow,
   Background,
@@ -19,7 +20,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
-import { getCanvasTasks, moveTask, updateTaskPosition } from "@/app/actions/tasks";
+import { getAllCanvasTasks, getCanvasTasks, moveTask, updateTaskPosition } from "@/app/actions/tasks";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_LABEL, isOverdue } from "@/lib/priority";
@@ -28,6 +29,7 @@ import { TaskDetail } from "./task-detail";
 type CanvasTask = {
   id: string;
   parentId: string | null;
+  projectId: string;
   title: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
   visibility: "PUBLIC" | "PRIVATE";
@@ -36,45 +38,92 @@ type CanvasTask = {
   canvasY: number | null;
 };
 
+type CanvasProject = { id: string; name: string; color: string | null };
+
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 72;
+const PROJECT_NODE_HEIGHT = 44;
 
-function layout(tasks: CanvasTask[]) {
+// projects가 있으면 "전체 뷰"(프로젝트 노드를 루트로 각 업무를 매단다), 없으면 단일 프로젝트 뷰.
+function buildGraph(
+  tasks: CanvasTask[],
+  projects: CanvasProject[] | null,
+  onOpen: (id: string) => void,
+  color: string | null,
+) {
+  const colorByProject = new Map((projects ?? []).map((p) => [p.id, p.color]));
+  const colorOf = (t: CanvasTask) =>
+    projects ? (colorByProject.get(t.projectId) ?? null) : color;
+
+  const links: [string, string][] = [];
+  for (const t of tasks) {
+    if (t.parentId) links.push([t.parentId, t.id]);
+    else if (projects) links.push([`project:${t.projectId}`, t.id]);
+  }
+
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "TB", nodesep: 32, ranksep: 56 });
-  tasks.forEach((t) => g.setNode(t.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
-  tasks.forEach((t) => {
-    if (t.parentId) g.setEdge(t.parentId, t.id);
-  });
+  for (const p of projects ?? []) {
+    g.setNode(`project:${p.id}`, { width: NODE_WIDTH, height: PROJECT_NODE_HEIGHT });
+  }
+  for (const t of tasks) g.setNode(t.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  for (const [source, target] of links) g.setEdge(source, target);
   dagre.layout(g);
-  return new Map(tasks.map((t) => [t.id, g.node(t.id)]));
+
+  const nodes: Node[] = [
+    ...(projects ?? []).map((p) => {
+      const pos = g.node(`project:${p.id}`);
+      return {
+        id: `project:${p.id}`,
+        type: "project",
+        position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - PROJECT_NODE_HEIGHT / 2 },
+        data: { project: p },
+        draggable: false,
+      };
+    }),
+    ...tasks.map((t) => {
+      const pos = g.node(t.id);
+      const position =
+        t.canvasX !== null && t.canvasY !== null
+          ? { x: t.canvasX, y: t.canvasY }
+          : { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
+      return {
+        id: t.id,
+        type: "task",
+        position,
+        data: { task: t, onOpen, color: colorOf(t) },
+      };
+    }),
+  ];
+
+  const edges: Edge[] = links.map(([source, target]) => ({
+    id: `${source}-${target}`,
+    source,
+    target,
+    markerEnd: { type: MarkerType.ArrowClosed },
+    ...(source.startsWith("project:") ? { style: { strokeDasharray: "4 4" } } : {}),
+  }));
+
+  return { nodes, edges };
 }
 
-function buildGraph(tasks: CanvasTask[], onOpen: (id: string) => void, color: string | null) {
-  const positions = layout(tasks);
-  const nodes: Node[] = tasks.map((t) => {
-    const pos = positions.get(t.id)!;
-    const position =
-      t.canvasX !== null && t.canvasY !== null
-        ? { x: t.canvasX, y: t.canvasY }
-        : { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
-    return {
-      id: t.id,
-      type: "task",
-      position,
-      data: { task: t, onOpen, color },
-    };
-  });
-  const edges: Edge[] = tasks
-    .filter((t) => t.parentId)
-    .map((t) => ({
-      id: `${t.parentId}-${t.id}`,
-      source: t.parentId!,
-      target: t.id,
-      markerEnd: { type: MarkerType.ArrowClosed },
-    }));
-  return { nodes, edges };
+function ProjectNode({ data }: NodeProps<Node<{ project: CanvasProject }>>) {
+  const { project } = data;
+  return (
+    <div
+      style={{ width: NODE_WIDTH }}
+      className="rounded-2xl bg-muted px-3 py-2 shadow-md ring-1 ring-foreground/10"
+    >
+      <Link href={`/projects/${project.id}`} className="flex items-center gap-1.5 text-sm font-bold">
+        {project.color && (
+          <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
+        )}
+        <span className="truncate">{project.name}</span>
+      </Link>
+      <Handle type="source" position={Position.Bottom} className="!size-3.5 !border-2 !border-background !bg-primary" />
+    </div>
+  );
 }
 
 function CanvasNode({
@@ -107,9 +156,13 @@ function CanvasNode({
   );
 }
 
-const nodeTypes = { task: CanvasNode };
+const nodeTypes = { task: CanvasNode, project: ProjectNode };
 
-export function TaskCanvas(props: { projectId: string; className?: string; color?: string | null }) {
+export function TaskCanvas(props: {
+  projectId?: string | null;
+  className?: string;
+  color?: string | null;
+}) {
   return (
     <ReactFlowProvider>
       <TaskCanvasInner {...props} />
@@ -118,22 +171,33 @@ export function TaskCanvas(props: { projectId: string; className?: string; color
 }
 
 function TaskCanvasInner({
-  projectId,
+  projectId = null,
   className = "h-[600px]",
   color = null,
 }: {
-  projectId: string;
+  projectId?: string | null;
   className?: string;
   color?: string | null;
 }) {
   const [tasks, setTasks] = useState<CanvasTask[] | null>(null);
+  const [projects, setProjects] = useState<CanvasProject[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { fitView } = useReactFlow();
 
+  // 전체 뷰는 여러 프로젝트에 걸쳐 있어 좌표 저장·부모 연결을 적용할 대상이 모호하므로 읽기 전용.
+  const readOnly = !projectId;
+
   const reload = useCallback(() => {
-    getCanvasTasks(projectId).then((t) => setTasks(t as CanvasTask[]));
+    if (projectId) {
+      getCanvasTasks(projectId).then((t) => setTasks(t as CanvasTask[]));
+    } else {
+      getAllCanvasTasks().then((r) => {
+        setProjects(r.projects);
+        setTasks(r.tasks as CanvasTask[]);
+      });
+    }
   }, [projectId]);
 
   useEffect(() => {
@@ -142,14 +206,14 @@ function TaskCanvasInner({
 
   useEffect(() => {
     if (!tasks) return;
-    const { nodes, edges } = buildGraph(tasks, setSelected, color);
+    const { nodes, edges } = buildGraph(tasks, projects, setSelected, color);
     setNodes(nodes);
     setEdges(edges);
     // ponytail: fitView은 노드가 실제로 측정(ResizeObserver)된 다음에야 정확히 계산되므로
     // rAF 한 틱으로는 부족할 때가 있어 짧은 지연을 둔다.
     const id = setTimeout(() => fitView(), 50);
     return () => clearTimeout(id);
-  }, [tasks, setNodes, setEdges, fitView, color]);
+  }, [tasks, projects, setNodes, setEdges, fitView, color]);
 
   const onConnect = useCallback(
     async (connection: Connection) => {
@@ -180,8 +244,10 @@ function TaskCanvasInner({
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeDragStop={onNodeDragStop}
+        onConnect={readOnly ? undefined : onConnect}
+        onNodeDragStop={readOnly ? undefined : onNodeDragStop}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         connectionRadius={40}
         proOptions={{ hideAttribution: true }}
       >

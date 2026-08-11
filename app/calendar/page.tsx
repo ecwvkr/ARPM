@@ -11,8 +11,11 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
 
   const params = await searchParams;
   const today = new Date();
-  const year = Number(params.y) || today.getFullYear();
-  const month = (Number(params.m) || today.getMonth() + 1) - 1;
+  const initialDate =
+    typeof params.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.d)
+      ? params.d
+      : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const initialView = params.v === "week" ? "week" : "month";
 
   const tasks = await listAllTasksForUser(session.user.id, !!session.user.isSuperAdmin, {});
 
@@ -29,7 +32,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
       </header>
 
       <WidthContainer mainClassName="space-y-4 px-6 py-6">
-        <CalendarView initialYear={year} initialMonth={month} tasks={tasks} />
+        <CalendarView initialDate={initialDate} initialView={initialView} tasks={tasks} />
       </WidthContainer>
     </div>
   );

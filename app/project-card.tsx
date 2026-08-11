@@ -55,7 +55,12 @@ export function ProjectCard({
             {project.visibility === "PUBLIC" ? "공개" : "비공개"}
           </Badge>
           {isOwner && (
-            <ProjectSettingsDialog project={project} isOwner={isOwner} triggerClassName="relative z-10 bg-background" />
+            <ProjectSettingsDialog
+              project={project}
+              isOwner={isOwner}
+              canDelete={!hidden}
+              triggerClassName="relative z-10 bg-background"
+            />
           )}
         </div>
       </div>

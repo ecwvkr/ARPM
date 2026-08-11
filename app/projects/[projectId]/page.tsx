@@ -65,7 +65,11 @@ export default async function ProjectDetailPage({
           </div>
           <div className="flex items-center gap-2">
             <NewTaskDialog projectId={project.id} currentUserId={session.user.id} />
-            <ProjectSettingsDialog project={{ ...project, members }} isOwner={isOwner} />
+            <ProjectSettingsDialog
+              project={{ ...project, members }}
+              isOwner={isOwner}
+              canDelete={(isOwner || !!session.user.isSuperAdmin) && !hidden}
+            />
             {session.user.isSuperAdmin && (
               <AdminControls
                 projectId={project.id}

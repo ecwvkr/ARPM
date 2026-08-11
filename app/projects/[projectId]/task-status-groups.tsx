@@ -18,7 +18,22 @@ export async function TaskStatusGroups({
   isSuperAdmin: boolean;
 }) {
   const tasks = await listTasksForProject(projectId, userId, isSuperAdmin);
+  return <TaskStatusGroupsView tasks={tasks} currentUserId={userId} />;
+}
 
+// 이미 업무를 가져온 화면(전체 업무)이 같은 쿼리를 다시 돌리지 않도록 표시 부분만 분리.
+type GroupTask = Awaited<ReturnType<typeof listTasksForProject>>[number] & {
+  projectName?: string;
+  projectColor?: string | null;
+};
+
+export function TaskStatusGroupsView({
+  tasks,
+  currentUserId,
+}: {
+  tasks: GroupTask[];
+  currentUserId: string;
+}) {
   if (tasks.length === 0) {
     return <p className="text-sm text-muted-foreground">아직 업무가 없습니다.</p>;
   }
@@ -51,8 +66,10 @@ export async function TaskStatusGroups({
                     dueDate={task.dueDate}
                     participants={buildParticipantChips(task)}
                     commentCount={task._count.comments}
-                    currentUserId={userId}
-                    unread={isTaskUnread(task, userId)}
+                    currentUserId={currentUserId}
+                    projectName={task.projectName}
+                    projectColor={task.projectColor}
+                    unread={isTaskUnread(task, currentUserId)}
                   />
                 ))}
               </div>

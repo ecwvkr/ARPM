@@ -6,10 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
 import { revalidateTaskViews } from "@/lib/revalidate";
 import { getCommentVisibleCount } from "@/lib/settings";
+import { listVisibleProjects } from "@/lib/projects";
 import {
   getTaskAccess,
   listTasksForProject,
   listCanvasTasksForProject,
+  listCanvasTasksForProjects,
   buildSubtree,
   collectSubtreeIds,
   collectDescendantIds,
@@ -238,7 +240,38 @@ export async function getCanvasTasks(projectId: string) {
     dueDate: t.dueDate,
     canvasX: t.canvasX,
     canvasY: t.canvasY,
+    projectId: t.projectId,
   }));
+}
+
+// 전체 뷰: 볼 수 있는 모든 프로젝트의 업무를 한 캔버스에 올린다. 저장된 좌표는
+// 프로젝트별 캔버스 기준이라 여기서 쓰면 서로 겹치므로, 전체 뷰는 자동 배치만 쓴다.
+export async function getAllCanvasTasks() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const isSuperAdmin = !!session.user.isSuperAdmin;
+  const projects = await listVisibleProjects(session.user.id, isSuperAdmin, false);
+  const tasks = await listCanvasTasksForProjects(
+    projects.map((p) => p.id),
+    session.user.id,
+    isSuperAdmin,
+  );
+
+  return {
+    projects: projects.map((p) => ({ id: p.id, name: p.name, color: p.color })),
+    tasks: tasks.map((t) => ({
+      id: t.id,
+      parentId: t.parentId,
+      title: t.title,
+      status: t.status,
+      visibility: t.visibility,
+      dueDate: t.dueDate,
+      canvasX: null,
+      canvasY: null,
+      projectId: t.projectId,
+    })),
+  };
 }
 
 export async function updateTaskPosition(taskId: string, x: number, y: number) {
