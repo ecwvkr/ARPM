@@ -66,5 +66,8 @@ export async function ensureDeadlineNotifications(userId: string) {
     where: { userId, isRead: true, createdAt: { lt: retentionCutoff } },
   });
 
-  await prisma.user.update({ where: { id: userId }, data: { lastDeadlineCheckAt: new Date(now) } });
+  // update가 아니라 updateMany를 쓴다. 세션은 살아있는데 계정이 삭제된 경우
+  // update는 레코드를 못 찾아 예외를 던지고, 그 예외가 대시보드 전체를 500으로
+  // 무너뜨렸다. 알림 점검 시각 기록은 실패해도 무방한 부수 작업이므로 조용히 넘어간다.
+  await prisma.user.updateMany({ where: { id: userId }, data: { lastDeadlineCheckAt: new Date(now) } });
 }
