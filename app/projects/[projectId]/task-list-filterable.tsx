@@ -66,6 +66,7 @@ export function TaskListFilterable({
               participants={buildParticipantChips(task)}
               commentCount={task._count.comments}
               currentUserId={currentUserId}
+              link={task.link}
               unread={isTaskUnread(task, currentUserId)}
             />
           ))}

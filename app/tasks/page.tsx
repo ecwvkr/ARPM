@@ -171,6 +171,7 @@ export default async function AllTasksPage({ searchParams }: PageProps<"/tasks">
                     currentUserId={session.user.id}
                     projectName={task.projectName}
                     projectColor={task.projectColor}
+                    link={task.link}
                     unread={isTaskUnread(task, session.user.id)}
                   />
                 ))}

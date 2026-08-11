@@ -20,10 +20,11 @@ export function BottomNav() {
   const pathname = usePathname();
   const recentProject = useSyncExternalStore(subscribeRecentProject, getRecentProject, getServerSnapshot);
 
-  // 탭은 항상 전체 업무로 간다. 프로젝트명은 "마지막으로 보던 프로젝트"를 알려주는
-  // 표시일 뿐, 필터가 아니다(프로젝트별 업무는 프로젝트 상세에서 본다).
+  // 탭은 항상 전체 업무로 간다. 프로젝트명은 지금 그 프로젝트를 보고 있을 때만
+  // 붙인다 — 전체 업무 화면에서까지 붙으면 그 프로젝트만 보는 것처럼 읽힌다.
+  const inProject = pathname.startsWith("/projects/");
   const tasksItem = {
-    label: recentProject ? `업무 (${recentProject.name})` : "업무",
+    label: inProject && recentProject ? `업무 (${recentProject.name})` : "업무",
     href: "/tasks",
   };
 

@@ -18,6 +18,15 @@ function formatShortDate(date: Date) {
   return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// 카드는 좁으므로 전체 URL 대신 도메인만 보여준다(전체는 title 툴팁으로).
+function linkLabel(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 export function TaskCard({
   taskId,
   projectId,
@@ -32,6 +41,7 @@ export function TaskCard({
   currentUserId,
   projectName,
   projectColor,
+  link,
   unread,
 }: {
   taskId: string;
@@ -47,6 +57,7 @@ export function TaskCard({
   currentUserId: string;
   projectName?: string;
   projectColor?: string | null;
+  link?: string | null;
   unread?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -199,6 +210,19 @@ export function TaskCard({
                 <span className="text-xs text-muted-foreground">+{participants.length - 4}</span>
               )}
             </div>
+          )}
+
+          {link && (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={link}
+              className="pointer-events-auto inline-flex w-fit max-w-full items-center gap-1 text-xs text-primary underline underline-offset-2"
+            >
+              <IconLink className="size-3.5 shrink-0" />
+              <span className="truncate">{linkLabel(link)}</span>
+            </a>
           )}
 
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">

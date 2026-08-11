@@ -96,6 +96,10 @@ export function NewTaskDialog({
             <Textarea id="memo" name="memo" rows={3} />
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="link">링크</Label>
+            <Input id="link" name="link" placeholder="https://example.com" />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="dueDate">기한</Label>
             <Input id="dueDate" name="dueDate" type="date" />
           </div>

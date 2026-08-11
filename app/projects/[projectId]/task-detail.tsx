@@ -37,7 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { IconCopy, IconArrowsMove, IconPencil, IconTrash, IconX, IconPlus } from "@tabler/icons-react";
+import { IconCopy, IconArrowsMove, IconPencil, IconTrash, IconX, IconPlus, IconLink } from "@tabler/icons-react";
 import { TaskTreePicker } from "./task-tree-picker";
 import { UserPicker } from "@/components/user-picker";
 import { DeriveDialog } from "./task-derive-dialog";
@@ -111,6 +111,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             taskId={taskId}
             title={task.title}
             memo={task.memo ?? ""}
+            link={task.link ?? ""}
             onDone={() => {
               setEditingInfo(false);
               afterMutation();
@@ -144,6 +145,17 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
               )}
             </div>
             {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
+            {task.link && (
+              <a
+                href={task.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-fit max-w-full items-center gap-1 text-sm text-primary underline underline-offset-2"
+              >
+                <IconLink className="size-4 shrink-0" />
+                <span className="truncate">{task.link}</span>
+              </a>
+            )}
           </>
         )}
         {task.parent && (
@@ -428,32 +440,51 @@ function DangerZone({ taskId, onDeleted }: { taskId: string; onDeleted: () => vo
   );
 }
 
+// useActionState의 formAction은 액션이 돌려준 오류 문자열을 호출부에 넘겨주지 않는다.
+// 그래서 이 파일의 폼들은 "await formAction(); onDone()"으로 실패해도 그대로 닫혔고,
+// 사용자가 입력한 내용이 조용히 사라졌다. 액션을 직접 호출해 성공했을 때만 닫는다.
+function useSubmit(
+  action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>,
+) {
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [isPending, startTransition] = useTransition();
+
+  function submit(formData: FormData, onSuccess: () => void) {
+    startTransition(async () => {
+      const error = await action(undefined, formData);
+      setErrorMessage(error);
+      if (!error) onSuccess();
+    });
+  }
+
+  return { errorMessage, isPending, submit };
+}
+
 function EditInfoForm({
   taskId,
   title,
   memo,
+  link,
   onDone,
   onCancel,
 }: {
   taskId: string;
   title: string;
   memo: string;
+  link: string;
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const action = updateTaskInfo.bind(null, taskId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const { errorMessage, isPending, submit } = useSubmit(updateTaskInfo.bind(null, taskId));
 
   return (
     <form
-      action={async (formData) => {
-        await formAction(formData);
-        onDone();
-      }}
+      action={(formData) => submit(formData, onDone)}
       className="space-y-2"
     >
       <Input name="title" defaultValue={title} required />
       <Textarea name="memo" defaultValue={memo} placeholder="메모" rows={3} />
+      <Input name="link" defaultValue={link} placeholder="링크 (https://example.com)" />
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={isPending}>
@@ -609,18 +640,16 @@ function InviteForm({
   onDone: () => void;
   excludeIds: string[];
 }) {
-  const action = inviteToTask.bind(null, taskId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const { errorMessage, isPending, submit } = useSubmit(inviteToTask.bind(null, taskId));
   const [grants, setGrants] = useState<{ taskId: string; includeSubtree: boolean }[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
 
   return (
     <form
-      action={async (formData) => {
+      action={(formData) => {
         formData.set("grants", JSON.stringify(grants));
         selected.forEach((userId) => formData.append("userIds", userId));
-        await formAction(formData);
-        onDone();
+        submit(formData, onDone);
       }}
       className="space-y-2"
     >
@@ -730,19 +759,19 @@ function CommentItem({
   onDone: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const action = updateComment.bind(null, comment.id);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const { errorMessage, isPending, submit } = useSubmit(updateComment.bind(null, comment.id));
   const [isDeleting, startTransition] = useTransition();
 
   if (editing) {
     return (
       <li className="rounded-md bg-muted/50 p-2 text-sm">
         <form
-          action={async (formData) => {
-            await formAction(formData);
-            setEditing(false);
-            onDone();
-          }}
+          action={(formData) =>
+            submit(formData, () => {
+              setEditing(false);
+              onDone();
+            })
+          }
           className="space-y-1.5"
         >
           <Textarea name="body" defaultValue={comment.body} rows={2} required />
@@ -805,17 +834,17 @@ function CommentForm({
   onDone: () => void;
   candidates: { userId: string; userName: string }[];
 }) {
-  const action = addComment.bind(null, taskId);
-  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const { errorMessage, isPending, submit } = useSubmit(addComment.bind(null, taskId));
   const [notify, setNotify] = useState<string[]>([]);
 
   return (
     <form
-      action={async (formData) => {
+      action={(formData) => {
         notify.forEach((userId) => formData.append("notify", userId));
-        await formAction(formData);
-        setNotify([]);
-        onDone();
+        submit(formData, () => {
+          setNotify([]);
+          onDone();
+        });
       }}
       className="space-y-2"
     >

@@ -69,6 +69,7 @@ export function TaskStatusGroupsView({
                     currentUserId={currentUserId}
                     projectName={task.projectName}
                     projectColor={task.projectColor}
+                    link={task.link}
                     unread={isTaskUnread(task, currentUserId)}
                   />
                 ))}

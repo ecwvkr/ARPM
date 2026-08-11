@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/permissions";
 import { revalidateTaskViews } from "@/lib/revalidate";
 import { getCommentVisibleCount } from "@/lib/settings";
+import { normalizeLink } from "@/lib/normalize";
 import { listVisibleProjects } from "@/lib/projects";
 import {
   getTaskAccess,
@@ -68,6 +69,8 @@ export async function createTask(
   if (!title) return "제목을 입력하세요.";
 
   const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const link = normalizeLink(formData.get("link") as string | null);
+  if (link === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
   const dueDateRaw = formData.get("dueDate") as string | null;
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   const recurrence = formData.get("recurrence") === "WEEKLY" ? "WEEKLY" : null;
@@ -93,6 +96,7 @@ export async function createTask(
       parentId,
       title,
       memo,
+      link,
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
       visibility,
       masterId: session.user.id,
@@ -119,6 +123,8 @@ export async function deriveTask(
   if (!title) return "제목을 입력하세요.";
 
   const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const link = normalizeLink(formData.get("link") as string | null);
+  if (link === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
   const dueDateRaw = formData.get("dueDate") as string | null;
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
 
@@ -128,6 +134,7 @@ export async function deriveTask(
       parentId: parent.id,
       title,
       memo,
+      link,
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
       visibility,
       masterId: session.user.id,
@@ -162,6 +169,7 @@ export async function duplicateTask(taskId: string) {
       parentId: task.parentId,
       title: `${task.title} 복사본`,
       memo: task.memo,
+      link: task.link,
       dueDate: task.dueDate,
       visibility: task.visibility,
       masterId: session.user.id,
@@ -359,6 +367,7 @@ export async function completeTask(taskId: string) {
         projectId: task.projectId,
         title: task.title,
         memo: task.memo,
+        link: task.link,
         dueDate: nextDueDate,
         visibility: task.visibility,
         masterId: task.masterId,
@@ -449,10 +458,12 @@ export async function updateTaskInfo(
   const title = (formData.get("title") as string | null)?.trim();
   if (!title) return "제목을 입력하세요.";
   const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const link = normalizeLink(formData.get("link") as string | null);
+  if (link === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { title, memo },
+    data: { title, memo, link },
   });
   revalidateTaskViews(task.projectId);
 }
