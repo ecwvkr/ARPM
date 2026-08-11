@@ -34,7 +34,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     projectColor: t.projectColor,
     participants: buildParticipantChips(t),
     commentCount: t._count.comments,
-    link: t.link,
+    links: t.links,
     unread: isTaskUnread(t, userId),
   }));
 

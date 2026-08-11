@@ -23,6 +23,7 @@ import {
   listMovableTargets,
 } from "@/app/actions/tasks";
 import { listAllUsers } from "@/app/actions/users";
+import { LinkFields } from "@/components/link-fields";
 import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,7 +112,7 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
             taskId={taskId}
             title={task.title}
             memo={task.memo ?? ""}
-            link={task.link ?? ""}
+            links={task.links}
             onDone={() => {
               setEditingInfo(false);
               afterMutation();
@@ -145,17 +146,18 @@ export function TaskDetail({ taskId, onDeleted }: { taskId: string; onDeleted: (
               )}
             </div>
             {task.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.memo}</p>}
-            {task.link && (
+            {task.links.map((link) => (
               <a
-                href={task.link}
+                key={link}
+                href={link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex w-fit max-w-full items-center gap-1 text-sm text-primary underline underline-offset-2"
+                className="flex w-fit max-w-full items-center gap-1 text-sm text-primary underline underline-offset-2"
               >
                 <IconLink className="size-4 shrink-0" />
-                <span className="truncate">{task.link}</span>
+                <span className="truncate">{link}</span>
               </a>
-            )}
+            ))}
           </>
         )}
         {task.parent && (
@@ -464,14 +466,14 @@ function EditInfoForm({
   taskId,
   title,
   memo,
-  link,
+  links,
   onDone,
   onCancel,
 }: {
   taskId: string;
   title: string;
   memo: string;
-  link: string;
+  links: string[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -484,7 +486,7 @@ function EditInfoForm({
     >
       <Input name="title" defaultValue={title} required />
       <Textarea name="memo" defaultValue={memo} placeholder="메모" rows={3} />
-      <Input name="link" defaultValue={link} placeholder="링크 (https://example.com)" />
+      <LinkFields defaultLinks={links} />
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={isPending}>

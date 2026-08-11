@@ -70,7 +70,7 @@ model Task {
   parentId    String? // 트리: 부모 1 (동일 프로젝트 내)
   title       String
   memo        String?
-  link        String? // 참고 링크 1개. 여러 개가 필요해지면 별도 테이블로 뺀다.
+  links       String[] // 참고 링크. 순서만 있으면 되므로 별도 테이블 대신 배열 컬럼.
   status      TaskStatus @default(TODO)
   visibility  Visibility @default(PUBLIC)
   masterId    String

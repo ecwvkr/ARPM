@@ -41,7 +41,7 @@ export function TaskCard({
   currentUserId,
   projectName,
   projectColor,
-  link,
+  links = [],
   unread,
 }: {
   taskId: string;
@@ -57,7 +57,7 @@ export function TaskCard({
   currentUserId: string;
   projectName?: string;
   projectColor?: string | null;
-  link?: string | null;
+  links?: string[];
   unread?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -212,17 +212,22 @@ export function TaskCard({
             </div>
           )}
 
-          {link && (
-            <a
-              href={link}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={link}
-              className="pointer-events-auto inline-flex w-fit max-w-full items-center gap-1 text-xs text-primary underline underline-offset-2"
-            >
-              <IconLink className="size-3.5 shrink-0" />
-              <span className="truncate">{linkLabel(link)}</span>
-            </a>
+          {links.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {links.map((link) => (
+                <a
+                  key={link}
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={link}
+                  className="pointer-events-auto inline-flex max-w-full items-center gap-1 text-xs text-primary underline underline-offset-2"
+                >
+                  <IconLink className="size-3.5 shrink-0" />
+                  <span className="truncate">{linkLabel(link)}</span>
+                </a>
+              ))}
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">

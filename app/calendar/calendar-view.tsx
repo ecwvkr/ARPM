@@ -27,7 +27,7 @@ export type CalendarTask = {
   projectColor: string | null;
   participants: ParticipantChipData[];
   commentCount: number;
-  link: string | null;
+  links: string[];
   unread: boolean;
 };
 
@@ -109,6 +109,23 @@ export function CalendarView({
   // 일간은 커서 날짜를 가운데 두고 앞뒤 3일씩 총 7일을 띠로 보여준다.
   const dayStrip = Array.from({ length: 7 }, (_, i) => addDays(cursor, i - 3));
 
+  function goToday() {
+    setCursor(new Date());
+    setSelectedKey(todayKey);
+  }
+
+  // 이미 오늘을 보고 있으면 누를 이유가 없으므로 비활성. 월간은 달이 맞더라도
+  // 선택된 날이 오늘이어야 "오늘을 보고 있는" 상태다.
+  const today = new Date();
+  const onToday =
+    view === "day"
+      ? cursorKey === todayKey
+      : view === "week"
+        ? weekDays.some((d) => dateKey(d) === todayKey)
+        : selectedKey === todayKey &&
+          cursor.getFullYear() === today.getFullYear() &&
+          cursor.getMonth() === today.getMonth();
+
   function go(delta: number) {
     if (view === "day") setCursor(addDays(cursor, delta));
     else if (view === "week") setCursor(addDays(cursor, delta * 7));
@@ -128,7 +145,7 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         {VIEWS.map((v) => (
           <button
             key={v.key}
@@ -143,6 +160,14 @@ export function CalendarView({
             {v.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={goToday}
+          disabled={onToday}
+          className="ml-auto rounded-full px-3 py-1 text-muted-foreground underline underline-offset-2 disabled:no-underline disabled:opacity-40"
+        >
+          오늘로 돌아가기
+        </button>
       </div>
 
       <div className="flex items-center justify-between">
@@ -217,7 +242,7 @@ export function CalendarView({
                   currentUserId={currentUserId}
                   projectName={t.projectName}
                   projectColor={t.projectColor}
-                  link={t.link}
+                  links={t.links}
                   unread={t.unread}
                 />
               ))}

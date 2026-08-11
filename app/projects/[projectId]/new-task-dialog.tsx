@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UserPicker } from "@/components/user-picker";
+import { LinkFields } from "@/components/link-fields";
 import {
   Dialog,
   DialogContent,
@@ -96,8 +97,8 @@ export function NewTaskDialog({
             <Textarea id="memo" name="memo" rows={3} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="link">링크</Label>
-            <Input id="link" name="link" placeholder="https://example.com" />
+            <Label>링크</Label>
+            <LinkFields />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="dueDate">기한</Label>

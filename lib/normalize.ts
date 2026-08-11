@@ -3,6 +3,18 @@ export function normalizeEmail(raw: string | null | undefined): string {
   return (raw ?? "").trim().toLowerCase();
 }
 
+// 폼의 link 입력들(빈 칸 포함)을 정리한다. 하나라도 형식이 틀리면 undefined(=입력 오류).
+export function normalizeLinks(raw: FormDataEntryValue[]): string[] | undefined {
+  const links: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== "string") continue;
+    const link = normalizeLink(value);
+    if (link === undefined) return undefined;
+    if (link) links.push(link);
+  }
+  return links;
+}
+
 // 업무 참고 링크. 스킴을 빼고 적는 게 보통이라 https://를 붙여주되, 화면에
 // 그대로 <a href>로 나가므로 http(s)가 아닌 스킴(javascript: 등)은 거부한다.
 // 빈 값이면 null, 값이 있는데 URL이 아니면 undefined(=입력 오류)를 돌려준다.
