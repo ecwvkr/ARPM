@@ -50,7 +50,11 @@ export async function createPartner(
   redirect(`/partners/${partner.id}`);
 }
 
-export async function updatePartnerName(
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+// 이름·공개범위·색상을 한 폼/한 업데이트로 묶는다(P5). 셋 다 Partner 한 행의
+// 컬럼이라 update() 한 번이 곧 "전부 성공 또는 전부 실패"라 별도 트랜잭션이 필요 없다.
+export async function updatePartnerSettings(
   partnerId: string,
   _prevState: string | undefined,
   formData: FormData,
@@ -59,55 +63,24 @@ export async function updatePartnerName(
   if (!session?.user?.id) redirect("/login");
 
   const { isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
-  if (!isOwner) return "파트너 owner만 이름을 변경할 수 있습니다.";
+  if (!isOwner) return "파트너 owner만 설정을 변경할 수 있습니다.";
 
   const name = (formData.get("name") as string | null)?.trim();
   if (!name) return "파트너 이름을 입력하세요.";
 
-  await prisma.partner.update({ where: { id: partnerId }, data: { name, lastActivityAt: new Date() } });
+  const visibility = formData.get("visibility") === "PUBLIC" ? "PUBLIC" : "PRIVATE";
+
+  const rawColor = (formData.get("color") as string | null)?.trim() || null;
+  if (rawColor && !HEX_COLOR.test(rawColor)) return "올바른 색상 값을 선택하세요.";
+
+  await prisma.partner.update({
+    where: { id: partnerId },
+    data: { name, visibility, color: rawColor, lastActivityAt: new Date() },
+  });
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
   revalidatePath("/projects");
   revalidatePath("/calendar");
-}
-
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
-
-export async function updatePartnerColor(
-  partnerId: string,
-  _prevState: string | undefined,
-  formData: FormData,
-) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const { isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
-  if (!isOwner) return "파트너 owner만 색상을 변경할 수 있습니다.";
-
-  const reset = formData.get("reset") === "1";
-  const raw = (formData.get("color") as string | null)?.trim();
-  if (!reset && !HEX_COLOR.test(raw ?? "")) return "올바른 색상 값을 선택하세요.";
-
-  await prisma.partner.update({
-    where: { id: partnerId },
-    data: { color: reset ? null : raw, lastActivityAt: new Date() },
-  });
-  revalidatePath(`/partners/${partnerId}`);
-  revalidatePath("/");
-  revalidatePath("/calendar");
-}
-
-export async function updatePartnerVisibility(partnerId: string, formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const { isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
-  if (!isOwner) throw new Error("파트너 owner만 공개 범위를 변경할 수 있습니다.");
-
-  const visibility = formData.get("visibility") === "PUBLIC" ? "PUBLIC" : "PRIVATE";
-  await prisma.partner.update({ where: { id: partnerId }, data: { visibility, lastActivityAt: new Date() } });
-  revalidatePath(`/partners/${partnerId}`);
-  revalidatePath("/");
 }
 
 export async function inviteMember(
