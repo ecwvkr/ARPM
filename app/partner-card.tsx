@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { AvatarStack } from "@/components/ui/avatar-stack";
 import { PartnerSettingsDialog } from "@/app/partners/[partnerId]/partner-settings-dialog";
 
 type PartnerCardData = {
@@ -66,18 +67,13 @@ export function PartnerCard({
       </div>
 
       {partner.members.length > 0 && (
-        <div className="pointer-events-none relative z-10 flex flex-wrap items-center gap-1.5">
-          {partner.members.slice(0, 4).map((m) => (
-            <span key={m.userId} className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span className="flex size-5 items-center justify-center rounded-full bg-background text-xs font-bold text-foreground">
-                {m.user.name.slice(0, 1)}
-              </span>
-              {m.user.name}
-            </span>
-          ))}
-          {partner.members.length > 4 && (
-            <span className="text-xs text-muted-foreground">+{partner.members.length - 4}</span>
-          )}
+        <div className="pointer-events-none relative z-10">
+          <AvatarStack
+            people={partner.members.map((m) => ({
+              id: m.userId,
+              name: m.role === "OWNER" ? `${m.user.name} (총관리자)` : m.user.name,
+            }))}
+          />
         </div>
       )}
 

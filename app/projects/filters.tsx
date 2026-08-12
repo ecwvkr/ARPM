@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { chipClass } from "@/lib/ui";
 import { saveFilter, deleteSavedFilter } from "@/app/actions/filters";
 
 export function ProjectFilters({
@@ -80,11 +81,7 @@ export function ProjectFilters({
         type="button"
         onClick={() => setParam("mine", mine ? "" : "1")}
         aria-pressed={mine}
-        className={
-          mine
-            ? "rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-            : "rounded-md border border-input px-3 py-1.5 text-sm"
-        }
+        className={chipClass(mine)}
       >
         내 프로젝트
       </button>

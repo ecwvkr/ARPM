@@ -12,6 +12,7 @@ import { ProjectCanvas } from "@/app/partners/[partnerId]/canvas-loader";
 import { listSavedFilters } from "@/app/actions/filters";
 import { ProjectFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
+import { chipClass } from "@/lib/ui";
 
 const VIEWS = [
   { key: undefined, label: "리스트 뷰" },
@@ -94,11 +95,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
             <Link
               key={v.label}
               href={viewHref(params, v.key)}
-              className={
-                view === v.key
-                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
-                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
-              }
+              className={chipClass(view === v.key)}
             >
               {v.label}
             </Link>

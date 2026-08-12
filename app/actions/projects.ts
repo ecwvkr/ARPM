@@ -80,7 +80,7 @@ export async function createProject(
   let parentId: string | null = null;
   if (parentIdRaw) {
     const parent = await prisma.project.findUnique({ where: { id: parentIdRaw }, select: { partnerId: true } });
-    if (!parent || parent.partnerId !== partnerId) return "잘못된 연계 프로젝트입니다.";
+    if (!parent || parent.partnerId !== partnerId) return "잘못된 상위 프로젝트입니다.";
     parentId = parentIdRaw;
   }
 

@@ -222,9 +222,9 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
               parentProjectId={projectId}
               onDone={afterMutation}
               trigger={
-                <Button size="sm" variant="outline" title="이 프로젝트의 하위 연계 프로젝트를 새로 만듭니다">
+                <Button size="sm" variant="outline" title="이 프로젝트의 하위 프로젝트를 새로 만듭니다">
                   <IconPlus className="size-4" />
-                  연계프로젝트
+                  하위 프로젝트 추가
                 </Button>
               }
             />
@@ -699,15 +699,15 @@ function MoveDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="sm" variant="outline" title="이 프로젝트의 상위 연계 프로젝트를 변경합니다">
+          <Button size="sm" variant="outline" title="이 프로젝트의 상위 프로젝트를 변경합니다">
             <IconArrowsMove className="size-4" />
-            연계프로젝트 수정
+            상위 프로젝트 변경
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>연계프로젝트 수정</DialogTitle>
+          <DialogTitle>상위 프로젝트 변경</DialogTitle>
         </DialogHeader>
         <MoveForm
           projectId={projectId}

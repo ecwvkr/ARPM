@@ -106,7 +106,7 @@ export function NewProjectDialog({
           </div>
           {projectOptions.length > 0 && (
             <div className="space-y-1.5">
-              <Label htmlFor="parentId">+ 연계 프로젝트 설정</Label>
+              <Label htmlFor="parentId">+ 상위 프로젝트 설정</Label>
               <select
                 id="parentId"
                 name="parentId"

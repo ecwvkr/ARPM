@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Avatar } from "@/components/ui/avatar-stack";
 import { duplicateProject } from "@/app/actions/projects";
 import type { ParticipantChipData } from "@/lib/priority";
 import { ParticipantPriorityDot } from "./project-priority-picker";
@@ -191,7 +192,7 @@ export function ProjectCard({
               {participants.slice(0, 4).map((p) => (
                 <span
                   key={p.userId}
-                  className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                  className="flex items-center gap-1 rounded-full bg-muted py-0.5 pr-1.5 pl-1"
                 >
                   <span className={p.userId === currentUserId ? "pointer-events-auto inline-flex" : "inline-flex"}>
                     <ParticipantPriorityDot
@@ -202,8 +203,7 @@ export function ProjectCard({
                       currentUserId={currentUserId}
                     />
                   </span>
-                  {p.userName}
-                  {p.isMaster && " · master"}
+                  <Avatar id={p.userId} name={p.isMaster ? `${p.userName} (master)` : p.userName} size="xs" />
                 </span>
               ))}
               {participants.length > 4 && (

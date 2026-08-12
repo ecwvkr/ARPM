@@ -44,7 +44,7 @@ export function DeriveDialog({
       <DialogTrigger
         render={
           trigger ?? (
-            <Button size="icon-sm" variant="outline" title="연계프로젝트 생성" aria-label="연계프로젝트 생성">
+            <Button size="icon-sm" variant="outline" title="하위 프로젝트 추가" aria-label="하위 프로젝트 추가">
               <IconPlus />
             </Button>
           )
@@ -52,7 +52,7 @@ export function DeriveDialog({
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>연계프로젝트 생성</DialogTitle>
+          <DialogTitle>하위 프로젝트 추가</DialogTitle>
         </DialogHeader>
         <form
           action={formAction}
