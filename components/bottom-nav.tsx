@@ -3,72 +3,80 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { IconLayoutGrid, IconChecklist, IconCalendar, IconSettings } from "@tabler/icons-react";
+import { IconLayoutGrid, IconChecklist, IconBuilding, IconCalendar, IconSettings } from "@tabler/icons-react";
 import { getRecentPartner, subscribeRecentPartner } from "@/lib/recent-partner";
+import { useSavedToast } from "@/components/ui/saved-toast";
 
 function getServerSnapshot() {
   return null;
 }
 
-const BASE_ITEMS = [
-  { label: "대시보드", href: "/", icon: IconLayoutGrid, disabled: false },
-  { label: "캘린더", href: "/calendar", icon: IconCalendar, disabled: false },
-  { label: "설정", href: "/settings", icon: IconSettings, disabled: false },
-] as const;
+// 5탭은 라벨 폭이 빡빡하므로 파트너명이 길면 줄인다.
+function abbreviatePartnerName(name: string, max = 4) {
+  return name.length > max ? `${name.slice(0, max)}···` : name;
+}
+
+const NAV_ITEM_CLASS =
+  "flex w-full flex-col items-center gap-1 truncate px-1 py-2.5 text-xs";
 
 export function BottomNav() {
   const pathname = usePathname();
   const recentPartner = useSyncExternalStore(subscribeRecentPartner, getRecentPartner, getServerSnapshot);
+  const { toast, trigger: showNoPartnerToast } = useSavedToast("대시보드에서 파트너를 먼저 선택해 주세요");
 
-  // 탭은 항상 전체 프로젝트로 간다. 파트너명은 지금 그 파트너를 보고 있을 때만
-  // 붙인다 — 전체 프로젝트 화면에서까지 붙으면 그 파트너만 보는 것처럼 읽힌다.
-  const inPartner = pathname.startsWith("/partners/");
-  const projectsItem = {
-    label: inPartner && recentPartner ? `프로젝트 (${recentPartner.name})` : "프로젝트",
-    href: "/projects",
-  };
-
-  const items = [
-    BASE_ITEMS[0],
-    { ...projectsItem, icon: IconChecklist, disabled: false as const },
-    ...BASE_ITEMS.slice(1),
-  ];
+  const partnerActive = pathname.startsWith("/partners/");
+  const partnerLabel = recentPartner ? `파트너(${abbreviatePartnerName(recentPartner.name)})` : "파트너";
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 bg-background shadow-[0_-1px_3px_rgba(0,0,0,0.06)]">
-      <ul className="mx-auto flex max-w-5xl items-stretch justify-between">
-        {items.map(({ label, href, icon: Icon, disabled }) => {
-          const basePath = href.split("?")[0];
-          const active = basePath === "/" ? pathname === "/" : pathname.startsWith(basePath);
-          if (disabled) {
-            return (
-              <li key={label} className="flex-1">
-                <span
-                  aria-disabled="true"
-                  title="준비 중"
-                  className="flex cursor-not-allowed flex-col items-center gap-1 py-2.5 text-xs text-muted-foreground/40"
-                >
-                  <Icon className="size-5" />
-                  {label}
-                </span>
-              </li>
-            );
-          }
-          return (
-            <li key={label} className="flex-1">
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-40 bg-background shadow-[0_-1px_3px_rgba(0,0,0,0.06)]">
+        <ul className="mx-auto flex max-w-5xl items-stretch justify-between">
+          <NavLink label="홈" href="/" Icon={IconLayoutGrid} active={pathname === "/"} />
+          <NavLink label="전체 프로젝트" href="/projects" Icon={IconChecklist} active={pathname.startsWith("/projects")} />
+
+          <li className="flex-1">
+            {recentPartner ? (
               <Link
-                href={href}
-                className={`flex flex-col items-center gap-1 truncate px-1 py-2.5 text-xs ${
-                  active ? "font-bold text-primary" : "text-muted-foreground"
-                }`}
+                href={`/partners/${recentPartner.id}`}
+                className={`${NAV_ITEM_CLASS} ${partnerActive ? "font-bold text-primary" : "text-muted-foreground"}`}
               >
-                <Icon className="size-5" />
-                {label}
+                <IconBuilding className="size-5" />
+                {partnerLabel}
               </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+            ) : (
+              <button type="button" onClick={showNoPartnerToast} className={`${NAV_ITEM_CLASS} text-muted-foreground`}>
+                <IconBuilding className="size-5" />
+                파트너
+              </button>
+            )}
+          </li>
+
+          <NavLink label="캘린더" href="/calendar" Icon={IconCalendar} active={pathname.startsWith("/calendar")} />
+          <NavLink label="설정" href="/settings" Icon={IconSettings} active={pathname.startsWith("/settings")} />
+        </ul>
+      </nav>
+      {toast}
+    </>
+  );
+}
+
+function NavLink({
+  label,
+  href,
+  Icon,
+  active,
+}: {
+  label: string;
+  href: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  active: boolean;
+}) {
+  return (
+    <li className="flex-1">
+      <Link href={href} className={`${NAV_ITEM_CLASS} ${active ? "font-bold text-primary" : "text-muted-foreground"}`}>
+        <Icon className="size-5" />
+        {label}
+      </Link>
+    </li>
   );
 }
