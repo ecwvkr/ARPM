@@ -14,9 +14,9 @@ import { ProjectFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
 
 const VIEWS = [
-  { key: undefined, label: "대시보드" },
-  { key: "status", label: "상태그룹" },
-  { key: "canvas", label: "캔버스" },
+  { key: undefined, label: "리스트 뷰" },
+  { key: "status", label: "보드 뷰" },
+  { key: "canvas", label: "워크플로우" },
 ] as const;
 
 // 뷰 탭은 현재 필터(partnerId/status/mine/q)를 그대로 유지한 채 view만 바꾼다.

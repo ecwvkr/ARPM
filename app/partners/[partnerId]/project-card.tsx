@@ -134,7 +134,7 @@ export function ProjectCard({
                         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                       >
                         <IconPlus className="size-4" />
-                        연계 프로젝트 생성
+                        하위 프로젝트 추가
                       </button>
                     }
                   />
