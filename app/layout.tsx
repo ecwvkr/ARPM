@@ -30,7 +30,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "AR_PM",
-  description: "프로젝트·업무 관리 툴",
+  description: "파트너·프로젝트 관리 툴",
   appleWebApp: {
     title: "AR_PM",
     statusBarStyle: "default",

@@ -8,15 +8,23 @@ import { MyNameForm } from "./my-name-form";
 import { ChangePasswordForm } from "./change-password-form";
 import { UserManagement } from "./user-management";
 import { AppSettingsForm } from "./app-settings-form";
+import { TrashSection } from "./trash-section";
 import { listAllUsersForAdmin } from "@/app/actions/admin";
 import { getCommentVisibleCount } from "@/lib/settings";
+import { listTrashedPartners } from "@/lib/partners";
+import { listTrashedProjects } from "@/lib/projects";
 
 export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const users = session.user.isSuperAdmin ? await listAllUsersForAdmin() : [];
-  const commentVisibleCount = session.user.isSuperAdmin ? await getCommentVisibleCount() : 0;
+  const isSuperAdmin = !!session.user.isSuperAdmin;
+  const users = isSuperAdmin ? await listAllUsersForAdmin() : [];
+  const commentVisibleCount = isSuperAdmin ? await getCommentVisibleCount() : 0;
+  const [trashedPartners, trashedProjects] = await Promise.all([
+    listTrashedPartners(session.user.id, isSuperAdmin),
+    listTrashedProjects(session.user.id, isSuperAdmin),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -46,7 +54,15 @@ export default async function SettingsPage() {
           <AccentColorForm currentColor={session.user.accentColor} />
         </section>
 
-        {session.user.isSuperAdmin && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-foreground">보관함</h2>
+          <p className="text-sm text-muted-foreground">
+            보관된 파트너·프로젝트를 복구하거나 영구 삭제합니다. 영구 삭제는 되돌릴 수 없습니다.
+          </p>
+          <TrashSection partners={trashedPartners} projects={trashedProjects} />
+        </section>
+
+        {isSuperAdmin && (
           <>
             <section className="space-y-2">
               <h2 className="text-sm font-bold text-foreground">계정 발급</h2>
@@ -64,7 +80,7 @@ export default async function SettingsPage() {
             <section className="space-y-2">
               <h2 className="text-sm font-bold text-foreground">글로벌 설정</h2>
               <p className="text-sm text-muted-foreground">
-                업무 상세의 코멘트는 최신 순으로 이 개수만큼만 기본 노출되고, 나머지는 &quot;더보기&quot;로 펼칩니다.
+                프로젝트 상세의 코멘트는 최신 순으로 이 개수만큼만 기본 노출되고, 나머지는 &quot;더보기&quot;로 펼칩니다.
               </p>
               <AppSettingsForm commentVisibleCount={commentVisibleCount} />
             </section>

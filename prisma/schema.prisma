@@ -23,128 +23,144 @@ model User {
   createdAt           DateTime  @default(now())
   lastDeadlineCheckAt DateTime? // 마감 임박/지연 알림 점검을 마지막으로 실행한 시각(대시보드 로드마다 재점검하지 않기 위한 쓰로틀)
 
-  ownedProjects      Project[]         @relation("ProjectOwner")
-  projectMemberships ProjectMember[]
-  masteredTasks      Task[]            @relation("TaskMaster")
-  taskParticipations TaskParticipant[]
-  priorities         TaskPriority[]
-  comments           Comment[]
-  taskReads          TaskRead[]
-  notifications      Notification[]
-  savedFilters       SavedFilter[]
-  auditLogs          AuditLog[]
+  ownedPartners        Partner[]          @relation("PartnerOwner")
+  partnerMemberships   PartnerMember[]
+  hiddenPartners       PartnerHide[] // 개인별 대시보드 숨김 (D2)
+  masteredProjects     Project[]          @relation("ProjectMaster")
+  projectParticipations ProjectParticipant[]
+  priorities           ProjectPriority[]
+  comments             Comment[]
+  projectReads         ProjectRead[]
+  notifications        Notification[]
+  savedFilters         SavedFilter[]
+  auditLogs            AuditLog[]
 }
 
-model Project {
+model Partner {
   id         String     @id @default(cuid())
   name       String
   visibility Visibility @default(PRIVATE)
-  isArchived Boolean    @default(false) // 숨김(총관리자)
-  deletedAt  DateTime? // 소프트 삭제(총관리자)
-  color      String? // 대시보드/캘린더/캔버스에서 프로젝트를 구분하는 색상
+  deletedAt  DateTime? // 소프트 삭제(보관함/휴지통). 총관리자·owner가 복구하거나 영구 삭제할 수 있다.
+  color      String? // 대시보드/캘린더/워크플로우에서 파트너를 구분하는 색상
   ownerId    String
-  owner      User       @relation("ProjectOwner", fields: [ownerId], references: [id])
+  owner      User       @relation("PartnerOwner", fields: [ownerId], references: [id])
   createdAt  DateTime   @default(now())
 
-  members ProjectMember[]
-  tasks   Task[]
+  members  PartnerMember[]
+  projects Project[]
+  hiddenBy PartnerHide[] // 이 파트너를 숨긴 사용자들 (D2)
 
   @@index([ownerId])
 }
 
-model ProjectMember {
-  projectId String
+model PartnerMember {
+  partnerId String
   userId    String
-  role      ProjectRole @default(MEMBER)
-  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role      PartnerRole @default(MEMBER)
+  partner   Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([projectId, userId])
-  // PK가 (projectId, userId)라 userId 단독 조회(내가 속한 프로젝트 찾기)는 PK를 쓸 수 없다.
+  @@id([partnerId, userId])
+  // PK가 (partnerId, userId)라 userId 단독 조회(내가 속한 파트너 찾기)는 PK를 쓸 수 없다.
   @@index([userId])
 }
 
-model Task {
-  id          String     @id @default(cuid())
-  projectId   String
-  parentId    String? // 트리: 부모 1 (동일 프로젝트 내)
+// 파트너 숨김은 총관리자 전역 설정이 아니라 계정별 개인 설정이다(D2). 켜고 끄는 것은
+// 대시보드 표시 여부에만 영향을 주고, 다른 사용자의 화면에는 영향을 주지 않는다.
+model PartnerHide {
+  userId    String
+  partnerId String
+  hiddenAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, partnerId])
+  @@index([partnerId])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  partnerId   String
+  parentId    String? // 트리: 부모 1 (동일 파트너 내)
   title       String
   memo        String?
   links       String[] // 참고 링크. 순서만 있으면 되므로 별도 테이블 대신 배열 컬럼.
-  status      TaskStatus @default(TODO)
-  visibility  Visibility @default(PUBLIC)
+  status      ProjectStatus @default(TODO)
+  visibility  Visibility    @default(PUBLIC)
   masterId    String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt // 미확인 표시 판정 기준(제목/메모/기한 등 수정 감지)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt // 미확인 표시 판정 기준(제목/메모/기한 등 수정 감지)
   dueDate     DateTime?
   completedAt DateTime?
+  deletedAt   DateTime? // 소프트 삭제(보관함/휴지통). 삭제 시 하위 트리 전체를 함께 보관한다(D3).
   canvasX     Float?
-  canvasY     Float? // 캔버스에서 드래그로 옮긴 위치. 없으면 dagre 자동배치 사용.
+  canvasY     Float? // 워크플로우에서 드래그로 옮긴 위치. 없으면 dagre 자동배치 사용.
   recurrence  String? // "WEEKLY" | null. 완료 시 다음 회차를 자동 생성.
 
-  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parent       Task?             @relation("TaskTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children     Task[]            @relation("TaskTree")
-  master       User              @relation("TaskMaster", fields: [masterId], references: [id])
-  participants TaskParticipant[]
-  priorities   TaskPriority[]
+  partner      Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  parent       Project?            @relation("ProjectTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Project[]           @relation("ProjectTree")
+  master       User                @relation("ProjectMaster", fields: [masterId], references: [id])
+  participants ProjectParticipant[]
+  priorities   ProjectPriority[]
   comments     Comment[]
-  reads        TaskRead[]
+  reads        ProjectRead[]
 
-  // 목록 조회는 항상 projectId로 좁힌 뒤 createdAt으로 정렬하므로 복합 인덱스로 둘 다 태운다.
-  @@index([projectId, createdAt])
+  // 목록 조회는 항상 partnerId로 좁힌 뒤 createdAt으로 정렬하므로 복합 인덱스로 둘 다 태운다.
+  @@index([partnerId, createdAt])
   @@index([parentId])
   @@index([masterId])
 }
 
-model TaskParticipant {
-  taskId         String
+model ProjectParticipant {
+  projectId      String
   userId         String
-  includeSubtree Boolean  @default(true) // false = '해당 업무만 공유'
-  joinedAt       DateTime @default(now())
-  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  includeSubtree Boolean         @default(true) // false = '해당 프로젝트만 공유'
+  role           ParticipantRole @default(MEMBER) // VIEWER는 조회·코멘트만 가능(D4)
+  joinedAt       DateTime        @default(now())
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([taskId, userId])
+  @@id([projectId, userId])
   @@index([userId])
 }
 
-model TaskPriority {
+model ProjectPriority {
   // 참여자별 우선순위
-  taskId    String
+  projectId String
   userId    String
   level     Priority @default(HOLD)
   updatedAt DateTime @updatedAt
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([taskId, userId])
+  @@id([projectId, userId])
   @@index([userId])
 }
 
-// 사용자별로 업무를 마지막으로 본 시각. 카드의 "미확인" 빨간 점 판정에 쓴다.
-model TaskRead {
-  taskId     String
+// 사용자별로 프로젝트를 마지막으로 본 시각. 카드의 "미확인" 빨간 점 판정에 쓴다.
+model ProjectRead {
+  projectId  String
   userId     String
   lastReadAt DateTime @updatedAt
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([taskId, userId])
+  @@id([projectId, userId])
   @@index([userId])
 }
 
 model Comment {
   id        String   @id @default(cuid())
-  taskId    String
+  projectId String
   authorId  String
   body      String
   createdAt DateTime @default(now())
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id])
 
-  // 코멘트 수 집계와 "최신 1건" 조회가 업무 목록마다 돌므로 정렬 컬럼까지 묶는다.
-  @@index([taskId, createdAt])
+  // 코멘트 수 집계와 "최신 1건" 조회가 프로젝트 목록마다 돌므로 정렬 컬럼까지 묶는다.
+  @@index([projectId, createdAt])
   @@index([authorId])
 }
 
@@ -166,7 +182,7 @@ model SavedFilter {
   id        String   @id @default(cuid())
   userId    String
   name      String
-  query     String // 쿼리스트링 그대로 저장 (예: "projectId=...&status=IN_PROGRESS")
+  query     String // 쿼리스트링 그대로 저장 (예: "partnerId=...&status=IN_PROGRESS")
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -181,12 +197,12 @@ model AuditLog {
   action     String
   targetType String
   targetId   String
-  projectId  String?
+  partnerId  String?
   message    String
   createdAt  DateTime @default(now())
   actor      User     @relation(fields: [actorId], references: [id])
 
-  @@index([projectId, createdAt])
+  @@index([partnerId, createdAt])
   @@index([actorId])
 }
 
@@ -201,12 +217,18 @@ enum Visibility {
   PRIVATE
 }
 
-enum ProjectRole {
+enum PartnerRole {
   OWNER
   MEMBER
 }
 
-enum TaskStatus {
+// VIEWER는 프로젝트를 보고 코멘트를 달 수만 있다 — 수정·삭제·상태 변경·상위 이동 불가(D4).
+enum ParticipantRole {
+  MEMBER
+  VIEWER
+}
+
+enum ProjectStatus {
   TODO
   IN_PROGRESS
   DONE

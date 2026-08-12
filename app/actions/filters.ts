@@ -23,7 +23,7 @@ export async function saveFilter(name: string, query: string) {
   await prisma.savedFilter.create({
     data: { userId: session.user.id, name: name.trim(), query },
   });
-  revalidatePath("/tasks");
+  revalidatePath("/projects");
 }
 
 export async function deleteSavedFilter(id: string) {
@@ -31,5 +31,5 @@ export async function deleteSavedFilter(id: string) {
   if (!session?.user?.id) redirect("/login");
 
   await prisma.savedFilter.deleteMany({ where: { id, userId: session.user.id } });
-  revalidatePath("/tasks");
+  revalidatePath("/projects");
 }

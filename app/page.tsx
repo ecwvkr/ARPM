@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { listVisibleProjectsWithUnread } from "@/lib/projects";
-import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
+import { listVisiblePartnersWithUnread } from "@/lib/partners";
+import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { isOverdue } from "@/lib/priority";
 import { LogoutButton } from "./logout-button";
-import { NewProjectDialog } from "./new-project-dialog";
+import { NewPartnerDialog } from "./new-partner-dialog";
 import { NotificationBell } from "./notification-bell";
-import { ProjectCard } from "./project-card";
+import { PartnerCard } from "./partner-card";
 import { WidthContainer } from "@/components/width-container";
 
 export default async function DashboardPage({
@@ -22,24 +22,25 @@ export default async function DashboardPage({
   const userId = session.user.id;
   const params = await searchParams;
   const isSuperAdmin = !!session.user.isSuperAdmin;
-  const showHidden = isSuperAdmin && params.hidden === "1";
+  // 숨김은 이제 계정별 개인 설정이라(D2) 누구나 자신이 숨긴 파트너를 다시 볼 수 있다.
+  const showHiddenByMe = params.hidden === "1";
 
-  // ponytail: 서로 의존하지 않는 세 조회(알림 점검·프로젝트 목록·내 업무)를 순차 대기
+  // ponytail: 서로 의존하지 않는 세 조회(알림 점검·파트너 목록·내 프로젝트)를 순차 대기
   // 대신 한 번에 날려 왕복 시간을 줄인다.
-  const [, projects, myTasks] = await Promise.all([
+  const [, partners, myProjects] = await Promise.all([
     ensureDeadlineNotifications(userId),
-    listVisibleProjectsWithUnread(userId, isSuperAdmin, showHidden),
-    listAllTasksForUser(userId, isSuperAdmin, { mineOnly: true }),
+    listVisiblePartnersWithUnread(userId, isSuperAdmin, showHiddenByMe),
+    listAllProjectsForUser(userId, isSuperAdmin, { mineOnly: true }),
   ]);
 
-  const ownedCount = projects.filter((p) => p.ownerId === userId).length;
-  const inProgressCount = projects.filter((p) =>
-    p.tasks.some((t) => t.status === "IN_PROGRESS"),
+  const ownedCount = partners.filter((p) => p.ownerId === userId).length;
+  const inProgressCount = partners.filter((p) =>
+    p.projects.some((t) => t.status === "IN_PROGRESS"),
   ).length;
 
   const weekFromNow = new Date();
   weekFromNow.setDate(weekFromNow.getDate() + 7);
-  const dueSoon = myTasks
+  const dueSoon = myProjects
     .filter((t) => t.status !== "DONE" && t.dueDate && t.dueDate <= weekFromNow)
     .sort((a, b) => a.dueDate!.getTime() - b.dueDate!.getTime())
     .slice(0, 5);
@@ -65,21 +66,19 @@ export default async function DashboardPage({
       </header>
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
         <div className="flex items-center justify-end gap-3">
-          {session?.user?.isSuperAdmin && (
-            <Link
-              href={showHidden ? "/" : "/?hidden=1"}
-              className="text-xs text-muted-foreground underline underline-offset-2"
-            >
-              {showHidden ? "숨김/삭제 프로젝트 숨기기" : "숨김/삭제 프로젝트 보기"}
-            </Link>
-          )}
-          <NewProjectDialog currentUserId={userId} />
+          <Link
+            href={showHiddenByMe ? "/" : "/?hidden=1"}
+            className="text-xs text-muted-foreground underline underline-offset-2"
+          >
+            {showHiddenByMe ? "숨긴 파트너 그만 보기" : "숨긴 파트너 보기"}
+          </Link>
+          <NewPartnerDialog currentUserId={userId} />
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <SummaryCard label="전체 프로젝트" value={projects.length} />
-          <SummaryCard label="나의 프로젝트" value={ownedCount} />
-          <SummaryCard label="진행중인 프로젝트" value={inProgressCount} />
+          <SummaryCard label="전체 파트너" value={partners.length} />
+          <SummaryCard label="나의 파트너" value={ownedCount} />
+          <SummaryCard label="진행중인 파트너" value={inProgressCount} />
         </div>
 
         {dueSoon.length > 0 && (
@@ -89,7 +88,7 @@ export default async function DashboardPage({
               {dueSoon.map((t) => (
                 <Link
                   key={t.id}
-                  href={`/projects/${t.projectId}?task=${t.id}`}
+                  href={`/partners/${t.partnerId}?project=${t.id}`}
                   className="flex items-center justify-between rounded-4xl bg-card p-3 text-sm shadow-md ring-1 ring-foreground/5 transition-shadow hover:shadow-lg dark:ring-foreground/10"
                 >
                   <span className="truncate">{t.title}</span>
@@ -108,18 +107,18 @@ export default async function DashboardPage({
           </section>
         )}
 
-        <h2 className="text-sm font-bold text-foreground">프로젝트</h2>
+        <h2 className="text-sm font-bold text-foreground">파트너</h2>
 
-        {projects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 프로젝트가 없습니다.</p>
+        {partners.length === 0 ? (
+          <p className="text-sm text-muted-foreground">아직 파트너가 없습니다.</p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
+            {partners.map((partner) => (
+              <PartnerCard
+                key={partner.id}
+                partner={partner}
                 currentUserId={userId}
-                hasUnread={project.tasks.some((t) => isTaskUnread(t, userId))}
+                hasUnread={partner.projects.some((t) => isProjectUnread(t, userId))}
               />
             ))}
           </div>

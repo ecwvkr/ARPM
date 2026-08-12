@@ -16,7 +16,7 @@ export const STATUS_LABEL: Record<string, string> = {
   DONE: "완료",
 };
 
-// 대시보드 업무 목록의 기본 노출 순서: 진행중 -> 진행전 -> 완료
+// 대시보드 프로젝트 목록의 기본 노출 순서: 진행중 -> 진행전 -> 완료
 export const STATUS_ORDER: Record<string, number> = {
   IN_PROGRESS: 0,
   TODO: 1,
@@ -34,10 +34,10 @@ export function isOverdue(dueDate: Date | null, status: string) {
   return dueDate.getTime() + KST_DUE_DAY_END_OFFSET_MS < Date.now();
 }
 
-// 내가 참여(마스터 포함) 중인 업무에 한해, 마지막으로 읽은 시각 이후 코멘트가 달렸거나
-// 내용이 수정됐으면 "미확인"으로 본다. 관여하지 않는 업무는 항상 false.
-export function isTaskUnread(
-  task: {
+// 내가 참여(마스터 포함) 중인 프로젝트에 한해, 마지막으로 읽은 시각 이후 코멘트가 달렸거나
+// 내용이 수정됐으면 "미확인"으로 본다. 관여하지 않는 프로젝트는 항상 false.
+export function isProjectUnread(
+  project: {
     masterId: string;
     updatedAt: Date;
     participants: { userId: string }[];
@@ -46,15 +46,15 @@ export function isTaskUnread(
   },
   userId: string,
 ): boolean {
-  const isInvolved = task.masterId === userId || task.participants.some((p) => p.userId === userId);
+  const isInvolved = project.masterId === userId || project.participants.some((p) => p.userId === userId);
   if (!isInvolved) return false;
 
-  const lastRead = task.reads[0]?.lastReadAt;
+  const lastRead = project.reads[0]?.lastReadAt;
   if (!lastRead) return true;
 
-  const latestCommentAt = task.comments[0]?.createdAt;
+  const latestCommentAt = project.comments[0]?.createdAt;
   const latestActivity =
-    latestCommentAt && latestCommentAt > task.updatedAt ? latestCommentAt : task.updatedAt;
+    latestCommentAt && latestCommentAt > project.updatedAt ? latestCommentAt : project.updatedAt;
   return lastRead < latestActivity;
 }
 
@@ -67,24 +67,24 @@ export type ParticipantChipData = {
 
 // 참여자 이름칩용 데이터: 우선순위가 없으면 기본값 '보류'. master가 아직 참여자로
 // 기록되지 않은 과거 데이터도 항상 첫 칩으로 노출한다.
-export function buildParticipantChips(task: {
+export function buildParticipantChips(project: {
   masterId: string;
   master: { name: string };
   participants: { userId: string; user: { name: string } }[];
   priorities: { userId: string; level: string }[];
 }): ParticipantChipData[] {
-  const priorityByUser = new Map(task.priorities.map((p) => [p.userId, p.level]));
-  const chips = task.participants.map((p) => ({
+  const priorityByUser = new Map(project.priorities.map((p) => [p.userId, p.level]));
+  const chips = project.participants.map((p) => ({
     userId: p.userId,
     userName: p.user.name,
     level: priorityByUser.get(p.userId) ?? "HOLD",
-    isMaster: p.userId === task.masterId,
+    isMaster: p.userId === project.masterId,
   }));
-  if (!chips.some((c) => c.userId === task.masterId)) {
+  if (!chips.some((c) => c.userId === project.masterId)) {
     chips.unshift({
-      userId: task.masterId,
-      userName: task.master.name,
-      level: priorityByUser.get(task.masterId) ?? "HOLD",
+      userId: project.masterId,
+      userName: project.master.name,
+      level: priorityByUser.get(project.masterId) ?? "HOLD",
       isMaster: true,
     });
   }

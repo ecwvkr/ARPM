@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { listAllTasksForUser, isTaskUnread } from "@/lib/tasks";
+import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
 import { buildParticipantChips } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
@@ -19,23 +19,23 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
       : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const initialView = params.v === "week" ? "week" : params.v === "day" ? "day" : "month";
 
-  const tasks = await listAllTasksForUser(userId, !!session.user.isSuperAdmin, {});
-  // 일간 뷰가 업무 카드를 그대로 쓰므로 카드에 필요한 값만 추려 넘긴다
+  const projects = await listAllProjectsForUser(userId, !!session.user.isSuperAdmin, {});
+  // 일간 뷰가 프로젝트 카드를 그대로 쓰므로 카드에 필요한 값만 추려 넘긴다
   // (prisma 결과 전체를 클라이언트로 넘기면 쓰지도 않는 관계 데이터까지 직렬화된다).
-  const calendarTasks = tasks.map((t) => ({
+  const calendarProjects = projects.map((t) => ({
     id: t.id,
-    projectId: t.projectId,
+    partnerId: t.partnerId,
     title: t.title,
     status: t.status,
     visibility: t.visibility,
     dueDate: t.dueDate,
     createdAt: t.createdAt,
-    projectName: t.projectName,
-    projectColor: t.projectColor,
+    partnerName: t.partnerName,
+    partnerColor: t.partnerColor,
     participants: buildParticipantChips(t),
     commentCount: t._count.comments,
     links: t.links,
-    unread: isTaskUnread(t, userId),
+    unread: isProjectUnread(t, userId),
   }));
 
   return (
@@ -54,7 +54,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
         <CalendarView
           initialDate={initialDate}
           initialView={initialView}
-          tasks={calendarTasks}
+          projects={calendarProjects}
           currentUserId={userId}
         />
       </WidthContainer>

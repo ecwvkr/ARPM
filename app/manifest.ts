@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "AR_PM",
     short_name: "AR_PM",
-    description: "프로젝트·업무 관리 툴",
+    description: "파트너·프로젝트 관리 툴",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priority";
-import { TaskCard } from "@/app/projects/[projectId]/task-card";
+import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 const VIEWS = [
@@ -15,16 +15,16 @@ const VIEWS = [
 
 export type CalendarView = (typeof VIEWS)[number]["key"];
 
-export type CalendarTask = {
+export type CalendarProject = {
   id: string;
-  projectId: string;
+  partnerId: string;
   title: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
   visibility: "PUBLIC" | "PRIVATE";
   dueDate: Date | null;
   createdAt: Date;
-  projectName: string;
-  projectColor: string | null;
+  partnerName: string;
+  partnerColor: string | null;
   participants: ParticipantChipData[];
   commentCount: number;
   links: string[];
@@ -50,21 +50,21 @@ function monthGrid(year: number, month: number) {
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 
-function TaskChip({ task, compact = false }: { task: CalendarTask; compact?: boolean }) {
+function ProjectChip({ project, compact = false }: { project: CalendarProject; compact?: boolean }) {
   return (
     <Link
-      href={`/projects/${task.projectId}?task=${task.id}`}
-      style={task.projectColor ? { borderLeftColor: task.projectColor } : undefined}
+      href={`/partners/${project.partnerId}?project=${project.id}`}
+      style={project.partnerColor ? { borderLeftColor: project.partnerColor } : undefined}
       className={`block truncate rounded-md px-1.5 py-0.5 text-xs ${
-        task.projectColor ? "border-l-2" : ""
+        project.partnerColor ? "border-l-2" : ""
       } ${
-        isOverdue(task.dueDate, task.status)
+        isOverdue(project.dueDate, project.status)
           ? "bg-destructive/15 text-destructive"
           : "bg-secondary text-secondary-foreground"
       }`}
-      title={`${task.title} · ${task.projectName} · ${STATUS_LABEL[task.status]}`}
+      title={`${project.title} · ${project.partnerName} · ${STATUS_LABEL[project.status]}`}
     >
-      {compact ? task.title : `${task.title} · ${task.projectName}`}
+      {compact ? project.title : `${project.title} · ${project.partnerName}`}
     </Link>
   );
 }
@@ -72,12 +72,12 @@ function TaskChip({ task, compact = false }: { task: CalendarTask; compact?: boo
 export function CalendarView({
   initialDate,
   initialView,
-  tasks,
+  projects,
   currentUserId,
 }: {
   initialDate: string;
   initialView: CalendarView;
-  tasks: CalendarTask[];
+  projects: CalendarProject[];
   currentUserId: string;
 }) {
   const router = useRouter();
@@ -91,15 +91,15 @@ export function CalendarView({
     router.replace(`/calendar?v=${view}&d=${cursorKey}`, { scroll: false });
   }, [view, cursorKey, router]);
 
-  const tasksByDate = useMemo(() => {
-    const map = new Map<string, CalendarTask[]>();
-    for (const t of tasks) {
+  const projectsByDate = useMemo(() => {
+    const map = new Map<string, CalendarProject[]>();
+    for (const t of projects) {
       if (!t.dueDate) continue;
       const key = dateKey(new Date(t.dueDate));
       map.set(key, [...(map.get(key) ?? []), t]);
     }
     return map;
-  }, [tasks]);
+  }, [projects]);
 
   const todayKey = dateKey(new Date());
   const weekStart = startOfWeek(cursor);
@@ -140,8 +140,8 @@ export function CalendarView({
         ? `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일 ~ ${weekEnd.getMonth() + 1}월 ${weekEnd.getDate()}일`
         : `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
 
-  const dayTasks = tasksByDate.get(cursorKey) ?? [];
-  const selectedTasks = tasksByDate.get(selectedKey) ?? [];
+  const dayProjects = projectsByDate.get(cursorKey) ?? [];
+  const selectedProjects = projectsByDate.get(selectedKey) ?? [];
 
   return (
     <div className="space-y-4">
@@ -195,7 +195,7 @@ export function CalendarView({
           <div className="grid grid-cols-7 gap-1 rounded-4xl bg-card p-2 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
             {dayStrip.map((d) => {
               const key = dateKey(d);
-              const count = (tasksByDate.get(key) ?? []).length;
+              const count = (projectsByDate.get(key) ?? []).length;
               const selected = key === cursorKey;
               return (
                 <button
@@ -222,15 +222,15 @@ export function CalendarView({
             })}
           </div>
 
-          {dayTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">이 날 마감인 업무가 없습니다.</p>
+          {dayProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground">이 날 마감인 프로젝트가 없습니다.</p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {dayTasks.map((t) => (
-                <TaskCard
+              {dayProjects.map((t) => (
+                <ProjectCard
                   key={t.id}
-                  taskId={t.id}
-                  projectId={t.projectId}
+                  projectId={t.id}
+                  partnerId={t.partnerId}
                   title={t.title}
                   statusLabel={STATUS_LABEL[t.status]}
                   visibility={t.visibility}
@@ -240,8 +240,8 @@ export function CalendarView({
                   participants={t.participants}
                   commentCount={t.commentCount}
                   currentUserId={currentUserId}
-                  projectName={t.projectName}
-                  projectColor={t.projectColor}
+                  partnerName={t.partnerName}
+                  partnerColor={t.partnerColor}
                   links={t.links}
                   unread={t.unread}
                 />
@@ -254,7 +254,7 @@ export function CalendarView({
         <div className="divide-y divide-foreground/5 overflow-hidden rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
           {weekDays.map((d, i) => {
             const key = dateKey(d);
-            const rowTasks = tasksByDate.get(key) ?? [];
+            const rowProjects = projectsByDate.get(key) ?? [];
             return (
               <div key={key} className="flex gap-3 p-3">
                 <div className="w-12 shrink-0 text-center">
@@ -268,10 +268,10 @@ export function CalendarView({
                   </span>
                 </div>
                 <div className="min-w-0 flex-1 space-y-1 py-1">
-                  {rowTasks.length === 0 ? (
+                  {rowProjects.length === 0 ? (
                     <p className="text-xs text-muted-foreground/60">-</p>
                   ) : (
-                    rowTasks.map((t) => <TaskChip key={t.id} task={t} />)
+                    rowProjects.map((t) => <ProjectChip key={t.id} project={t} />)
                   )}
                 </div>
               </div>
@@ -289,11 +289,11 @@ export function CalendarView({
             {monthDays.map((d) => {
               const key = dateKey(d);
               const inMonth = d.getMonth() === cursor.getMonth();
-              const cellTasks = tasksByDate.get(key) ?? [];
+              const cellProjects = projectsByDate.get(key) ?? [];
               // 칸 높이를 고정하고 2건까지만 보여준 뒤 나머지는 개수로 접는다.
               // 전체는 아래 선택 패널에서 확인한다(칸이 늘어나 그리드가 흔들리지 않게).
-              const visible = cellTasks.slice(0, 2);
-              const overflow = cellTasks.length - visible.length;
+              const visible = cellProjects.slice(0, 2);
+              const overflow = cellProjects.length - visible.length;
 
               return (
                 <button
@@ -315,7 +315,7 @@ export function CalendarView({
                   </span>
                   <div className="mt-1 space-y-0.5">
                     {visible.map((t) => (
-                      <TaskChip key={t.id} task={t} compact />
+                      <ProjectChip key={t.id} project={t} compact />
                     ))}
                     {overflow > 0 && (
                       <p className="px-1 text-xs text-muted-foreground">+{overflow}건</p>
@@ -331,14 +331,14 @@ export function CalendarView({
       {view === "month" && (
         <section className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
           <h3 className="text-sm font-bold">
-            {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")} ({selectedTasks.length}건)
+            {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")} ({selectedProjects.length}건)
           </h3>
-          {selectedTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">이 날 마감인 업무가 없습니다.</p>
+          {selectedProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground">이 날 마감인 프로젝트가 없습니다.</p>
           ) : (
             <div className="space-y-1">
-              {selectedTasks.map((t) => (
-                <TaskChip key={t.id} task={t} />
+              {selectedProjects.map((t) => (
+                <ProjectChip key={t.id} project={t} />
               ))}
             </div>
           )}

@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-// refId의 의미는 알림 종류마다 다르다: 대부분은 taskId지만, PROJECT_INVITED와
-// TASK_DELETED(업무가 이미 삭제됨)는 projectId를 담는다.
-const PROJECT_REF_TYPES = new Set(["PROJECT_INVITED", "TASK_DELETED"]);
+// refId의 의미는 알림 종류마다 다르다: 대부분은 projectId지만, PARTNER_INVITED와
+// PROJECT_ARCHIVED(프로젝트가 보관함으로 이동해 일반 조회에서 사라짐)는 partnerId를 담는다.
+const PARTNER_REF_TYPES = new Set(["PARTNER_INVITED", "PROJECT_ARCHIVED"]);
 
 export async function listMyNotifications() {
   const session = await auth();
@@ -18,26 +18,26 @@ export async function listMyNotifications() {
     take: 20,
   });
 
-  const taskRefIds = notifications
-    .filter((n) => n.refId && !PROJECT_REF_TYPES.has(n.type))
+  const projectRefIds = notifications
+    .filter((n) => n.refId && !PARTNER_REF_TYPES.has(n.type))
     .map((n) => n.refId!);
 
-  const tasks = taskRefIds.length
-    ? await prisma.task.findMany({
-        where: { id: { in: taskRefIds } },
-        select: { id: true, projectId: true },
+  const projects = projectRefIds.length
+    ? await prisma.project.findMany({
+        where: { id: { in: projectRefIds } },
+        select: { id: true, partnerId: true },
       })
     : [];
-  const projectIdByTaskId = new Map(tasks.map((t) => [t.id, t.projectId]));
+  const partnerIdByProjectId = new Map(projects.map((t) => [t.id, t.partnerId]));
 
   return notifications.map((n) => {
     let href: string | null = null;
     if (n.refId) {
-      if (PROJECT_REF_TYPES.has(n.type)) {
-        href = `/projects/${n.refId}`;
+      if (PARTNER_REF_TYPES.has(n.type)) {
+        href = `/partners/${n.refId}`;
       } else {
-        const projectId = projectIdByTaskId.get(n.refId);
-        if (projectId) href = `/projects/${projectId}?task=${n.refId}`;
+        const partnerId = partnerIdByProjectId.get(n.refId);
+        if (partnerId) href = `/partners/${partnerId}?project=${n.refId}`;
       }
     }
     return { ...n, href };

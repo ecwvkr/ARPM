@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { IconLayoutGrid, IconChecklist, IconCalendar, IconSettings } from "@tabler/icons-react";
-import { getRecentProject, subscribeRecentProject } from "@/lib/recent-project";
+import { getRecentPartner, subscribeRecentPartner } from "@/lib/recent-partner";
 
 function getServerSnapshot() {
   return null;
@@ -18,19 +18,19 @@ const BASE_ITEMS = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const recentProject = useSyncExternalStore(subscribeRecentProject, getRecentProject, getServerSnapshot);
+  const recentPartner = useSyncExternalStore(subscribeRecentPartner, getRecentPartner, getServerSnapshot);
 
-  // 탭은 항상 전체 업무로 간다. 프로젝트명은 지금 그 프로젝트를 보고 있을 때만
-  // 붙인다 — 전체 업무 화면에서까지 붙으면 그 프로젝트만 보는 것처럼 읽힌다.
-  const inProject = pathname.startsWith("/projects/");
-  const tasksItem = {
-    label: inProject && recentProject ? `업무 (${recentProject.name})` : "업무",
-    href: "/tasks",
+  // 탭은 항상 전체 프로젝트로 간다. 파트너명은 지금 그 파트너를 보고 있을 때만
+  // 붙인다 — 전체 프로젝트 화면에서까지 붙으면 그 파트너만 보는 것처럼 읽힌다.
+  const inPartner = pathname.startsWith("/partners/");
+  const projectsItem = {
+    label: inPartner && recentPartner ? `프로젝트 (${recentPartner.name})` : "프로젝트",
+    href: "/projects",
   };
 
   const items = [
     BASE_ITEMS[0],
-    { ...tasksItem, icon: IconChecklist, disabled: false as const },
+    { ...projectsItem, icon: IconChecklist, disabled: false as const },
     ...BASE_ITEMS.slice(1),
   ];
 
