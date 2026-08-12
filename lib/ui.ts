@@ -5,3 +5,9 @@ export function chipClass(active: boolean, className = "") {
     active ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-muted/70"
   } ${className}`;
 }
+
+// 다중 선택 필터는 URL에 comma-join된 문자열 하나로 담는다(반복 키 대신) — 서버·클라이언트
+// 양쪽에서 같은 방식으로 나눠 읽는다.
+export function toArray(v: string | null | undefined): string[] {
+  return v ? v.split(",").filter(Boolean) : [];
+}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getPartnerAccess } from "@/lib/permissions";
 import { listVisiblePartners } from "@/lib/partners";
+import { isOverdue } from "@/lib/priority";
 
 export { isOverdue, isProjectUnread } from "@/lib/priority";
 
@@ -14,6 +15,7 @@ export function getMaxPriority(priorities: { level: string }[]): string {
   );
 }
 
+// "마감일 임박순" — 기존부터 있던 기본 정렬 그대로.
 export function sortProjects<
   T extends { dueDate: Date | null; createdAt: Date; priorities: { level: string }[] },
 >(projects: T[]): T[] {
@@ -28,6 +30,84 @@ export function sortProjects<
 
     return a.createdAt.getTime() - b.createdAt.getTime();
   });
+}
+
+function sortByRecent<T extends { createdAt: Date }>(projects: T[]): T[] {
+  return [...projects].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+function sortByPriority<T extends { dueDate: Date | null; priorities: { level: string }[] }>(
+  projects: T[],
+): T[] {
+  return [...projects].sort((a, b) => {
+    const aPriority = PRIORITY_RANK[getMaxPriority(a.priorities)];
+    const bPriority = PRIORITY_RANK[getMaxPriority(b.priorities)];
+    if (aPriority !== bPriority) return bPriority - aPriority;
+    const aDue = a.dueDate ? a.dueDate.getTime() : Infinity;
+    const bDue = b.dueDate ? b.dueDate.getTime() : Infinity;
+    return aDue - bDue;
+  });
+}
+
+// diffDaysFromToday: app/page.tsx의 dueLabel과 같은 방식(서버 로컬 자정 기준)으로 맞춘다.
+function diffDaysFromToday(dueDate: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dueDate);
+  d.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / 86400000);
+}
+
+// 기본 정렬(P7): ① 완료는 맨 아래 ② 지연·오늘/내일 마감이 그 다음으로 위 ③ 나머지는 최근 활동순.
+function defaultBucket(status: string, dueDate: Date | null): 0 | 1 | 2 {
+  if (status === "DONE") return 2;
+  if (isOverdue(dueDate, status)) return 0;
+  if (dueDate && diffDaysFromToday(dueDate) <= 1) return 0;
+  return 1;
+}
+
+function sortProjectsDefault<
+  T extends { status: string; dueDate: Date | null; updatedAt: Date },
+>(projects: T[]): T[] {
+  return [...projects].sort((a, b) => {
+    const ba = defaultBucket(a.status, a.dueDate);
+    const bb = defaultBucket(b.status, b.dueDate);
+    if (ba !== bb) return ba - bb;
+    if (ba === 0) {
+      const aDue = a.dueDate ? a.dueDate.getTime() : Infinity;
+      const bDue = b.dueDate ? b.dueDate.getTime() : Infinity;
+      return aDue - bDue;
+    }
+    return b.updatedAt.getTime() - a.updatedAt.getTime();
+  });
+}
+
+export type ProjectSort = "default" | "due" | "recent" | "priority";
+
+function applySort<
+  T extends {
+    status: string;
+    dueDate: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    priorities: { level: string }[];
+  },
+>(projects: T[], sort: ProjectSort | undefined): T[] {
+  if (sort === "due") return sortProjects(projects);
+  if (sort === "recent") return sortByRecent(projects);
+  if (sort === "priority") return sortByPriority(projects);
+  return sortProjectsDefault(projects);
+}
+
+export type DueBucket = "OVERDUE" | "TODAY" | "WEEK" | "NONE";
+
+function dueBucketOf(dueDate: Date | null, status: string): DueBucket | "LATER" {
+  if (!dueDate) return "NONE";
+  if (isOverdue(dueDate, status)) return "OVERDUE";
+  const diff = diffDaysFromToday(dueDate);
+  if (diff <= 0) return "TODAY";
+  if (diff <= 7) return "WEEK";
+  return "LATER";
 }
 
 // 가장 가까운 조상의 grant가 우선한다: 전체 공유(true) 상속 도중 특정 가지에 false grant를
@@ -252,15 +332,19 @@ export function listCanvasProjectsForPartner(partnerId: string, userId: string, 
   return listCanvasProjectsForPartners([partnerId], userId, isSuperAdmin);
 }
 
+export type ProjectListFilters = {
+  partnerIds?: string[];
+  statuses?: ("TODO" | "IN_PROGRESS" | "DONE")[];
+  assigneeIds?: string[];
+  dueBuckets?: DueBucket[];
+  q?: string;
+  sort?: ProjectSort;
+};
+
 export async function listAllProjectsForUser(
   userId: string,
   isSuperAdmin: boolean,
-  filters: {
-    partnerId?: string;
-    status?: "TODO" | "IN_PROGRESS" | "DONE";
-    mineOnly?: boolean;
-    q?: string;
-  } = {},
+  filters: ProjectListFilters = {},
 ) {
   const partners = await listVisiblePartners(userId, isSuperAdmin, false);
   return listProjectsForPartners(partners, userId, isSuperAdmin, filters);
@@ -273,20 +357,16 @@ export async function listProjectsForPartners(
   partners: { id: string; name: string; color: string | null }[],
   userId: string,
   isSuperAdmin: boolean,
-  filters: {
-    partnerId?: string;
-    status?: "TODO" | "IN_PROGRESS" | "DONE";
-    mineOnly?: boolean;
-    q?: string;
-  } = {},
+  filters: ProjectListFilters = {},
 ) {
-  const targetPartners = filters.partnerId
-    ? partners.filter((p) => p.id === filters.partnerId)
+  const targetPartners = filters.partnerIds?.length
+    ? partners.filter((p) => filters.partnerIds!.includes(p.id))
     : partners;
   const partnerMeta = new Map(targetPartners.map((p) => [p.id, { name: p.name, color: p.color }]));
 
   // ponytail: 파트너마다 따로 조회하던 N+1을 partnerId IN 배열 한 방 쿼리로 바꾸고,
-  // 가시성 필터링은 메모리에서 처리한다.
+  // 가시성 필터링은 메모리에서 처리한다. 상태·담당자·마감일·검색 필터도 실측 결과(2000건
+  // 기준 전체 조회+필터링 ~150ms) DB로 내릴 필요가 없어 같은 자리에서 메모리로 처리한다.
   const allProjects = await prisma.project.findMany({
     where: { partnerId: { in: targetPartners.map((p) => p.id) }, deletedAt: null },
     include: projectListInclude(userId),
@@ -299,18 +379,33 @@ export async function listProjectsForPartners(
     return { ...t, partnerName: meta.name, partnerColor: meta.color };
   });
 
-  if (filters.status) projects = projects.filter((t) => t.status === filters.status);
+  if (filters.statuses?.length) {
+    projects = projects.filter((t) => filters.statuses!.includes(t.status));
+  }
   if (filters.q) {
     const q = filters.q.toLowerCase();
-    projects = projects.filter((t) => t.title.toLowerCase().includes(q));
-  }
-  if (filters.mineOnly) {
     projects = projects.filter(
-      (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        t.master.name.toLowerCase().includes(q) ||
+        t.participants.some((p) => p.user.name.toLowerCase().includes(q)),
     );
   }
+  if (filters.assigneeIds?.length) {
+    projects = projects.filter(
+      (t) =>
+        filters.assigneeIds!.includes(t.masterId) ||
+        t.participants.some((p) => filters.assigneeIds!.includes(p.userId)),
+    );
+  }
+  if (filters.dueBuckets?.length) {
+    projects = projects.filter((t) => {
+      const bucket = dueBucketOf(t.dueDate, t.status);
+      return bucket !== "LATER" && filters.dueBuckets!.includes(bucket);
+    });
+  }
 
-  return sortProjects(projects);
+  return applySort(projects, filters.sort);
 }
 
 // 설정 > 보관함(휴지통)에서 쓰는 목록. superAdmin은 전체, 그 외는 본인이 master이거나

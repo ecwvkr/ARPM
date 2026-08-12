@@ -36,7 +36,7 @@ export default async function DashboardPage({
   const [, allPartners, myProjects] = await Promise.all([
     ensureDeadlineNotifications(userId),
     listVisiblePartnersWithUnread(userId, isSuperAdmin, sort),
-    listAllProjectsForUser(userId, isSuperAdmin, { mineOnly: true }),
+    listAllProjectsForUser(userId, isSuperAdmin, { assigneeIds: [userId] }),
   ]);
 
   // 개인별 숨김(D2)·즐겨찾기는 같은 조회 결과에서 갈라낸다 — 별도 쿼리 없이 한 번에 온

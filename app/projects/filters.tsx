@@ -1,17 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { chipClass } from "@/lib/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
+import { ProjectSortSelect } from "./project-sort-select";
+import { chipClass, toArray } from "@/lib/ui";
 import { saveFilter, deleteSavedFilter } from "@/app/actions/filters";
+import { IconSearch, IconBookmark, IconUser } from "@tabler/icons-react";
+
+const STATUS_OPTIONS = [
+  { value: "TODO", label: "진행전" },
+  { value: "IN_PROGRESS", label: "진행중" },
+  { value: "DONE", label: "완료" },
+];
+
+const DUE_OPTIONS = [
+  { value: "OVERDUE", label: "지연" },
+  { value: "TODAY", label: "오늘" },
+  { value: "WEEK", label: "이번주" },
+  { value: "NONE", label: "마감일 없음" },
+];
 
 export function ProjectFilters({
   partners,
+  assignees,
+  currentUserId,
   savedFilters,
 }: {
   partners: { id: string; name: string }[];
+  assignees: { id: string; name: string }[];
+  currentUserId: string;
   savedFilters: { id: string; name: string; query: string }[];
 }) {
   const router = useRouter();
@@ -26,7 +47,41 @@ export function ProjectFilters({
     router.push(`/projects?${params.toString()}`);
   }
 
-  const mine = searchParams.get("mine") === "1";
+  function setArrayParam(key: string, values: string[]) {
+    setParam(key, values.join(","));
+  }
+
+  // 검색은 타이핑 멈춘 뒤 0.3초에 자동 적용한다.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const current = searchParams.get("q") ?? "";
+      if (queryInput.trim() !== current) setParam("q", queryInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryInput]);
+
+  // 저장된 필터 적용, 네비게이션 등 입력창 밖에서 q가 바뀌면 입력창도 맞춰준다.
+  // (렌더 중 상태 조정 — https://react.dev/learn/you-might-not-need-an-effect)
+  const currentQ = searchParams.get("q") ?? "";
+  const [syncedQ, setSyncedQ] = useState(currentQ);
+  if (currentQ !== syncedQ) {
+    setSyncedQ(currentQ);
+    setQueryInput(currentQ);
+  }
+
+  const selectedPartners = toArray(searchParams.get("partners"));
+  const selectedStatuses = toArray(searchParams.get("status"));
+  const selectedAssignees = toArray(searchParams.get("assignee"));
+  const selectedDue = toArray(searchParams.get("due"));
+  const mine = selectedAssignees.includes(currentUserId);
+
+  function toggleMine() {
+    setArrayParam(
+      "assignee",
+      mine ? selectedAssignees.filter((id) => id !== currentUserId) : [...selectedAssignees, currentUserId],
+    );
+  }
 
   function handleSave() {
     const name = window.prompt("즐겨찾기 이름");
@@ -38,79 +93,86 @@ export function ProjectFilters({
 
   return (
     <div className="space-y-2">
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        value={queryInput}
-        onChange={(e) => setQueryInput(e.target.value)}
-        onBlur={() => setParam("q", queryInput.trim())}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") setParam("q", queryInput.trim());
-        }}
-        placeholder="프로젝트명 검색"
-        aria-label="프로젝트명 검색"
-        className="h-auto w-40 py-1.5 text-sm"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={queryInput}
+            onChange={(e) => setQueryInput(e.target.value)}
+            placeholder="프로젝트명·담당자 검색"
+            aria-label="프로젝트명·담당자 검색"
+            className="h-auto w-48 py-1.5 pl-8 text-sm"
+          />
+        </div>
 
-      <select
-        value={searchParams.get("partnerId") ?? ""}
-        onChange={(e) => setParam("partnerId", e.target.value)}
-        aria-label="파트너 필터"
-        className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
-      >
-        <option value="">전체 파트너</option>
-        {partners.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+        <MultiSelectFilter
+          label="파트너"
+          options={partners.map((p) => ({ value: p.id, label: p.name }))}
+          selected={selectedPartners}
+          onChange={(v) => setArrayParam("partners", v)}
+        />
+        <MultiSelectFilter
+          label="상태"
+          options={STATUS_OPTIONS}
+          selected={selectedStatuses}
+          onChange={(v) => setArrayParam("status", v)}
+        />
+        <MultiSelectFilter
+          label="담당자"
+          options={assignees.map((a) => ({ value: a.id, label: a.id === currentUserId ? `${a.name} (나)` : a.name }))}
+          selected={selectedAssignees}
+          onChange={(v) => setArrayParam("assignee", v)}
+        />
+        <MultiSelectFilter
+          label="마감일"
+          options={DUE_OPTIONS}
+          selected={selectedDue}
+          onChange={(v) => setArrayParam("due", v)}
+        />
 
-      <select
-        value={searchParams.get("status") ?? ""}
-        onChange={(e) => setParam("status", e.target.value)}
-        aria-label="상태 필터"
-        className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
-      >
-        <option value="">전체 상태</option>
-        <option value="TODO">진행전</option>
-        <option value="IN_PROGRESS">진행중</option>
-        <option value="DONE">완료</option>
-      </select>
+        <button type="button" onClick={toggleMine} aria-pressed={mine} className={chipClass(mine, "flex items-center gap-1")}>
+          <IconUser className="size-3.5" />내 프로젝트
+        </button>
 
-      <button
-        type="button"
-        onClick={() => setParam("mine", mine ? "" : "1")}
-        aria-pressed={mine}
-        className={chipClass(mine)}
-      >
-        내 프로젝트
-      </button>
+        <ProjectSortSelect />
 
-      <Button type="button" size="sm" variant="outline" onClick={handleSave} disabled={isPending}>
-        현재 필터 저장
-      </Button>
-    </div>
-
-    {savedFilters.length > 0 && (
-      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        <span>즐겨찾기:</span>
-        {savedFilters.map((f) => (
-          <span key={f.id} className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
-            <button type="button" onClick={() => router.push(`/projects?${f.query}`)}>
-              {f.name}
-            </button>
-            <button
-              type="button"
-              aria-label={`${f.name} 삭제`}
-              onClick={() => startTransition(async () => { await deleteSavedFilter(f.id); })}
-              className="text-muted-foreground/60 hover:text-destructive"
-            >
-              ×
-            </button>
-          </span>
-        ))}
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button type="button" size="sm" variant="outline">
+                <IconBookmark className="size-3.5" />
+                필터
+              </Button>
+            }
+          />
+          <PopoverContent className="w-64 gap-2 p-2" align="start">
+            <Button type="button" size="sm" variant="ghost" onClick={handleSave} disabled={isPending} className="justify-start">
+              + 현재 필터 저장
+            </Button>
+            {savedFilters.length === 0 ? (
+              <p className="px-2 py-1 text-xs text-muted-foreground">저장된 필터가 없습니다.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {savedFilters.map((f) => (
+                  <li key={f.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                    <button type="button" onClick={() => router.push(`/projects?${f.query}`)} className="truncate text-left text-sm">
+                      {f.name}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${f.name} 삭제`}
+                      onClick={() => startTransition(async () => { await deleteSavedFilter(f.id); })}
+                      className="shrink-0 text-muted-foreground/60 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
-    )}
     </div>
   );
 }

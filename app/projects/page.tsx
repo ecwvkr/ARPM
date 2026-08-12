@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisiblePartners } from "@/lib/partners";
-import { listProjectsForPartners, isProjectUnread } from "@/lib/projects";
+import { listProjectsForPartners, isProjectUnread, type DueBucket, type ProjectSort } from "@/lib/projects";
 import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
@@ -10,9 +10,10 @@ import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog"
 import { ProjectStatusGroupsView } from "@/app/partners/[partnerId]/project-status-groups";
 import { ProjectCanvas } from "@/app/partners/[partnerId]/canvas-loader";
 import { listSavedFilters } from "@/app/actions/filters";
+import { listAllUsers } from "@/app/actions/users";
 import { ProjectFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
-import { chipClass } from "@/lib/ui";
+import { chipClass, toArray } from "@/lib/ui";
 
 const VIEWS = [
   { key: undefined, label: "리스트 뷰" },
@@ -36,16 +37,30 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
   if (!session?.user?.id) return null;
 
   const params = await searchParams;
+  // partnerId(단수)는 워크플로우 뷰의 파트너 전환 전용. 리스트·보드 뷰의 파트너 필터는
+  // 다중 선택이라 별도 파라미터(partners, comma-join)를 쓴다.
   const partnerId = typeof params.partnerId === "string" ? params.partnerId : undefined;
-  const status = typeof params.status === "string" ? params.status : undefined;
-  const mineOnly = params.mine === "1";
+  const selectedPartnerIds = toArray(typeof params.partners === "string" ? params.partners : undefined);
+  const selectedStatuses = toArray(typeof params.status === "string" ? params.status : undefined) as (
+    | "TODO"
+    | "IN_PROGRESS"
+    | "DONE"
+  )[];
+  const selectedAssigneeIds = toArray(typeof params.assignee === "string" ? params.assignee : undefined);
+  const selectedDueBuckets = toArray(typeof params.due === "string" ? params.due : undefined) as DueBucket[];
   const q = typeof params.q === "string" ? params.q : undefined;
+  const sort = typeof params.sort === "string" ? (params.sort as ProjectSort) : undefined;
   const view = typeof params.view === "string" ? params.view : undefined;
   const isCanvas = view === "canvas";
 
   const isSuperAdmin = !!session.user.isSuperAdmin;
-  const partners = await listVisiblePartners(session.user.id, isSuperAdmin, false);
+  const [partners, assignees] = await Promise.all([
+    listVisiblePartners(session.user.id, isSuperAdmin, false),
+    listAllUsers(),
+  ]);
   const activePartner = partnerId ? partners.find((p) => p.id === partnerId) : undefined;
+  const singleSelectedPartner =
+    selectedPartnerIds.length === 1 ? partners.find((p) => p.id === selectedPartnerIds[0]) : undefined;
 
   // 캔버스 뷰는 자체 조회(서버 액션)를 쓰므로 목록·저장필터를 미리 가져오지 않는다.
   const [savedFilters, projects] = await Promise.all([
@@ -53,10 +68,12 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
     isCanvas
       ? []
       : listProjectsForPartners(partners, session.user.id, isSuperAdmin, {
-          partnerId,
-          status: status as "TODO" | "IN_PROGRESS" | "DONE" | undefined,
-          mineOnly,
+          partnerIds: selectedPartnerIds,
+          statuses: selectedStatuses,
+          assigneeIds: selectedAssigneeIds,
+          dueBuckets: selectedDueBuckets,
           q,
+          sort,
         }),
   ]);
 
@@ -68,10 +85,14 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
             <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
               ← 전체 파트너
             </Link>
-            <h1 className="text-base font-bold">{activePartner ? `${activePartner.name} 프로젝트` : "전체 프로젝트"}</h1>
-            {activePartner && (
+            <h1 className="text-base font-bold">
+              {(isCanvas ? activePartner : singleSelectedPartner)
+                ? `${(isCanvas ? activePartner : singleSelectedPartner)!.name} 프로젝트`
+                : "전체 프로젝트"}
+            </h1>
+            {(isCanvas ? activePartner : singleSelectedPartner) && (
               <Link
-                href={viewHref({ ...params, partnerId: undefined }, view)}
+                href={viewHref({ ...params, partnerId: undefined, partners: undefined }, view)}
                 className="block text-xs text-muted-foreground underline underline-offset-2"
               >
                 ← 전체 프로젝트 보기
@@ -143,6 +164,8 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
           <>
             <ProjectFilters
               partners={partners.map((p) => ({ id: p.id, name: p.name }))}
+              assignees={assignees}
+              currentUserId={session.user.id}
               savedFilters={savedFilters.map((f) => ({ id: f.id, name: f.name, query: f.query }))}
             />
 
