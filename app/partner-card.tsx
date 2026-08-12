@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/ui/avatar-stack";
 import { PartnerSettingsDialog } from "@/app/partners/[partnerId]/partner-settings-dialog";
+import { PartnerPinButton } from "@/app/partner-pin-button";
 
 type PartnerCardData = {
   id: string;
@@ -15,6 +16,7 @@ type PartnerCardData = {
   members: { userId: string; role: "OWNER" | "MEMBER"; user: { id: string; name: string } }[];
   projects: { status: string }[];
   hiddenBy?: { userId: string }[];
+  pinnedBy?: { userId: string }[];
 };
 
 export function PartnerCard({
@@ -50,6 +52,7 @@ export function PartnerCard({
       <div className="relative z-10 flex items-start justify-between gap-2">
         <h3 className="pointer-events-none text-base font-bold">{partner.name}</h3>
         <div className="flex shrink-0 items-center gap-1">
+          <PartnerPinButton partnerId={partner.id} pinned={(partner.pinnedBy?.length ?? 0) > 0} />
           <Badge
             variant={partner.visibility === "PUBLIC" ? "secondary" : "outline"}
             className="pointer-events-none rounded-full bg-background px-3"

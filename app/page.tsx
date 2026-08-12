@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { listVisiblePartnersWithUnread } from "@/lib/partners";
+import { listVisiblePartnersWithUnread, type PartnerSort } from "@/lib/partners";
 import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { isOverdue } from "@/lib/priority";
@@ -10,6 +10,10 @@ import { NewPartnerDialog } from "./new-partner-dialog";
 import { NotificationBell } from "./notification-bell";
 import { PartnerCard } from "./partner-card";
 import { WidthContainer } from "@/components/width-container";
+import { PartnerSortSelect } from "./partner-sort-select";
+import { IconChevronRight } from "@tabler/icons-react";
+
+type PartnerFilter = "all" | "mine" | "inprogress";
 
 export default async function DashboardPage({
   searchParams,
@@ -22,21 +26,43 @@ export default async function DashboardPage({
   const userId = session.user.id;
   const params = await searchParams;
   const isSuperAdmin = !!session.user.isSuperAdmin;
-  // 숨김은 이제 계정별 개인 설정이라(D2) 누구나 자신이 숨긴 파트너를 다시 볼 수 있다.
-  const showHiddenByMe = params.hidden === "1";
+  const sort: PartnerSort =
+    params.sort === "name" || params.sort === "created" ? params.sort : "activity";
+  const filter: PartnerFilter =
+    params.filter === "mine" || params.filter === "inprogress" ? params.filter : "all";
 
   // ponytail: 서로 의존하지 않는 세 조회(알림 점검·파트너 목록·내 프로젝트)를 순차 대기
   // 대신 한 번에 날려 왕복 시간을 줄인다.
-  const [, partners, myProjects] = await Promise.all([
+  const [, allPartners, myProjects] = await Promise.all([
     ensureDeadlineNotifications(userId),
-    listVisiblePartnersWithUnread(userId, isSuperAdmin, showHiddenByMe),
+    listVisiblePartnersWithUnread(userId, isSuperAdmin, sort),
     listAllProjectsForUser(userId, isSuperAdmin, { mineOnly: true }),
   ]);
 
-  const ownedCount = partners.filter((p) => p.ownerId === userId).length;
-  const inProgressCount = partners.filter((p) =>
-    p.projects.some((t) => t.status === "IN_PROGRESS"),
-  ).length;
+  // 개인별 숨김(D2)·즐겨찾기는 같은 조회 결과에서 갈라낸다 — 별도 쿼리 없이 한 번에 온
+  // 목록을 화면에서 두 묶음(안 숨김/숨김)으로 나누고, 각 묶음 안에서는 즐겨찾기를 맨 위로.
+  const visibleAll = allPartners.filter((p) => (p.hiddenBy?.length ?? 0) === 0);
+  const ownedCount = visibleAll.filter((p) => p.ownerId === userId).length;
+  const inProgressCount = visibleAll.filter((p) => p.projects.some((t) => t.status === "IN_PROGRESS")).length;
+
+  const byFilter = (p: (typeof allPartners)[number]) => {
+    if (filter === "mine") return p.ownerId === userId;
+    if (filter === "inprogress") return p.projects.some((t) => t.status === "IN_PROGRESS");
+    return true;
+  };
+  const sortPinnedFirst = (list: typeof allPartners) => [
+    ...list.filter((p) => (p.pinnedBy?.length ?? 0) > 0),
+    ...list.filter((p) => (p.pinnedBy?.length ?? 0) === 0),
+  ];
+  const partners = sortPinnedFirst(visibleAll.filter(byFilter));
+  const hiddenPartners = sortPinnedFirst(allPartners.filter((p) => (p.hiddenBy?.length ?? 0) > 0 && byFilter(p)));
+
+  function widgetHref(next: PartnerFilter) {
+    const sp = new URLSearchParams();
+    sp.set("sort", sort);
+    if (next !== "all") sp.set("filter", next);
+    return `/?${sp.toString()}`;
+  }
 
   const weekFromNow = new Date();
   weekFromNow.setDate(weekFromNow.getDate() + 7);
@@ -65,20 +91,15 @@ export default async function DashboardPage({
         </div>
       </header>
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
-        <div className="flex items-center justify-end gap-3">
-          <Link
-            href={showHiddenByMe ? "/" : "/?hidden=1"}
-            className="text-xs text-muted-foreground underline underline-offset-2"
-          >
-            {showHiddenByMe ? "숨긴 파트너 그만 보기" : "숨긴 파트너 보기"}
-          </Link>
-          <NewPartnerDialog currentUserId={userId} />
-        </div>
-
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <SummaryCard label="전체 파트너" value={partners.length} />
-          <SummaryCard label="나의 파트너" value={ownedCount} />
-          <SummaryCard label="진행중인 파트너" value={inProgressCount} />
+          <SummaryCard label="전체 파트너" value={visibleAll.length} href={widgetHref("all")} active={filter === "all"} />
+          <SummaryCard label="나의 파트너" value={ownedCount} href={widgetHref("mine")} active={filter === "mine"} />
+          <SummaryCard
+            label="진행중인 파트너"
+            value={inProgressCount}
+            href={widgetHref("inprogress")}
+            active={filter === "inprogress"}
+          />
         </div>
 
         {dueSoon.length > 0 && (
@@ -107,10 +128,18 @@ export default async function DashboardPage({
           </section>
         )}
 
-        <h2 className="text-sm font-bold text-foreground">파트너</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-foreground">파트너</h2>
+          <div className="flex items-center gap-2">
+            <PartnerSortSelect />
+            <NewPartnerDialog currentUserId={userId} />
+          </div>
+        </div>
 
         {partners.length === 0 ? (
-          <p className="text-sm text-muted-foreground">아직 파트너가 없습니다.</p>
+          <p className="text-sm text-muted-foreground">
+            {filter === "all" ? "아직 파트너가 없습니다." : "조건에 맞는 파트너가 없습니다."}
+          </p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {partners.map((partner) => (
@@ -122,6 +151,25 @@ export default async function DashboardPage({
               />
             ))}
           </div>
+        )}
+
+        {hiddenPartners.length > 0 && (
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground underline underline-offset-2">
+              숨긴 파트너 보기 ({hiddenPartners.length})
+              <IconChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {hiddenPartners.map((partner) => (
+                <PartnerCard
+                  key={partner.id}
+                  partner={partner}
+                  currentUserId={userId}
+                  hasUnread={partner.projects.some((t) => isProjectUnread(t, userId))}
+                />
+              ))}
+            </div>
+          </details>
         )}
       </WidthContainer>
     </div>
@@ -140,11 +188,36 @@ function dueLabel(dueDate: Date, status: string) {
   return `D-${diffDays}`;
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  label,
+  value,
+  href,
+  active,
+}: {
+  label: string;
+  value: number;
+  href: string;
+  active: boolean;
+}) {
   return (
-    <div className="rounded-4xl bg-card p-4 text-center shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-2xl font-black">{value}개</p>
-    </div>
+    <Link
+      href={href}
+      aria-pressed={active}
+      className={`group flex items-center justify-between rounded-4xl p-4 shadow-md ring-1 transition-colors ${
+        active
+          ? "bg-foreground text-background ring-foreground"
+          : "bg-card ring-foreground/5 hover:bg-muted dark:ring-foreground/10"
+      }`}
+    >
+      <div className="text-left">
+        <p className={active ? "text-xs text-background/70" : "text-xs text-muted-foreground"}>{label}</p>
+        <p className="text-2xl font-black">{value}개</p>
+      </div>
+      <IconChevronRight
+        className={`size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 ${
+          active ? "text-background" : "text-muted-foreground"
+        }`}
+      />
+    </Link>
   );
 }

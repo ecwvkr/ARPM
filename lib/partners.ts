@@ -44,22 +44,29 @@ export function listVisiblePartners(
   });
 }
 
+export type PartnerSort = "activity" | "name" | "created";
+
+const PARTNER_SORT_ORDER: Record<PartnerSort, Prisma.PartnerOrderByWithRelationInput> = {
+  activity: { lastActivityAt: "desc" },
+  name: { name: "asc" },
+  created: { createdAt: "desc" },
+};
+
 // 대시보드 전용: 파트너 카드의 "미확인" 빨간 점 판정에 필요한 필드까지 함께 가져오고,
-// 이 사용자가 개인적으로 숨긴 파트너는 showHiddenByMe가 아니면 제외한다(D2).
+// 이 사용자가 개인적으로 숨기거나 즐겨찾기한 파트너도 함께 표시해(hiddenBy/pinnedBy)
+// 대시보드에서 숨김 섹션 분리·즐겨찾기 상단 고정을 계산할 수 있게 한다(D2).
 export function listVisiblePartnersWithUnread(
   userId: string,
   isSuperAdmin: boolean,
-  showHiddenByMe = false,
+  sort: PartnerSort = "activity",
 ) {
   return prisma.partner.findMany({
-    where: {
-      ...visiblePartnersWhere(userId, isSuperAdmin, false),
-      ...(showHiddenByMe ? {} : { hiddenBy: { none: { userId } } }),
-    },
+    where: visiblePartnersWhere(userId, isSuperAdmin, false),
     include: {
       owner: true,
       members: { include: { user: { select: { id: true, name: true } } } },
       hiddenBy: { where: { userId }, select: { userId: true } },
+      pinnedBy: { where: { userId }, select: { userId: true } },
       projects: {
         select: {
           status: true,
@@ -71,7 +78,7 @@ export function listVisiblePartnersWithUnread(
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: PARTNER_SORT_ORDER[sort],
   });
 }
 
