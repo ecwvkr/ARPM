@@ -26,6 +26,7 @@ model User {
   ownedPartners        Partner[]          @relation("PartnerOwner")
   partnerMemberships   PartnerMember[]
   hiddenPartners       PartnerHide[] // 개인별 대시보드 숨김 (D2)
+  pinnedPartners       PartnerPin[] // 개인별 대시보드 즐겨찾기 고정
   masteredProjects     Project[]          @relation("ProjectMaster")
   projectParticipations ProjectParticipant[]
   priorities           ProjectPriority[]
@@ -40,15 +41,17 @@ model Partner {
   id         String     @id @default(cuid())
   name       String
   visibility Visibility @default(PRIVATE)
-  deletedAt  DateTime? // 소프트 삭제(보관함/휴지통). 총관리자·owner가 복구하거나 영구 삭제할 수 있다.
-  color      String? // 대시보드/캘린더/워크플로우에서 파트너를 구분하는 색상
-  ownerId    String
-  owner      User       @relation("PartnerOwner", fields: [ownerId], references: [id])
-  createdAt  DateTime   @default(now())
+  deletedAt      DateTime? // 소프트 삭제(보관함/휴지통). 총관리자·owner가 복구하거나 영구 삭제할 수 있다.
+  color          String? // 대시보드/캘린더/워크플로우에서 파트너를 구분하는 색상
+  ownerId        String
+  owner          User       @relation("PartnerOwner", fields: [ownerId], references: [id])
+  createdAt      DateTime   @default(now())
+  lastActivityAt DateTime   @default(now()) // 대시보드 "최근 활동순" 정렬용. 하위 프로젝트가 바뀔 때마다 갱신한다.
 
   members  PartnerMember[]
   projects Project[]
   hiddenBy PartnerHide[] // 이 파트너를 숨긴 사용자들 (D2)
+  pinnedBy PartnerPin[] // 이 파트너를 즐겨찾기 고정한 사용자들
 
   @@index([ownerId])
 }
@@ -71,6 +74,18 @@ model PartnerHide {
   userId    String
   partnerId String
   hiddenAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, partnerId])
+  @@index([partnerId])
+}
+
+// 파트너 즐겨찾기(대시보드 상단 고정). 사람마다 보고 싶은 파트너가 다르므로 개인별 테이블.
+model PartnerPin {
+  userId    String
+  partnerId String
+  createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 

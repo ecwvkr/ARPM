@@ -31,7 +31,7 @@ export async function getProjectDetail(projectId: string) {
       update: {},
       create: { projectId, userId: session.user.id },
     });
-    revalidateProjectViews(access.project.partnerId);
+    await revalidateProjectViews(access.project.partnerId, { touch: false });
   }
 
   return {
@@ -106,7 +106,7 @@ export async function createProject(
     },
   });
 
-  revalidateProjectViews(partnerId);
+  await revalidateProjectViews(partnerId);
 }
 
 export async function deriveProject(
@@ -154,7 +154,7 @@ export async function deriveProject(
     });
   }
 
-  revalidateProjectViews(parent.partnerId);
+  await revalidateProjectViews(parent.partnerId);
 }
 
 export async function duplicateProject(projectId: string) {
@@ -178,7 +178,7 @@ export async function duplicateProject(projectId: string) {
     },
   });
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function moveProject(projectId: string, formData: FormData) {
@@ -203,7 +203,7 @@ export async function moveProject(projectId: string, formData: FormData) {
   }
 
   await prisma.project.update({ where: { id: projectId }, data: { parentId: newParentId } });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function listMovableTargets(projectId: string) {
@@ -306,7 +306,7 @@ export async function joinProject(projectId: string) {
     create: { projectId, userId: session.user.id },
   });
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function leaveProject(projectId: string) {
@@ -320,7 +320,7 @@ export async function leaveProject(projectId: string) {
     where: { projectId_userId: { projectId, userId: session.user.id } },
   });
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function removeParticipant(projectId: string, userId: string) {
@@ -332,7 +332,7 @@ export async function removeParticipant(projectId: string, userId: string) {
   if (userId === project.masterId) throw new Error("master는 위임을 통해서만 변경할 수 있습니다.");
 
   await prisma.projectParticipant.deleteMany({ where: { projectId, userId } });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function updateProjectStatus(projectId: string, status: "TODO" | "IN_PROGRESS") {
@@ -344,7 +344,7 @@ export async function updateProjectStatus(projectId: string, status: "TODO" | "I
   if (project.completedAt) throw new Error("완료된 프로젝트는 상태를 변경할 수 없습니다.");
 
   await prisma.project.update({ where: { id: projectId }, data: { status } });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function completeProject(projectId: string) {
@@ -378,7 +378,7 @@ export async function completeProject(projectId: string) {
     });
   }
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function reopenProject(projectId: string) {
@@ -407,7 +407,7 @@ export async function reopenProject(projectId: string) {
     }),
   ]);
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function setMyPriority(projectId: string, level: "URGENT" | "NORMAL" | "HOLD") {
@@ -423,7 +423,7 @@ export async function setMyPriority(projectId: string, level: "URGENT" | "NORMAL
     create: { projectId, userId: session.user.id, level },
   });
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function extendDueDate(
@@ -441,7 +441,7 @@ export async function extendDueDate(
   if (!dueDateRaw) return "날짜를 입력하세요.";
 
   await prisma.project.update({ where: { id: projectId }, data: { dueDate: new Date(dueDateRaw) } });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function updateProjectInfo(
@@ -466,7 +466,7 @@ export async function updateProjectInfo(
     where: { id: projectId },
     data: { title, memo, links },
   });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function updateProjectVisibility(projectId: string, formData: FormData) {
@@ -478,7 +478,7 @@ export async function updateProjectVisibility(projectId: string, formData: FormD
 
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   await prisma.project.update({ where: { id: projectId }, data: { visibility } });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function transferMaster(projectId: string, formData: FormData) {
@@ -524,7 +524,7 @@ export async function transferMaster(projectId: string, formData: FormData) {
       },
     }),
   ]);
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function inviteToProject(
@@ -581,7 +581,7 @@ export async function inviteToProject(
     ]),
   );
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function addComment(
@@ -613,7 +613,7 @@ export async function addComment(
     });
   }
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function updateComment(
@@ -632,7 +632,7 @@ export async function updateComment(
   if (!body) return "내용을 입력하세요.";
 
   await prisma.comment.update({ where: { id: commentId }, data: { body } });
-  revalidateProjectViews(comment.project.partnerId);
+  await revalidateProjectViews(comment.project.partnerId);
 }
 
 export async function deleteComment(commentId: string) {
@@ -644,7 +644,7 @@ export async function deleteComment(commentId: string) {
   if (comment.authorId !== session.user.id && !session.user.isSuperAdmin) return;
 
   await prisma.comment.delete({ where: { id: commentId } });
-  revalidateProjectViews(comment.project.partnerId);
+  await revalidateProjectViews(comment.project.partnerId);
 }
 
 // 소프트 삭제(보관함으로 이동). 하위 트리를 함께 보관해야 나중에 복구했을 때 구조가
@@ -699,7 +699,7 @@ export async function archiveProject(
     }),
   ]);
 
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
 }
 
 // 보관함에서 복구. 함께 보관됐던 하위 트리를 같이 되돌린다. getProjectAccess는 보관된
@@ -723,7 +723,7 @@ export async function restoreProject(projectId: string) {
   const subtreeIds = [projectId, ...collectDescendantIds(all, projectId)];
 
   await prisma.project.updateMany({ where: { id: { in: subtreeIds } }, data: { deletedAt: null } });
-  revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId);
   revalidatePath("/settings");
 }
 

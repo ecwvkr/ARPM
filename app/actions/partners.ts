@@ -64,7 +64,7 @@ export async function updatePartnerName(
   const name = (formData.get("name") as string | null)?.trim();
   if (!name) return "파트너 이름을 입력하세요.";
 
-  await prisma.partner.update({ where: { id: partnerId }, data: { name } });
+  await prisma.partner.update({ where: { id: partnerId }, data: { name, lastActivityAt: new Date() } });
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
   revalidatePath("/projects");
@@ -88,7 +88,10 @@ export async function updatePartnerColor(
   const raw = (formData.get("color") as string | null)?.trim();
   if (!reset && !HEX_COLOR.test(raw ?? "")) return "올바른 색상 값을 선택하세요.";
 
-  await prisma.partner.update({ where: { id: partnerId }, data: { color: reset ? null : raw } });
+  await prisma.partner.update({
+    where: { id: partnerId },
+    data: { color: reset ? null : raw, lastActivityAt: new Date() },
+  });
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
   revalidatePath("/calendar");
@@ -102,7 +105,7 @@ export async function updatePartnerVisibility(partnerId: string, formData: FormD
   if (!isOwner) throw new Error("파트너 owner만 공개 범위를 변경할 수 있습니다.");
 
   const visibility = formData.get("visibility") === "PUBLIC" ? "PUBLIC" : "PRIVATE";
-  await prisma.partner.update({ where: { id: partnerId }, data: { visibility } });
+  await prisma.partner.update({ where: { id: partnerId }, data: { visibility, lastActivityAt: new Date() } });
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
 }
@@ -175,6 +178,27 @@ export async function togglePartnerHide(partnerId: string) {
     await prisma.partnerHide.delete({ where: { userId_partnerId: { userId: session.user.id, partnerId } } });
   } else {
     await prisma.partnerHide.create({ data: { userId: session.user.id, partnerId } });
+  }
+
+  revalidatePath("/");
+}
+
+// 즐겨찾기도 숨김과 마찬가지로 계정별 개인 설정 — 대시보드 정렬과 무관하게 항상 최상단에 고정된다.
+export async function togglePartnerPin(partnerId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { canView } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
+  if (!canView) throw new Error("접근할 수 없는 파트너입니다.");
+
+  const existing = await prisma.partnerPin.findUnique({
+    where: { userId_partnerId: { userId: session.user.id, partnerId } },
+  });
+
+  if (existing) {
+    await prisma.partnerPin.delete({ where: { userId_partnerId: { userId: session.user.id, partnerId } } });
+  } else {
+    await prisma.partnerPin.create({ data: { userId: session.user.id, partnerId } });
   }
 
   revalidatePath("/");
