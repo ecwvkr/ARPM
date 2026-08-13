@@ -125,14 +125,10 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
 
         {isCanvas ? (
           <>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-sm">
               <Link
                 href={viewHref({ ...params, partnerId: undefined }, "canvas")}
-                className={
-                  activePartner
-                    ? "text-muted-foreground underline underline-offset-2"
-                    : "font-medium underline underline-offset-2"
-                }
+                className={chipClass(!activePartner, "shrink-0")}
               >
                 전체 뷰
               </Link>
@@ -140,11 +136,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
                 <Link
                   key={p.id}
                   href={viewHref({ ...params, partnerId: p.id }, "canvas")}
-                  className={`flex items-center gap-1.5 ${
-                    p.id === activePartner?.id
-                      ? "font-medium underline underline-offset-2"
-                      : "text-muted-foreground underline underline-offset-2"
-                  }`}
+                  className={chipClass(p.id === activePartner?.id, "flex shrink-0 items-center gap-1.5")}
                 >
                   {p.color && (
                     <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: p.color }} />

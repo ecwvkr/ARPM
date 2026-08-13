@@ -299,9 +299,9 @@ export async function listProjectsForPartner(partnerId: string, userId: string, 
   return sortProjects(filterVisibleProjects(allProjects, userId, isSuperAdmin));
 }
 
-// 캔버스는 노드를 그리는 데 필요한 스칼라 필드와, 가시성 판정에 필요한 participants만
-// 있으면 된다. 목록용 조회(projectListInclude)는 master·우선순위·코멘트·읽음까지 끌어오는데
-// 캔버스에서는 전부 버려지므로 쓰지 않는다.
+// 캔버스는 노드를 그리는 데 필요한 스칼라 필드와, 가시성 판정에 필요한 participants,
+// 그리고 노드에 아바타로 보여줄 참여자 이름 정도만 있으면 된다. 목록용 조회
+// (projectListInclude)는 우선순위·코멘트·읽음까지 끌어오는데 캔버스에서는 버려지므로 쓰지 않는다.
 export async function listCanvasProjectsForPartners(
   partnerIds: string[],
   userId: string,
@@ -320,7 +320,7 @@ export async function listCanvasProjectsForPartners(
       dueDate: true,
       canvasX: true,
       canvasY: true,
-      participants: { select: { userId: true, includeSubtree: true } },
+      participants: { select: { userId: true, includeSubtree: true, user: { select: { name: true } } } },
     },
     orderBy: { createdAt: "asc" },
   });

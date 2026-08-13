@@ -15,6 +15,7 @@ import { ProjectKanban } from "./project-kanban";
 import { ProjectDeepLink } from "./project-deep-link";
 import { RecentPartnerTracker } from "./recent-partner-tracker";
 import { WidthContainer } from "@/components/width-container";
+import { chipClass } from "@/lib/ui";
 
 export default async function PartnerDetailPage({
   params,
@@ -78,35 +79,14 @@ export default async function PartnerDetailPage({
       <WidthContainer mainClassName="space-y-8 px-6 py-6">
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs">
-            <Link
-              href={`/partners/${partner.id}`}
-              className={
-                !view
-                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
-                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
-              }
-            >
-              대시보드
+            <Link href={`/partners/${partner.id}`} className={chipClass(!view)}>
+              리스트 뷰
             </Link>
-            <Link
-              href={`/partners/${partner.id}?view=status`}
-              className={
-                view === "status"
-                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
-                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
-              }
-            >
-              상태그룹
+            <Link href={`/partners/${partner.id}?view=status`} className={chipClass(view === "status")}>
+              보드 뷰
             </Link>
-            <Link
-              href={`/partners/${partner.id}?view=canvas`}
-              className={
-                view === "canvas"
-                  ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
-                  : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
-              }
-            >
-              캔버스
+            <Link href={`/partners/${partner.id}?view=canvas`} className={chipClass(view === "canvas")}>
+              워크플로우
             </Link>
           </div>
           {view === "status" ? (

@@ -243,6 +243,7 @@ export async function getCanvasProjects(partnerId: string) {
   return projects.map((t) => ({
     id: t.id,
     parentId: t.parentId,
+    masterId: t.masterId,
     title: t.title,
     status: t.status,
     visibility: t.visibility,
@@ -250,6 +251,7 @@ export async function getCanvasProjects(partnerId: string) {
     canvasX: t.canvasX,
     canvasY: t.canvasY,
     partnerId: t.partnerId,
+    participants: t.participants.map((p) => ({ userId: p.userId, name: p.user.name })),
   }));
 }
 
@@ -272,6 +274,7 @@ export async function getAllCanvasProjects() {
     projects: projects.map((t) => ({
       id: t.id,
       parentId: t.parentId,
+      masterId: t.masterId,
       title: t.title,
       status: t.status,
       visibility: t.visibility,
@@ -279,6 +282,7 @@ export async function getAllCanvasProjects() {
       canvasX: null,
       canvasY: null,
       partnerId: t.partnerId,
+      participants: t.participants.map((p) => ({ userId: p.userId, name: p.user.name })),
     })),
   };
 }
@@ -466,6 +470,23 @@ export async function updateProjectInfo(
     where: { id: projectId },
     data: { title, memo, links },
   });
+  await revalidateProjectViews(project.partnerId);
+}
+
+// 워크플로우 노드의 더블클릭 인라인 이름수정 전용 — updateProjectInfo는 memo·links까지
+// 같이 받아야 해서(안 주면 지워짐) 캔버스 노드처럼 제목만 들고 있는 자리에서는 못 쓴다.
+export async function renameProject(projectId: string, title: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const trimmed = title.trim();
+  if (!trimmed) throw new Error("제목을 입력하세요.");
+
+  const { project, canManage } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!project || !canManage) throw new Error("master만 수정할 수 있습니다.");
+  if (project.completedAt) throw new Error("완료된 프로젝트는 수정할 수 없습니다.");
+
+  await prisma.project.update({ where: { id: projectId }, data: { title: trimmed } });
   await revalidateProjectViews(project.partnerId);
 }
 
