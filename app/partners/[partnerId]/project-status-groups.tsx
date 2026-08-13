@@ -45,10 +45,10 @@ export function ProjectStatusGroupsView({
         return (
           <details
             key={group.status}
-            className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10"
-            open
+            className="overflow-hidden rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10"
+            open={group.status !== "DONE"}
           >
-            <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+            <summary className="sticky top-0 z-10 cursor-pointer bg-card px-4 py-3 text-sm font-medium">
               {group.label} ({groupProjects.length})
             </summary>
             {groupProjects.length > 0 && (
@@ -59,7 +59,7 @@ export function ProjectStatusGroupsView({
                     projectId={project.id}
                     partnerId={project.partnerId}
                     title={project.title}
-                    statusLabel={group.label}
+                    status={project.status}
                     visibility={project.visibility}
                     overdue={isOverdue(project.dueDate, project.status)}
                     createdAt={project.createdAt}

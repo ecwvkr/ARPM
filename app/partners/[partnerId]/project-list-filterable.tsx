@@ -58,7 +58,7 @@ export function ProjectListFilterable({
               projectId={project.id}
               partnerId={project.partnerId}
               title={project.title}
-              statusLabel={STATUS_LABEL[project.status]}
+              status={project.status}
               visibility={project.visibility}
               overdue={isOverdue(project.dueDate, project.status)}
               createdAt={project.createdAt}

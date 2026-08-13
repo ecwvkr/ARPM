@@ -1,18 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar } from "@/components/ui/avatar-stack";
-import { duplicateProject } from "@/app/actions/projects";
-import type { ParticipantChipData } from "@/lib/priority";
-import { ParticipantPriorityDot } from "./project-priority-picker";
+import { showToast } from "@/components/ui/global-toast";
+import { duplicateProject, setMyPriority, transferMaster } from "@/app/actions/projects";
+import { listAllUsers } from "@/app/actions/users";
+import { PRIORITY_LABEL, type ParticipantChipData } from "@/lib/priority";
+import { ParticipantPriorityDot, PriorityDot } from "./project-priority-picker";
+import { ProjectStatusBadge } from "./project-status-badge";
 import { DeriveDialog } from "./project-derive-dialog";
 import { DeleteDialog } from "./project-delete-dialog";
 import { ProjectDetail } from "./project-detail";
-import { IconDotsVertical, IconPlus, IconCopy, IconLink, IconTrash, IconFolder } from "@tabler/icons-react";
+import {
+  IconDotsVertical,
+  IconPlus,
+  IconCopy,
+  IconLink,
+  IconArchive,
+  IconFolder,
+  IconFlag3,
+  IconUserCog,
+  IconChevronRight,
+} from "@tabler/icons-react";
+
+const PRIORITY_LEVELS = ["URGENT", "NORMAL", "HOLD"] as const;
 
 function formatShortDate(date: Date) {
   const d = new Date(date);
@@ -32,7 +47,7 @@ export function ProjectCard({
   projectId,
   partnerId,
   title,
-  statusLabel,
+  status,
   visibility,
   overdue,
   createdAt,
@@ -48,7 +63,7 @@ export function ProjectCard({
   projectId: string;
   partnerId: string;
   title: string;
-  statusLabel: string;
+  status: "TODO" | "IN_PROGRESS" | "DONE";
   visibility: "PUBLIC" | "PRIVATE";
   overdue: boolean;
   createdAt: Date;
@@ -63,8 +78,14 @@ export function ProjectCard({
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [expanded, setExpanded] = useState<"priority" | "master" | null>(null);
   const [isPending, startTransition] = useTransition();
-  const done = statusLabel === "완료";
+  const done = status === "DONE";
+
+  function handleMenuOpenChange(next: boolean) {
+    setMenuOpen(next);
+    if (!next) setExpanded(null);
+  }
 
   return (
     <>
@@ -111,7 +132,7 @@ export function ProjectCard({
               <Badge variant={visibility === "PUBLIC" ? "secondary" : "outline"}>
                 {visibility === "PUBLIC" ? "공개" : "비공개"}
               </Badge>
-              <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <Popover open={menuOpen} onOpenChange={handleMenuOpenChange}>
                 <PopoverTrigger
                   render={
                     <Button
@@ -125,7 +146,38 @@ export function ProjectCard({
                     </Button>
                   }
                 />
-                <PopoverContent className="pointer-events-auto w-44 gap-0.5 p-1.5">
+                <PopoverContent className="pointer-events-auto w-52 gap-0.5 p-1.5">
+                  <QuickMenuPrioritySection
+                    projectId={projectId}
+                    currentUserId={currentUserId}
+                    participants={participants}
+                    expanded={expanded === "priority"}
+                    onToggle={() => setExpanded(expanded === "priority" ? null : "priority")}
+                  />
+                  <QuickMenuMasterSection
+                    projectId={projectId}
+                    masterName={participants.find((p) => p.isMaster)?.userName ?? ""}
+                    expanded={expanded === "master"}
+                    onToggle={() => setExpanded(expanded === "master" ? null : "master")}
+                    onDone={() => setMenuOpen(false)}
+                  />
+
+                  <hr className="my-1 border-foreground/10" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${location.origin}/partners/${partnerId}?project=${projectId}`);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                  >
+                    <IconLink className="size-4" />
+                    프로젝트 링크 복사
+                  </button>
+
+                  <hr className="my-1 border-foreground/10" />
+
                   <DeriveDialog
                     parentProjectId={projectId}
                     onDone={() => setMenuOpen(false)}
@@ -153,27 +205,22 @@ export function ProjectCard({
                     <IconCopy className="size-4" />
                     프로젝트 복제
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${location.origin}/partners/${partnerId}?project=${projectId}`);
-                      setMenuOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-                  >
-                    <IconLink className="size-4" />
-                    프로젝트 링크 복사
-                  </button>
+
+                  <hr className="my-1 border-foreground/10" />
+
                   <DeleteDialog
                     projectId={projectId}
-                    onDeleted={() => setMenuOpen(false)}
+                    onDeleted={() => {
+                      setMenuOpen(false);
+                      showToast("보관함으로 이동되었습니다");
+                    }}
                     trigger={
                       <button
                         type="button"
                         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
                       >
-                        <IconTrash className="size-4" />
-                        삭제하기
+                        <IconArchive className="size-4" />
+                        보관함으로 이동
                       </button>
                     }
                   />
@@ -183,7 +230,7 @@ export function ProjectCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant={statusLabel === "완료" ? "secondary" : "default"}>{statusLabel}</Badge>
+            <ProjectStatusBadge projectId={projectId} status={status} />
             {overdue && <Badge variant="destructive">지연</Badge>}
           </div>
 
@@ -249,5 +296,122 @@ export function ProjectCard({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// 빠른 작업 메뉴 행. 눌러 펼치면 같은 팝오버 안에서 바로 옵션이 나온다(팝오버 중첩 대신
+// 아코디언 방식 — 중첩 팝오버의 포커스/닫힘 상호작용 리스크를 피한다).
+function QuickMenuRow({
+  icon,
+  label,
+  expanded,
+  onToggle,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+      >
+        {icon}
+        <span className="flex-1">{label}</span>
+        <IconChevronRight className={`size-3.5 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+      </button>
+      {expanded && <div className="mt-0.5 mb-1 space-y-0.5 pl-6">{children}</div>}
+    </div>
+  );
+}
+
+function QuickMenuPrioritySection({
+  projectId,
+  currentUserId,
+  participants,
+  expanded,
+  onToggle,
+}: {
+  projectId: string;
+  currentUserId: string;
+  participants: ParticipantChipData[];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const myLevel = participants.find((p) => p.userId === currentUserId)?.level ?? "HOLD";
+
+  return (
+    <QuickMenuRow icon={<IconFlag3 className="size-4" />} label="내 우선순위 변경" expanded={expanded} onToggle={onToggle}>
+      {PRIORITY_LEVELS.map((level) => (
+        <button
+          key={level}
+          type="button"
+          disabled={isPending}
+          onClick={() => startTransition(() => setMyPriority(projectId, level))}
+          className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-muted ${
+            myLevel === level ? "font-medium" : "text-muted-foreground"
+          }`}
+        >
+          <PriorityDot level={level} />
+          {PRIORITY_LABEL[level]}
+        </button>
+      ))}
+    </QuickMenuRow>
+  );
+}
+
+function QuickMenuMasterSection({
+  projectId,
+  masterName,
+  expanded,
+  onToggle,
+  onDone,
+}: {
+  projectId: string;
+  masterName: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onDone: () => void;
+}) {
+  const [users, setUsers] = useState<{ id: string; name: string }[] | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (expanded && !users) listAllUsers().then(setUsers);
+  }, [expanded, users]);
+
+  function delegate(userId: string) {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("userId", userId);
+      await transferMaster(projectId, formData);
+      onDone();
+    });
+  }
+
+  return (
+    <QuickMenuRow icon={<IconUserCog className="size-4" />} label={`담당자 변경 (${masterName})`} expanded={expanded} onToggle={onToggle}>
+      {!users ? (
+        <p className="px-2 py-1 text-xs text-muted-foreground">불러오는 중...</p>
+      ) : (
+        users.map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            disabled={isPending}
+            onClick={() => delegate(u.id)}
+            className="flex w-full items-center rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-muted"
+          >
+            {u.name}
+          </button>
+        ))
+      )}
+    </QuickMenuRow>
   );
 }

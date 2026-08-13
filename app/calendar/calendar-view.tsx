@@ -232,7 +232,7 @@ export function CalendarView({
                   projectId={t.id}
                   partnerId={t.partnerId}
                   title={t.title}
-                  statusLabel={STATUS_LABEL[t.status]}
+                  status={t.status}
                   visibility={t.visibility}
                   overdue={isOverdue(t.dueDate, t.status)}
                   createdAt={t.createdAt}

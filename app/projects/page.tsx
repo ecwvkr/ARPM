@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisiblePartners } from "@/lib/partners";
 import { listProjectsForPartners, isProjectUnread, type DueBucket, type ProjectSort } from "@/lib/projects";
-import { STATUS_LABEL, isOverdue, buildParticipantChips } from "@/lib/priority";
+import { isOverdue, buildParticipantChips } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
@@ -181,7 +181,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
                     projectId={project.id}
                     partnerId={project.partnerId}
                     title={project.title}
-                    statusLabel={STATUS_LABEL[project.status]}
+                    status={project.status}
                     visibility={project.visibility}
                     overdue={isOverdue(project.dueDate, project.status)}
                     createdAt={project.createdAt}

@@ -4,6 +4,7 @@ import Script from "next/script";
 import { auth } from "@/auth";
 import { pickForeground } from "@/lib/color";
 import { BottomNav } from "@/components/bottom-nav";
+import { GlobalToastHost } from "@/components/ui/global-toast";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </Script>
         {children}
         {session && <BottomNav />}
+        <GlobalToastHost />
       </body>
     </html>
   );
