@@ -263,12 +263,12 @@ export function CalendarView({
                   key={key}
                   type="button"
                   onClick={() => setSelectedKey(key)}
-                  className={`h-24 overflow-hidden rounded-xl p-1 text-left ${inMonth ? "" : "opacity-40"} ${
+                  className={`flex h-24 flex-col items-start overflow-hidden rounded-xl p-1 text-left ${inMonth ? "" : "opacity-40"} ${
                     key === selectedKey ? "ring-2 ring-primary" : ""
                   }`}
                 >
                   <span
-                    className={`inline-flex size-6 items-center justify-center rounded-full text-xs ${
+                    className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs ${
                       key === todayKey
                         ? "bg-primary font-medium text-primary-foreground"
                         : "text-muted-foreground"
@@ -276,7 +276,7 @@ export function CalendarView({
                   >
                     {d.getDate()}
                   </span>
-                  <div className="mt-1 space-y-0.5">
+                  <div className="mt-1 w-full space-y-0.5">
                     {visible.map((t) => (
                       <ProjectChip key={t.id} project={t} compact />
                     ))}

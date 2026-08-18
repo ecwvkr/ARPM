@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { WidthContainer } from "@/components/width-container";
 import { AccentColorForm } from "../accent-color-form";
-import { CreateAccountForm } from "../create-account-form";
 import { MyNameForm } from "../my-name-form";
 import { ChangePasswordForm } from "../change-password-form";
 import { UserManagement } from "../user-management";
@@ -55,7 +54,6 @@ export default async function SettingsSectionPage({ params }: PageProps<"/settin
         )}
         {slug === "appearance" && <AccentColorForm currentColor={session.user.accentColor} />}
         {slug === "trash" && <TrashPanel userId={session.user.id} isSuperAdmin={isSuperAdmin} />}
-        {slug === "new-account" && <CreateAccountForm />}
         {slug === "users" && <UserPanel />}
         {slug === "app" && <AppSettingsPanel />}
       </WidthContainer>

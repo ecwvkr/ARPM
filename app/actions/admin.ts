@@ -40,7 +40,7 @@ export async function createUserAccount(_prevState: string | undefined, formData
   await prisma.user.create({
     data: { name, email, passwordHash, isSuperAdmin },
   });
-  revalidatePath("/settings");
+  revalidatePath("/settings/users");
 }
 
 export async function listAllUsersForAdmin() {
@@ -64,7 +64,7 @@ export async function updateUserInfo(userId: string, _prevState: string | undefi
   if (existing && existing.id !== userId) return "이미 사용 중인 이메일 또는 아이디입니다.";
 
   await prisma.user.update({ where: { id: userId }, data: { name, email } });
-  revalidatePath("/settings");
+  revalidatePath("/settings/users");
 }
 
 export async function resetUserPassword(userId: string, _prevState: string | undefined, formData: FormData) {
@@ -85,7 +85,7 @@ export async function toggleUserSuperAdmin(userId: string) {
     await assertNotLastActiveSuperAdmin(userId);
   }
   await prisma.user.update({ where: { id: userId }, data: { isSuperAdmin: !target.isSuperAdmin } });
-  revalidatePath("/settings");
+  revalidatePath("/settings/users");
 }
 
 export async function toggleUserActive(userId: string) {
@@ -96,5 +96,5 @@ export async function toggleUserActive(userId: string) {
     await assertNotLastActiveSuperAdmin(userId);
   }
   await prisma.user.update({ where: { id: userId }, data: { isActive: !target.isActive } });
-  revalidatePath("/settings");
+  revalidatePath("/settings/users");
 }

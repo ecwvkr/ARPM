@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CreateAccountForm } from "./create-account-form";
 import { EditUserDialog } from "./edit-user-dialog";
 import { ResetPasswordDialog } from "./reset-password-dialog";
+import { IconPlus } from "@tabler/icons-react";
 
 type AdminUser = { id: string; name: string; email: string; isSuperAdmin: boolean; isActive: boolean };
 
@@ -35,12 +37,15 @@ export function UserManagement({ users }: { users: AdminUser[] }) {
 
   return (
     <div className="space-y-2">
-      <Input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="이름·이메일로 검색"
-        className="max-w-sm"
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="이름·이메일로 검색"
+          className="max-w-sm"
+        />
+        <CreateAccountDialog />
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <ul className="space-y-1.5">
         {filtered.map((u) => (
@@ -86,6 +91,28 @@ export function UserManagement({ users }: { users: AdminUser[] }) {
         )}
       </ul>
     </div>
+  );
+}
+
+function CreateAccountDialog() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button size="icon-sm" variant="outline" title="계정 발급" aria-label="계정 발급">
+            <IconPlus className="size-4" />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>계정 발급</DialogTitle>
+        </DialogHeader>
+        <CreateAccountForm onCreated={() => setOpen(false)} />
+      </DialogContent>
+    </Dialog>
   );
 }
 

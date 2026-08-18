@@ -1,23 +1,27 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { createUserAccount } from "@/app/actions/admin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { showToast } from "@/components/ui/global-toast";
 
-export function CreateAccountForm() {
+// onCreated 없이 쓰이는 곳이 없어 항상 전달된다고 가정 — 다이얼로그를 닫는 용도.
+export function CreateAccountForm({ onCreated }: { onCreated: () => void }) {
   const [errorMessage, formAction, isPending] = useActionState(createUserAccount, undefined);
-  const [success, setSuccess] = useState(false);
   const submitted = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (submitted.current && !isPending && !errorMessage) {
       submitted.current = false;
-      setSuccess(true);
       formRef.current?.reset();
+      onCreated();
+      // 다이얼로그가 바로 닫혀 폼 안의 성공 메시지는 보일 틈이 없다 — 대신 토스트로 알린다.
+      showToast("계정이 생성되었습니다");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPending, errorMessage]);
 
   return (
@@ -26,7 +30,6 @@ export function CreateAccountForm() {
       action={formAction}
       onSubmit={() => {
         submitted.current = true;
-        setSuccess(false);
       }}
       className="max-w-sm space-y-3"
     >
@@ -47,7 +50,6 @@ export function CreateAccountForm() {
         총관리자 권한 부여
       </label>
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-      {success && <p className="text-sm text-muted-foreground">계정이 생성되었습니다.</p>}
       <Button type="submit" disabled={isPending}>
         {isPending ? "생성 중..." : "계정 생성"}
       </Button>

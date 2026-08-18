@@ -20,15 +20,9 @@ export const SETTINGS_SECTIONS = [
     adminOnly: false,
   },
   {
-    slug: "new-account",
-    title: "계정 발급",
-    description: "새 팀원 계정을 직접 발급합니다.",
-    adminOnly: true,
-  },
-  {
     slug: "users",
     title: "사용자 관리",
-    description: "팀원 정보 수정·권한 부여·계정 활성화를 관리합니다.",
+    description: "팀원 정보 수정·권한 부여·계정 활성화를 관리하고, + 버튼으로 새 계정을 발급합니다.",
     adminOnly: true,
   },
   {
