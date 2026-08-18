@@ -17,7 +17,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     typeof params.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.d)
       ? params.d
       : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const initialView = params.v === "week" ? "week" : params.v === "day" ? "day" : "month";
+  const initialView = params.v === "day" ? "day" : "month";
 
   const projects = await listAllProjectsForUser(userId, !!session.user.isSuperAdmin, {});
   // 일간 뷰가 프로젝트 카드를 그대로 쓰므로 카드에 필요한 값만 추려 넘긴다

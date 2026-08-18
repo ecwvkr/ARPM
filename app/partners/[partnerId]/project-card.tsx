@@ -271,7 +271,9 @@ export function ProjectCard({
                   className="pointer-events-auto inline-flex max-w-full items-center gap-1 text-xs text-primary underline underline-offset-2"
                 >
                   <IconLink className="size-3.5 shrink-0" />
-                  <span className="truncate">{linkLabel(link)}</span>
+                  {/* flex 자식은 기본 min-width:auto라 끊을 곳 없는 긴 URL이 줄어들지 않고
+                      카드를 밀어내 좌우 스크롤을 만든다. min-w-0이라야 truncate가 먹는다. */}
+                  <span className="min-w-0 truncate">{linkLabel(link)}</span>
                 </a>
               ))}
             </div>
@@ -288,7 +290,7 @@ export function ProjectCard({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl">
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>프로젝트 상세</DialogTitle>
           </DialogHeader>

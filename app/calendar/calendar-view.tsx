@@ -7,9 +7,9 @@ import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priorit
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+// 주간 뷰는 월간 뷰와 보여주는 게 겹쳐 없앴다.
 const VIEWS = [
   { key: "day", label: "일간 뷰" },
-  { key: "week", label: "주간 뷰" },
   { key: "month", label: "월간 뷰" },
 ] as const;
 
@@ -102,9 +102,7 @@ export function CalendarView({
   }, [projects]);
 
   const todayKey = dateKey(new Date());
-  const weekStart = startOfWeek(cursor);
-  // ponytail: 7·42개 Date 생성은 memo할 가치가 없다.
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // ponytail: 42개 Date 생성은 memo할 가치가 없다.
   const monthDays = monthGrid(cursor.getFullYear(), cursor.getMonth());
   // 일간은 커서 날짜를 가운데 두고 앞뒤 3일씩 총 7일을 띠로 보여준다.
   const dayStrip = Array.from({ length: 7 }, (_, i) => addDays(cursor, i - 3));
@@ -120,25 +118,19 @@ export function CalendarView({
   const onToday =
     view === "day"
       ? cursorKey === todayKey
-      : view === "week"
-        ? weekDays.some((d) => dateKey(d) === todayKey)
-        : selectedKey === todayKey &&
-          cursor.getFullYear() === today.getFullYear() &&
-          cursor.getMonth() === today.getMonth();
+      : selectedKey === todayKey &&
+        cursor.getFullYear() === today.getFullYear() &&
+        cursor.getMonth() === today.getMonth();
 
   function go(delta: number) {
     if (view === "day") setCursor(addDays(cursor, delta));
-    else if (view === "week") setCursor(addDays(cursor, delta * 7));
     else setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1));
   }
 
-  const weekEnd = addDays(weekStart, 6);
   const title =
     view === "day"
       ? `${cursor.getMonth() + 1}월 ${cursor.getDate()}일 (${WEEKDAY[cursor.getDay()]})`
-      : view === "week"
-        ? `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일 ~ ${weekEnd.getMonth() + 1}월 ${weekEnd.getDate()}일`
-        : `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
+      : `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
 
   const dayProjects = projectsByDate.get(cursorKey) ?? [];
   const selectedProjects = projectsByDate.get(selectedKey) ?? [];
@@ -174,7 +166,7 @@ export function CalendarView({
         <button
           type="button"
           onClick={() => go(-1)}
-          aria-label={view === "day" ? "이전날" : view === "week" ? "이전주" : "이전달"}
+          aria-label={view === "day" ? "이전날" : "이전달"}
           className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           ←
@@ -183,7 +175,7 @@ export function CalendarView({
         <button
           type="button"
           onClick={() => go(1)}
-          aria-label={view === "day" ? "다음날" : view === "week" ? "다음주" : "다음달"}
+          aria-label={view === "day" ? "다음날" : "다음달"}
           className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           →
@@ -249,35 +241,6 @@ export function CalendarView({
             </div>
           )}
         </>
-      ) : view === "week" ? (
-        // 주간은 하루당 한 줄이라 세로로 늘어나도 읽기 좋다 — 잘라내지 않고 전부 보여준다.
-        <div className="divide-y divide-foreground/5 overflow-hidden rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
-          {weekDays.map((d, i) => {
-            const key = dateKey(d);
-            const rowProjects = projectsByDate.get(key) ?? [];
-            return (
-              <div key={key} className="flex gap-3 p-3">
-                <div className="w-12 shrink-0 text-center">
-                  <p className="text-xs text-muted-foreground">{WEEKDAY[i]}</p>
-                  <span
-                    className={`inline-flex size-7 items-center justify-center rounded-full text-sm ${
-                      key === todayKey ? "bg-primary font-medium text-primary-foreground" : ""
-                    }`}
-                  >
-                    {d.getDate()}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1 space-y-1 py-1">
-                  {rowProjects.length === 0 ? (
-                    <p className="text-xs text-muted-foreground/60">-</p>
-                  ) : (
-                    rowProjects.map((t) => <ProjectChip key={t.id} project={t} />)
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       ) : (
         <div className="overflow-hidden rounded-4xl bg-card p-3 shadow-md ring-1 ring-foreground/5 sm:p-4 dark:ring-foreground/10">
           <div className="grid grid-cols-7 gap-1 pb-2 text-center text-xs text-muted-foreground">

@@ -84,7 +84,9 @@ export default async function DashboardPage({
               <p className="text-sm text-muted-foreground">{session?.user?.name}님</p>
             </div>
           </div>
+          {/* 다른 화면들처럼 생성 버튼은 최상단 바에 둔다. */}
           <div className="flex items-center gap-3">
+            <NewPartnerDialog currentUserId={userId} />
             <NotificationBell />
             <LogoutButton />
           </div>
@@ -130,10 +132,7 @@ export default async function DashboardPage({
 
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-foreground">파트너</h2>
-          <div className="flex items-center gap-2">
-            <PartnerSortSelect />
-            <NewPartnerDialog currentUserId={userId} />
-          </div>
+          <PartnerSortSelect />
         </div>
 
         {partners.length === 0 ? (

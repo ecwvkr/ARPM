@@ -49,13 +49,15 @@ export function PartnerCard({
         />
       )}
 
-      <div className="relative z-10 flex items-start justify-between gap-2">
-        <h3 className="pointer-events-none text-base font-bold">{partner.name}</h3>
-        <div className="flex shrink-0 items-center gap-1">
+      {/* 카드는 2~4열 그리드라 어느 폭에서도 좁다. 제목과 버튼을 한 줄에 두면 제목이
+          글자당 한 줄씩 세로로 접히므로, 버튼 줄은 항상 제목 아래로 내린다. */}
+      <div className="relative z-10 flex flex-col gap-1.5">
+        <h3 className="pointer-events-none break-keep text-base font-bold">{partner.name}</h3>
+        <div className="flex flex-wrap items-center gap-0.5">
           <PartnerPinButton partnerId={partner.id} pinned={(partner.pinnedBy?.length ?? 0) > 0} />
           <Badge
             variant={partner.visibility === "PUBLIC" ? "secondary" : "outline"}
-            className="pointer-events-none rounded-full bg-background px-3"
+            className="pointer-events-none rounded-full bg-background px-2"
           >
             {partner.visibility === "PUBLIC" ? "공개" : "비공개"}
           </Badge>

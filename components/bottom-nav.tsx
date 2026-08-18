@@ -32,7 +32,6 @@ export function BottomNav() {
       <nav className="fixed inset-x-0 bottom-0 z-40 bg-background shadow-[0_-1px_3px_rgba(0,0,0,0.06)]">
         <ul className="mx-auto flex max-w-5xl items-stretch justify-between">
           <NavLink label="홈" href="/" Icon={IconLayoutGrid} active={pathname === "/"} />
-          <NavLink label="전체 프로젝트" href="/projects" Icon={IconChecklist} active={pathname.startsWith("/projects")} />
 
           <li className="flex-1">
             {recentPartner ? (
@@ -51,6 +50,7 @@ export function BottomNav() {
             )}
           </li>
 
+          <NavLink label="전체 프로젝트" href="/projects" Icon={IconChecklist} active={pathname.startsWith("/projects")} />
           <NavLink label="캘린더" href="/calendar" Icon={IconCalendar} active={pathname.startsWith("/calendar")} />
           <NavLink label="설정" href="/settings" Icon={IconSettings} active={pathname.startsWith("/settings")} />
         </ul>

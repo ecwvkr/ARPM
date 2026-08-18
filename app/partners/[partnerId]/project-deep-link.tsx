@@ -21,7 +21,7 @@ export function ProjectDeepLink() {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl">
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>프로젝트 상세</DialogTitle>
         </DialogHeader>

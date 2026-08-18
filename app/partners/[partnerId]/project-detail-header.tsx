@@ -113,7 +113,9 @@ export function ProjectDetailHeader({
           className="flex w-fit max-w-full items-center gap-1 text-sm text-primary underline underline-offset-2"
         >
           <IconLink className="size-4 shrink-0" />
-          <span className="truncate">{link}</span>
+          {/* flex 자식은 기본 min-width:auto라 끊을 곳 없는 긴 URL이 줄어들지 않고
+              모달을 밀어내 좌우 스크롤을 만든다. min-w-0이라야 truncate가 먹는다. */}
+          <span className="min-w-0 truncate">{link}</span>
         </a>
       ))}
       {project.parent && <p className="text-xs text-muted-foreground">상위 프로젝트: {project.parent.title}</p>}

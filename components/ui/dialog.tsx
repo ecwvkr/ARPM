@@ -53,7 +53,12 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // 내용이 길어지면 화면 위아래로 잘려나가므로 모든 다이얼로그에 높이 상한과
+          // 스크롤을 기본으로 준다. 개별 호출부에서 다시 지정할 필요 없다.
+          // grid의 암묵적 열은 max-content로 잡혀서, 긴 URL 같이 끊을 곳 없는 내용이
+          // 있으면 열이 통째로 늘어나 좌우 스크롤이 생긴다. 열을 minmax(0,1fr)로 묶고
+          // 자식의 min-width:auto도 0으로 눌러야 안쪽 truncate가 실제로 동작한다.
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[85vh] w-full max-w-[calc(100%-2rem)] grid-cols-[minmax(0,1fr)] -translate-x-1/2 -translate-y-1/2 gap-6 overflow-y-auto rounded-4xl bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 duration-100 outline-none [&>*]:min-w-0 sm:max-w-md dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
