@@ -77,6 +77,18 @@ export async function createProject(
   const dueDateRaw = formData.get("dueDate") as string | null;
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   const recurrence = formData.get("recurrence") === "WEEKLY" ? "WEEKLY" : null;
+  // startDate/sourceGoogleEventId는 구글 일정을 업무로 전환할 때만 채워진다(G5) —
+  // 일반 생성 폼에는 없는 필드라 보통은 둘 다 비어 있다.
+  const startDateRaw = formData.get("startDate") as string | null;
+  const sourceGoogleEventId = (formData.get("sourceGoogleEventId") as string | null) || null;
+
+  if (sourceGoogleEventId) {
+    const alreadyConverted = await prisma.project.findFirst({
+      where: { sourceGoogleEventId, deletedAt: null },
+      select: { id: true },
+    });
+    if (alreadyConverted) return "이미 업무로 전환된 일정입니다.";
+  }
 
   const parentIdRaw = formData.get("parentId") as string | null;
   let parentId: string | null = null;
@@ -101,6 +113,8 @@ export async function createProject(
       memo,
       links,
       dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      startDate: startDateRaw ? new Date(startDateRaw) : null,
+      sourceGoogleEventId,
       visibility,
       masterId: session.user.id,
       recurrence,

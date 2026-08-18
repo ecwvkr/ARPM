@@ -54,6 +54,10 @@ export type NormalizedGoogleEvent = {
   startDate: Date; // 로컬 자정 기준 시작일
   endDate: Date; // 로컬 자정 기준 종료일(포함, exclusive 아님)
   allDay: boolean;
+  // 이 일정을 이미 업무로 전환한 프로젝트가 있으면 채워진다(G5) — 있으면 원본 칩에
+  // "전환됨" 표시를 하고 재전환을 막는다.
+  convertedProjectId: string | null;
+  convertedPartnerId: string | null;
 };
 
 function dateOnly(d: Date) {
@@ -116,6 +120,8 @@ function normalizeEvent(item: RawGoogleEvent, calendarId: string, meta: GoogleCa
     startDate,
     endDate,
     allDay,
+    convertedProjectId: null,
+    convertedPartnerId: null,
   };
 }
 
@@ -157,6 +163,22 @@ export async function getSyncedGoogleEvents(rangeStart: Date, rangeEnd: Date): P
       if (normalized) events.push(normalized);
     }
   });
+  if (events.length === 0) return events;
+
+  // 이미 업무로 전환된 일정이 있으면 표시해 준다(G5) — 보관된(deletedAt) 전환 결과는
+  // 무시해, 전환한 업무를 보관하면 원본 일정을 다시 전환할 수 있게 한다.
+  const converted = await prisma.project.findMany({
+    where: { sourceGoogleEventId: { in: events.map((e) => e.id) }, deletedAt: null },
+    select: { id: true, partnerId: true, sourceGoogleEventId: true },
+  });
+  const convertedByEventId = new Map(converted.map((p) => [p.sourceGoogleEventId!, p]));
+  for (const event of events) {
+    const match = convertedByEventId.get(event.id);
+    if (match) {
+      event.convertedProjectId = match.id;
+      event.convertedPartnerId = match.partnerId;
+    }
+  }
   return events;
 }
 

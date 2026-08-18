@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priority";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
-import { IconBrandGoogle } from "@tabler/icons-react";
+import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog";
+import { IconBrandGoogle, IconArrowRight, IconCheck } from "@tabler/icons-react";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 // 주간 뷰는 월간 뷰와 보여주는 게 겹쳐 없앴다.
@@ -43,6 +44,8 @@ export type CalendarGoogleEvent = {
   startDate: Date;
   endDate: Date;
   allDay: boolean;
+  convertedProjectId: string | null;
+  convertedPartnerId: string | null;
 };
 
 // 월간뷰 칸·선택 패널은 프로젝트 마감일 칩과 구글 일정 칩을 같은 목록에 섞어서
@@ -160,25 +163,79 @@ function ProjectChip({ project, compact = false }: { project: CalendarProject; c
 }
 
 // 프로젝트 칩(secondary/destructive 배경)과 한눈에 구분되도록 구글 아이콘 + 중립
-// 배경을 쓴다. 캘린더별 색상은 왼쪽 테두리로만 얹는다(전환 기능은 G5에서 붙는다).
-function GoogleEventChip({ event, compact = false }: { event: CalendarGoogleEvent; compact?: boolean }) {
+// 배경을 쓴다. 캘린더별 색상은 왼쪽 테두리로만 얹는다. 전환 버튼은 칸이 좁은 월간뷰
+// 바에는 안 두고(WeekBarItem), 여유 있는 일간뷰·선택 패널에서만 보여준다(G5).
+function GoogleEventChip({
+  event,
+  compact = false,
+  partners,
+  currentUserId,
+}: {
+  event: CalendarGoogleEvent;
+  compact?: boolean;
+  partners?: { id: string; name: string }[];
+  currentUserId?: string;
+}) {
   return (
     <div
       style={{ borderLeftColor: event.calendarColor }}
-      className="flex items-center gap-1 truncate rounded-md border-l-2 bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+      className="flex items-center gap-1.5 rounded-md border-l-2 bg-muted py-0.5 pr-1 pl-1.5 text-xs text-muted-foreground"
       title={`${event.title} · ${event.calendarSummary}`}
     >
       <IconBrandGoogle className="size-3 shrink-0" />
-      <span className="truncate">{compact ? event.title : `${event.title} · ${event.calendarSummary}`}</span>
+      <span className="min-w-0 flex-1 truncate">
+        {compact ? event.title : `${event.title} · ${event.calendarSummary}`}
+      </span>
+      {event.convertedProjectId && event.convertedPartnerId ? (
+        <Link
+          href={`/partners/${event.convertedPartnerId}?project=${event.convertedProjectId}`}
+          className="shrink-0 whitespace-nowrap text-primary underline underline-offset-2"
+        >
+          전환됨
+        </Link>
+      ) : (
+        partners &&
+        currentUserId && (
+          <NewProjectDialog
+            partners={partners}
+            currentUserId={currentUserId}
+            initial={{
+              title: event.title,
+              dueDate: dateKey(event.endDate),
+              startDate: event.startDate.getTime() !== event.endDate.getTime() ? dateKey(event.startDate) : undefined,
+              sourceGoogleEventId: event.id,
+            }}
+            trigger={
+              <button
+                type="button"
+                className="flex shrink-0 items-center gap-0.5 whitespace-nowrap text-primary underline underline-offset-2"
+              >
+                업무로 전환
+                <IconArrowRight className="size-3" />
+              </button>
+            }
+          />
+        )
+      )}
     </div>
   );
 }
 
-function DayItemChip({ item, compact = false }: { item: DayItem; compact?: boolean }) {
+function DayItemChip({
+  item,
+  compact = false,
+  partners,
+  currentUserId,
+}: {
+  item: DayItem;
+  compact?: boolean;
+  partners?: { id: string; name: string }[];
+  currentUserId?: string;
+}) {
   return item.kind === "project" ? (
     <ProjectChip project={item.data} compact={compact} />
   ) : (
-    <GoogleEventChip event={item.data} compact={compact} />
+    <GoogleEventChip event={item.data} compact={compact} partners={partners} currentUserId={currentUserId} />
   );
 }
 
@@ -188,6 +245,7 @@ function WeekBarItem({ item }: { item: WeekItem }) {
   if (item.kind === "project") return <ProjectChip project={item.data} compact />;
 
   const e = item.data;
+  const converted = !!e.convertedProjectId;
   return (
     <div
       style={{
@@ -196,10 +254,10 @@ function WeekBarItem({ item }: { item: WeekItem }) {
       }}
       className={`flex h-full items-center gap-1 overflow-hidden px-1.5 text-xs text-foreground ${
         item.isActualStart ? "rounded-l-md border-l-4" : ""
-      } ${item.isActualEnd ? "rounded-r-md" : ""}`}
-      title={`${e.title} · ${e.calendarSummary}`}
+      } ${item.isActualEnd ? "rounded-r-md" : ""} ${converted ? "opacity-60" : ""}`}
+      title={converted ? `${e.title} · ${e.calendarSummary} (업무로 전환됨)` : `${e.title} · ${e.calendarSummary}`}
     >
-      {item.isActualStart && <IconBrandGoogle className="size-3 shrink-0" />}
+      {item.isActualStart && (converted ? <IconCheck className="size-3 shrink-0" /> : <IconBrandGoogle className="size-3 shrink-0" />)}
       <span className="truncate">{e.title}</span>
     </div>
   );
@@ -211,12 +269,14 @@ export function CalendarView({
   projects,
   googleEvents,
   currentUserId,
+  partners,
 }: {
   initialDate: string;
   initialView: CalendarView;
   projects: CalendarProject[];
   googleEvents: CalendarGoogleEvent[];
   currentUserId: string;
+  partners: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [view, setView] = useState<CalendarView>(initialView);
@@ -396,7 +456,12 @@ export function CalendarView({
               <h3 className="text-sm font-bold">구글 일정</h3>
               <div className="space-y-1">
                 {dayGoogleEvents.map((e) => (
-                  <GoogleEventChip key={`${e.calendarId}-${e.id}`} event={e} />
+                  <GoogleEventChip
+                    key={`${e.calendarId}-${e.id}`}
+                    event={e}
+                    partners={partners}
+                    currentUserId={currentUserId}
+                  />
                 ))}
               </div>
             </div>
@@ -492,7 +557,12 @@ export function CalendarView({
           ) : (
             <div className="space-y-1">
               {selectedItems.map((item) => (
-                <DayItemChip key={item.kind === "project" ? item.data.id : `${item.data.calendarId}-${item.data.id}`} item={item} />
+                <DayItemChip
+                  key={item.kind === "project" ? item.data.id : `${item.data.calendarId}-${item.data.id}`}
+                  item={item}
+                  partners={partners}
+                  currentUserId={currentUserId}
+                />
               ))}
             </div>
           )}

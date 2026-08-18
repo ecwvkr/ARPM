@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
+import { listVisiblePartners } from "@/lib/partners";
 import { buildParticipantChips } from "@/lib/priority";
 import { getSyncedGoogleEvents } from "@/lib/google/calendar";
 import { NotificationBell } from "@/app/notification-bell";
@@ -27,9 +28,10 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   const googleRangeStart = new Date(cursorYear, cursorMonth - 2, 1);
   const googleRangeEnd = new Date(cursorYear, cursorMonth + 2, 0);
 
-  const [projects, googleEvents] = await Promise.all([
+  const [projects, googleEvents, partners] = await Promise.all([
     listAllProjectsForUser(userId, !!session.user.isSuperAdmin, {}),
     getSyncedGoogleEvents(googleRangeStart, googleRangeEnd),
+    listVisiblePartners(userId, !!session.user.isSuperAdmin, false),
   ]);
   // 일간 뷰가 프로젝트 카드를 그대로 쓰므로 카드에 필요한 값만 추려 넘긴다
   // (prisma 결과 전체를 클라이언트로 넘기면 쓰지도 않는 관계 데이터까지 직렬화된다).
@@ -68,6 +70,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
           projects={calendarProjects}
           googleEvents={googleEvents}
           currentUserId={userId}
+          partners={partners.map((p) => ({ id: p.id, name: p.name }))}
         />
       </WidthContainer>
     </div>

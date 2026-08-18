@@ -21,10 +21,16 @@ export function NewProjectDialog({
   partnerId,
   partners,
   currentUserId,
+  trigger,
+  initial,
 }: {
   partnerId?: string;
   partners?: { id: string; name: string }[];
   currentUserId: string;
+  trigger?: React.ReactElement;
+  // 구글 일정을 업무로 전환할 때(G5) 제목·기간을 미리 채워 연다. startDate는 생성 폼에는
+  // 노출하지 않고 hidden input으로만 넘긴다 — 일반 생성에는 없는 개념이라서다.
+  initial?: { title?: string; dueDate?: string; startDate?: string; sourceGoogleEventId?: string };
 }) {
   const [open, setOpen] = useState(false);
   const [errorMessage, formAction, isPending] = useActionState(createProject, undefined);
@@ -50,14 +56,16 @@ export function NewProjectDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="icon-sm" variant="outline" title="새 프로젝트" aria-label="새 프로젝트">
-            <IconPlus />
-          </Button>
+          trigger ?? (
+            <Button size="icon-sm" variant="outline" title="새 프로젝트" aria-label="새 프로젝트">
+              <IconPlus />
+            </Button>
+          )
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>새 프로젝트</DialogTitle>
+          <DialogTitle>{initial?.sourceGoogleEventId ? "구글 일정을 업무로 전환" : "새 프로젝트"}</DialogTitle>
         </DialogHeader>
         <form
           action={(formData) => {
@@ -88,9 +96,13 @@ export function NewProjectDialog({
               </select>
             </div>
           )}
+          {initial?.startDate && <input type="hidden" name="startDate" value={initial.startDate} />}
+          {initial?.sourceGoogleEventId && (
+            <input type="hidden" name="sourceGoogleEventId" value={initial.sourceGoogleEventId} />
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="title">제목</Label>
-            <Input id="title" name="title" required />
+            <Input id="title" name="title" defaultValue={initial?.title} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="memo">메모</Label>
@@ -102,7 +114,7 @@ export function NewProjectDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="dueDate">기한</Label>
-            <Input id="dueDate" name="dueDate" type="date" />
+            <Input id="dueDate" name="dueDate" type="date" defaultValue={initial?.dueDate} />
           </div>
           {projectOptions.length > 0 && (
             <div className="space-y-1.5">
