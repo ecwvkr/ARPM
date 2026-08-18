@@ -8,15 +8,27 @@ import { ChangePasswordForm } from "../change-password-form";
 import { UserManagement } from "../user-management";
 import { AppSettingsForm } from "../app-settings-form";
 import { TrashSection } from "../trash-section";
+import { GoogleConnectionPanel } from "../google-connection";
 import { SETTINGS_SECTIONS } from "../sections";
 import { listAllUsersForAdmin } from "@/app/actions/admin";
+import { getGoogleConnectionStatus } from "@/app/actions/google";
 import { getCommentVisibleCount } from "@/lib/settings";
 import { listTrashedPartners } from "@/lib/partners";
 import { listTrashedProjects } from "@/lib/projects";
 import { IconChevronLeft } from "@tabler/icons-react";
 
-export default async function SettingsSectionPage({ params }: PageProps<"/settings/[section]">) {
+const GOOGLE_ERROR_LABEL: Record<string, string> = {
+  invalid_state: "연결 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요.",
+  no_refresh_token: "구글이 재연결 권한을 내려주지 않았습니다. 다시 시도해 주세요.",
+  access_denied: "구글 동의 화면에서 연결을 취소했습니다.",
+};
+
+export default async function SettingsSectionPage({
+  params,
+  searchParams,
+}: PageProps<"/settings/[section]">) {
   const { section: slug } = await params;
+  const { connected, error } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -42,6 +54,14 @@ export default async function SettingsSectionPage({ params }: PageProps<"/settin
 
       <WidthContainer mainClassName="space-y-3 px-6 py-6">
         <p className="text-sm text-muted-foreground">{section.description}</p>
+        {slug === "google" && connected === "1" && (
+          <p className="rounded-2xl bg-secondary p-3 text-sm text-secondary-foreground">연결되었습니다.</p>
+        )}
+        {slug === "google" && typeof error === "string" && (
+          <p className="rounded-2xl bg-destructive/10 p-3 text-sm text-destructive">
+            {GOOGLE_ERROR_LABEL[error] ?? `연결에 실패했습니다: ${error}`}
+          </p>
+        )}
         {slug === "account" && (
           <div className="space-y-2">
             <div className="max-w-sm space-y-1">
@@ -56,6 +76,7 @@ export default async function SettingsSectionPage({ params }: PageProps<"/settin
         {slug === "trash" && <TrashPanel userId={session.user.id} isSuperAdmin={isSuperAdmin} />}
         {slug === "users" && <UserPanel />}
         {slug === "app" && <AppSettingsPanel />}
+        {slug === "google" && <GooglePanel />}
       </WidthContainer>
     </div>
   );
@@ -76,4 +97,8 @@ async function UserPanel() {
 
 async function AppSettingsPanel() {
   return <AppSettingsForm commentVisibleCount={await getCommentVisibleCount()} />;
+}
+
+async function GooglePanel() {
+  return <GoogleConnectionPanel status={await getGoogleConnectionStatus()} />;
 }

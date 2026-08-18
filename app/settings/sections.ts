@@ -31,6 +31,12 @@ export const SETTINGS_SECTIONS = [
     description: "코멘트 기본 노출 개수 등 앱 전체 설정입니다.",
     adminOnly: true,
   },
+  {
+    slug: "google",
+    title: "구글 캘린더",
+    description: "회사 공용 구글 계정을 연결해 일정을 캘린더 뷰와 동기화합니다.",
+    adminOnly: true,
+  },
 ] as const;
 
 export type SettingsSectionSlug = (typeof SETTINGS_SECTIONS)[number]["slug"];

@@ -35,6 +35,7 @@ model User {
   notifications        Notification[]
   savedFilters         SavedFilter[]
   auditLogs            AuditLog[]
+  googleConnections     GoogleConnection[]
 }
 
 model Partner {
@@ -112,6 +113,12 @@ model Project {
   canvasY     Float? // 워크플로우에서 드래그로 옮긴 위치. 없으면 dagre 자동배치 사용.
   recurrence  String? // "WEEKLY" | null. 완료 시 다음 회차를 자동 생성.
 
+  // 구글 캘린더 연동(G). startDate는 구글 장기 일정을 업무로 전환할 때만 채워지고
+  // 생성·수정 UI에는 노출하지 않는다 — 없으면 지금처럼 dueDate 기준으로만 표시.
+  startDate           DateTime?
+  googleEventId       String? // 이 업무를 구글 보조 캘린더로 내보낸 이벤트 id (수정·삭제 매칭용)
+  sourceGoogleEventId String? // 구글 일정을 전환해 만든 경우 그 원본 이벤트 id (중복 전환 방지)
+
   partner      Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   parent       Project?            @relation("ProjectTree", fields: [parentId], references: [id], onDelete: SetNull)
   children     Project[]           @relation("ProjectTree")
@@ -125,6 +132,7 @@ model Project {
   @@index([partnerId, createdAt])
   @@index([parentId])
   @@index([masterId])
+  @@index([sourceGoogleEventId])
 }
 
 model ProjectParticipant {
@@ -225,6 +233,21 @@ model AuditLog {
 model AppSetting {
   id                  String @id @default(cuid())
   commentVisibleCount Int    @default(5)
+}
+
+// 회사 공용 구글 계정 연동. AppSetting처럼 항상 단일 행만 존재한다(연결 안 됨 = 행 없음).
+// 총관리자만 연결·해제할 수 있다. 토큰은 평문 저장하지 않고 GOOGLE_TOKEN_KEY로 암호화한다.
+model GoogleConnection {
+  id             String   @id @default(cuid())
+  googleEmail    String
+  accessToken    String
+  refreshToken   String
+  expiresAt      DateTime
+  scope          String
+  syncCalendarId String? // 웹앱 업무를 내보내는 보조 캘린더("AR_PM 업무") id
+  connectedById  String
+  connectedAt    DateTime @default(now())
+  connectedBy    User     @relation(fields: [connectedById], references: [id])
 }
 
 enum Visibility {
