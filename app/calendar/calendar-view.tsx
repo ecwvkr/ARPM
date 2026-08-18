@@ -68,6 +68,78 @@ function monthGrid(year: number, month: number) {
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 
+function dateOnly(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// 여러 날에 걸친 구글 일정을 주(week) 단위로 잘라 시작~끝 칸(0~6, 일~토)을 구한다.
+// 주 경계에서 잘린 세그먼트는 실제 시작/끝이 아니므로 그쪽 모서리를 각지게 둬서
+// "다음 주로 이어짐"을 표시한다.
+type WeekItem =
+  | { kind: "project"; key: string; startCol: number; endCol: number; data: CalendarProject }
+  | {
+      kind: "google";
+      key: string;
+      startCol: number;
+      endCol: number;
+      data: CalendarGoogleEvent;
+      isActualStart: boolean;
+      isActualEnd: boolean;
+    };
+
+const MAX_LANES = 2; // 기존 칸당 2건 표시 예산과 동일하게 맞춘다.
+const NUMBER_ROW_H = 24;
+const LANE_H = 20;
+
+function layoutWeek(weekDays: Date[], projects: CalendarProject[], googleEvents: CalendarGoogleEvent[]) {
+  const weekStart = weekDays[0];
+  const weekEnd = weekDays[6];
+  const items: WeekItem[] = [];
+
+  for (const p of projects) {
+    if (!p.dueDate) continue;
+    const d = dateOnly(new Date(p.dueDate));
+    if (d < weekStart || d > weekEnd) continue;
+    const col = Math.round((d.getTime() - weekStart.getTime()) / 86_400_000);
+    items.push({ kind: "project", key: p.id, startCol: col, endCol: col, data: p });
+  }
+
+  for (const e of googleEvents) {
+    if (e.endDate < weekStart || e.startDate > weekEnd) continue;
+    const clampedStart = e.startDate < weekStart ? weekStart : e.startDate;
+    const clampedEnd = e.endDate > weekEnd ? weekEnd : e.endDate;
+    items.push({
+      kind: "google",
+      key: `${e.calendarId}-${e.id}`,
+      startCol: Math.round((clampedStart.getTime() - weekStart.getTime()) / 86_400_000),
+      endCol: Math.round((clampedEnd.getTime() - weekStart.getTime()) / 86_400_000),
+      data: e,
+      isActualStart: clampedStart.getTime() === e.startDate.getTime(),
+      isActualEnd: clampedEnd.getTime() === e.endDate.getTime(),
+    });
+  }
+
+  // 겹치는 항목은 레인을 나눠 배치한다(구간 그래프 색칠의 그리디 버전) — 레인 수를
+  // 넘어가면 그 항목이 걸치는 모든 날짜의 "+N건" 카운트에 더한다.
+  items.sort((a, b) => a.startCol - b.startCol || b.endCol - b.startCol - (a.endCol - a.startCol));
+  const laneEnds: number[] = [];
+  const placed: { item: WeekItem; lane: number }[] = [];
+  const overflowCols = new Array(7).fill(0);
+
+  for (const item of items) {
+    let lane = laneEnds.findIndex((end) => end < item.startCol);
+    if (lane === -1) lane = laneEnds.length;
+    if (lane >= MAX_LANES) {
+      for (let c = item.startCol; c <= item.endCol; c++) overflowCols[c]++;
+      continue;
+    }
+    laneEnds[lane] = item.endCol;
+    placed.push({ item, lane });
+  }
+
+  return { placed, overflowCols };
+}
+
 function ProjectChip({ project, compact = false }: { project: CalendarProject; compact?: boolean }) {
   return (
     <Link
@@ -110,6 +182,29 @@ function DayItemChip({ item, compact = false }: { item: DayItem; compact?: boole
   );
 }
 
+// 주 그리드 안에서 여러 칸에 걸쳐 놓이는 바. 프로젝트는 항상 하루짜리라 기존
+// ProjectChip을 그대로 쓰고, 구글 일정만 실제 시작/끝 여부에 따라 모서리를 다르게 둔다.
+function WeekBarItem({ item }: { item: WeekItem }) {
+  if (item.kind === "project") return <ProjectChip project={item.data} compact />;
+
+  const e = item.data;
+  return (
+    <div
+      style={{
+        backgroundColor: `color-mix(in oklch, ${e.calendarColor} 22%, var(--muted))`,
+        borderLeftColor: e.calendarColor,
+      }}
+      className={`flex h-full items-center gap-1 overflow-hidden px-1.5 text-xs text-foreground ${
+        item.isActualStart ? "rounded-l-md border-l-4" : ""
+      } ${item.isActualEnd ? "rounded-r-md" : ""}`}
+      title={`${e.title} · ${e.calendarSummary}`}
+    >
+      {item.isActualStart && <IconBrandGoogle className="size-3 shrink-0" />}
+      <span className="truncate">{e.title}</span>
+    </div>
+  );
+}
+
 export function CalendarView({
   initialDate,
   initialView,
@@ -143,8 +238,8 @@ export function CalendarView({
       push(dateKey(new Date(t.dueDate)), { kind: "project", data: t });
     }
     for (const e of googleEvents) {
-      // 여러 날에 걸친 일정은 걸치는 날마다 칩을 하나씩 둔다 — 이어지는 바 표시는
-      // 별도 단계(G3)에서 붙이고, 지금은 날짜별 목록에 데이터가 맞게 들어가는 것까지만 맞춘다.
+      // 일간뷰·선택 패널은 걸치는 날마다 항목을 하나씩 둔다(단순 목록이라 레인이 필요 없다).
+      // 월간뷰의 이어지는 바는 이 맵을 안 쓰고 layoutWeek()가 주 단위로 따로 계산한다.
       for (let d = new Date(e.startDate); d <= e.endDate; d = addDays(d, 1)) {
         push(dateKey(d), { kind: "google", data: e });
       }
@@ -153,8 +248,10 @@ export function CalendarView({
   }, [projects, googleEvents]);
 
   const todayKey = dateKey(new Date());
-  // ponytail: 42개 Date 생성은 memo할 가치가 없다.
+  // ponytail: 42개 Date 생성과 6칸 청크는 memo할 가치가 없다.
   const monthDays = monthGrid(cursor.getFullYear(), cursor.getMonth());
+  const weeks: Date[][] = [];
+  for (let i = 0; i < monthDays.length; i += 7) weeks.push(monthDays.slice(i, i + 7));
   // 일간은 커서 날짜를 가운데 두고 앞뒤 3일씩 총 7일을 띠로 보여준다.
   const dayStrip = Array.from({ length: 7 }, (_, i) => addDays(cursor, i - 3));
 
@@ -312,43 +409,73 @@ export function CalendarView({
               <div key={w}>{w}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
-            {monthDays.map((d) => {
-              const key = dateKey(d);
-              const inMonth = d.getMonth() === cursor.getMonth();
-              const cellItems = itemsByDate.get(key) ?? [];
-              // 칸 높이를 고정하고 2건까지만 보여준 뒤 나머지는 개수로 접는다.
-              // 전체는 아래 선택 패널에서 확인한다(칸이 늘어나 그리드가 흔들리지 않게).
-              const visible = cellItems.slice(0, 2);
-              const overflow = cellItems.length - visible.length;
-
+          <div className="space-y-1">
+            {weeks.map((weekDays) => {
+              const { placed, overflowCols } = layoutWeek(weekDays, projects, googleEvents);
+              const weekHeight = NUMBER_ROW_H + MAX_LANES * LANE_H + 16;
               return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedKey(key)}
-                  className={`flex h-24 flex-col items-start overflow-hidden rounded-xl p-1 text-left ${inMonth ? "" : "opacity-40"} ${
-                    key === selectedKey ? "ring-2 ring-primary" : ""
-                  }`}
-                >
-                  <span
-                    className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs ${
-                      key === todayKey
-                        ? "bg-primary font-medium text-primary-foreground"
-                        : "text-muted-foreground"
-                    }`}
+                <div key={dateKey(weekDays[0])} className="relative" style={{ height: weekHeight }}>
+                  {/* 배경: 요일별 클릭 선택 영역 + 오늘/이번달 아님/선택 표시. 클릭은 이 레이어가
+                      받고, 앞 레이어(숫자·바)는 프로젝트 칩 등 실제 인터랙션이 필요한 부분만
+                      pointer-events-auto로 다시 열어준다. */}
+                  <div className="absolute inset-0 grid grid-cols-7 gap-1">
+                    {weekDays.map((d) => {
+                      const key = dateKey(d);
+                      const inMonth = d.getMonth() === cursor.getMonth();
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSelectedKey(key)}
+                          aria-label={`${d.getMonth() + 1}월 ${d.getDate()}일 선택`}
+                          className={`rounded-xl ${inMonth ? "" : "opacity-40"} ${
+                            key === selectedKey ? "ring-2 ring-primary" : ""
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    className="pointer-events-none absolute inset-0 grid grid-cols-7 gap-x-1 p-1"
+                    style={{ gridTemplateRows: `${NUMBER_ROW_H}px repeat(${MAX_LANES}, ${LANE_H}px) auto` }}
                   >
-                    {d.getDate()}
-                  </span>
-                  <div className="mt-1 w-full space-y-0.5">
-                    {visible.map((item) => (
-                      <DayItemChip key={item.kind === "project" ? item.data.id : `${item.data.calendarId}-${item.data.id}`} item={item} compact />
+                    {weekDays.map((d, col) => {
+                      const key = dateKey(d);
+                      return (
+                        <span
+                          key={key}
+                          style={{ gridColumn: col + 1, gridRow: 1 }}
+                          className={`inline-flex size-6 items-center justify-center justify-self-start rounded-full text-xs ${
+                            key === todayKey ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground"
+                          }`}
+                        >
+                          {d.getDate()}
+                        </span>
+                      );
+                    })}
+                    {placed.map(({ item, lane }) => (
+                      <div
+                        key={item.key}
+                        style={{ gridColumn: `${item.startCol + 1} / ${item.endCol + 2}`, gridRow: lane + 2 }}
+                        className="pointer-events-auto min-w-0"
+                      >
+                        <WeekBarItem item={item} />
+                      </div>
                     ))}
-                    {overflow > 0 && (
-                      <p className="px-1 text-xs text-muted-foreground">+{overflow}건</p>
+                    {weekDays.map((d, col) =>
+                      overflowCols[col] > 0 ? (
+                        <p
+                          key={dateKey(d)}
+                          style={{ gridColumn: col + 1, gridRow: MAX_LANES + 2 }}
+                          className="px-1 text-xs text-muted-foreground"
+                        >
+                          +{overflowCols[col]}건
+                        </p>
+                      ) : null,
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
