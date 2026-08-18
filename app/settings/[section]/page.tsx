@@ -8,10 +8,10 @@ import { ChangePasswordForm } from "../change-password-form";
 import { UserManagement } from "../user-management";
 import { AppSettingsForm } from "../app-settings-form";
 import { TrashSection } from "../trash-section";
-import { GoogleConnectionPanel } from "../google-connection";
+import { GoogleConnectionPanel, GoogleCalendarSelector } from "../google-connection";
 import { SETTINGS_SECTIONS } from "../sections";
 import { listAllUsersForAdmin } from "@/app/actions/admin";
-import { getGoogleConnectionStatus } from "@/app/actions/google";
+import { getGoogleConnectionStatus, listAvailableCalendars } from "@/app/actions/google";
 import { getCommentVisibleCount } from "@/lib/settings";
 import { listTrashedPartners } from "@/lib/partners";
 import { listTrashedProjects } from "@/lib/projects";
@@ -100,5 +100,11 @@ async function AppSettingsPanel() {
 }
 
 async function GooglePanel() {
-  return <GoogleConnectionPanel status={await getGoogleConnectionStatus()} />;
+  const status = await getGoogleConnectionStatus();
+  return (
+    <div className="space-y-4">
+      <GoogleConnectionPanel status={status} />
+      {status && <GoogleCalendarSelector result={await listAvailableCalendars()} />}
+    </div>
+  );
 }

@@ -245,6 +245,7 @@ model GoogleConnection {
   expiresAt      DateTime
   scope          String
   syncCalendarId String? // 웹앱 업무를 내보내는 보조 캘린더("AR_PM 업무") id
+  enabledCalendarIds String[] @default([]) // 캘린더 뷰에 표시할 캘린더로 관리자가 고른 id 목록
   connectedById  String
   connectedAt    DateTime @default(now())
   connectedBy    User     @relation(fields: [connectedById], references: [id])

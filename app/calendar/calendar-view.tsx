@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priority";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
+import { IconBrandGoogle } from "@tabler/icons-react";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 // 주간 뷰는 월간 뷰와 보여주는 게 겹쳐 없앴다.
@@ -30,6 +31,23 @@ export type CalendarProject = {
   links: string[];
   unread: boolean;
 };
+
+// lib/google/calendar.ts의 NormalizedGoogleEvent와 같은 모양 — 서버 컴포넌트에서
+// Date 필드를 그대로 넘겨받는다(CalendarProject도 같은 방식).
+export type CalendarGoogleEvent = {
+  id: string;
+  calendarId: string;
+  calendarSummary: string;
+  calendarColor: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  allDay: boolean;
+};
+
+// 월간뷰 칸·선택 패널은 프로젝트 마감일 칩과 구글 일정 칩을 같은 목록에 섞어서
+// 보여준다 — 2건 초과 시 접는 로직과 렌더링을 한 곳에서 함께 처리하기 위한 태그.
+type DayItem = { kind: "project"; data: CalendarProject } | { kind: "google"; data: CalendarGoogleEvent };
 
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -69,15 +87,40 @@ function ProjectChip({ project, compact = false }: { project: CalendarProject; c
   );
 }
 
+// 프로젝트 칩(secondary/destructive 배경)과 한눈에 구분되도록 구글 아이콘 + 중립
+// 배경을 쓴다. 캘린더별 색상은 왼쪽 테두리로만 얹는다(전환 기능은 G5에서 붙는다).
+function GoogleEventChip({ event, compact = false }: { event: CalendarGoogleEvent; compact?: boolean }) {
+  return (
+    <div
+      style={{ borderLeftColor: event.calendarColor }}
+      className="flex items-center gap-1 truncate rounded-md border-l-2 bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+      title={`${event.title} · ${event.calendarSummary}`}
+    >
+      <IconBrandGoogle className="size-3 shrink-0" />
+      <span className="truncate">{compact ? event.title : `${event.title} · ${event.calendarSummary}`}</span>
+    </div>
+  );
+}
+
+function DayItemChip({ item, compact = false }: { item: DayItem; compact?: boolean }) {
+  return item.kind === "project" ? (
+    <ProjectChip project={item.data} compact={compact} />
+  ) : (
+    <GoogleEventChip event={item.data} compact={compact} />
+  );
+}
+
 export function CalendarView({
   initialDate,
   initialView,
   projects,
+  googleEvents,
   currentUserId,
 }: {
   initialDate: string;
   initialView: CalendarView;
   projects: CalendarProject[];
+  googleEvents: CalendarGoogleEvent[];
   currentUserId: string;
 }) {
   const router = useRouter();
@@ -91,15 +134,23 @@ export function CalendarView({
     router.replace(`/calendar?v=${view}&d=${cursorKey}`, { scroll: false });
   }, [view, cursorKey, router]);
 
-  const projectsByDate = useMemo(() => {
-    const map = new Map<string, CalendarProject[]>();
+  const itemsByDate = useMemo(() => {
+    const map = new Map<string, DayItem[]>();
+    const push = (key: string, item: DayItem) => map.set(key, [...(map.get(key) ?? []), item]);
+
     for (const t of projects) {
       if (!t.dueDate) continue;
-      const key = dateKey(new Date(t.dueDate));
-      map.set(key, [...(map.get(key) ?? []), t]);
+      push(dateKey(new Date(t.dueDate)), { kind: "project", data: t });
+    }
+    for (const e of googleEvents) {
+      // 여러 날에 걸친 일정은 걸치는 날마다 칩을 하나씩 둔다 — 이어지는 바 표시는
+      // 별도 단계(G3)에서 붙이고, 지금은 날짜별 목록에 데이터가 맞게 들어가는 것까지만 맞춘다.
+      for (let d = new Date(e.startDate); d <= e.endDate; d = addDays(d, 1)) {
+        push(dateKey(d), { kind: "google", data: e });
+      }
     }
     return map;
-  }, [projects]);
+  }, [projects, googleEvents]);
 
   const todayKey = dateKey(new Date());
   // ponytail: 42개 Date 생성은 memo할 가치가 없다.
@@ -132,8 +183,10 @@ export function CalendarView({
       ? `${cursor.getMonth() + 1}월 ${cursor.getDate()}일 (${WEEKDAY[cursor.getDay()]})`
       : `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
 
-  const dayProjects = projectsByDate.get(cursorKey) ?? [];
-  const selectedProjects = projectsByDate.get(selectedKey) ?? [];
+  const dayItems = itemsByDate.get(cursorKey) ?? [];
+  const dayProjects = dayItems.filter((i) => i.kind === "project").map((i) => i.data);
+  const dayGoogleEvents = dayItems.filter((i) => i.kind === "google").map((i) => i.data);
+  const selectedItems = itemsByDate.get(selectedKey) ?? [];
 
   return (
     <div className="space-y-4">
@@ -187,7 +240,7 @@ export function CalendarView({
           <div className="grid grid-cols-7 gap-1 rounded-4xl bg-card p-2 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
             {dayStrip.map((d) => {
               const key = dateKey(d);
-              const count = (projectsByDate.get(key) ?? []).length;
+              const count = (itemsByDate.get(key) ?? []).length;
               const selected = key === cursorKey;
               return (
                 <button
@@ -240,6 +293,17 @@ export function CalendarView({
               ))}
             </div>
           )}
+
+          {dayGoogleEvents.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold">구글 일정</h3>
+              <div className="space-y-1">
+                {dayGoogleEvents.map((e) => (
+                  <GoogleEventChip key={`${e.calendarId}-${e.id}`} event={e} />
+                ))}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="overflow-hidden rounded-4xl bg-card p-3 shadow-md ring-1 ring-foreground/5 sm:p-4 dark:ring-foreground/10">
@@ -252,11 +316,11 @@ export function CalendarView({
             {monthDays.map((d) => {
               const key = dateKey(d);
               const inMonth = d.getMonth() === cursor.getMonth();
-              const cellProjects = projectsByDate.get(key) ?? [];
+              const cellItems = itemsByDate.get(key) ?? [];
               // 칸 높이를 고정하고 2건까지만 보여준 뒤 나머지는 개수로 접는다.
               // 전체는 아래 선택 패널에서 확인한다(칸이 늘어나 그리드가 흔들리지 않게).
-              const visible = cellProjects.slice(0, 2);
-              const overflow = cellProjects.length - visible.length;
+              const visible = cellItems.slice(0, 2);
+              const overflow = cellItems.length - visible.length;
 
               return (
                 <button
@@ -277,8 +341,8 @@ export function CalendarView({
                     {d.getDate()}
                   </span>
                   <div className="mt-1 w-full space-y-0.5">
-                    {visible.map((t) => (
-                      <ProjectChip key={t.id} project={t} compact />
+                    {visible.map((item) => (
+                      <DayItemChip key={item.kind === "project" ? item.data.id : `${item.data.calendarId}-${item.data.id}`} item={item} compact />
                     ))}
                     {overflow > 0 && (
                       <p className="px-1 text-xs text-muted-foreground">+{overflow}건</p>
@@ -294,14 +358,14 @@ export function CalendarView({
       {view === "month" && (
         <section className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
           <h3 className="text-sm font-bold">
-            {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")} ({selectedProjects.length}건)
+            {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")} ({selectedItems.length}건)
           </h3>
-          {selectedProjects.length === 0 ? (
+          {selectedItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">이 날 마감인 프로젝트가 없습니다.</p>
           ) : (
             <div className="space-y-1">
-              {selectedProjects.map((t) => (
-                <ProjectChip key={t.id} project={t} />
+              {selectedItems.map((item) => (
+                <DayItemChip key={item.kind === "project" ? item.data.id : `${item.data.calendarId}-${item.data.id}`} item={item} />
               ))}
             </div>
           )}
