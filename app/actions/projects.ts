@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getPartnerAccess } from "@/lib/permissions";
 import { revalidateProjectViews } from "@/lib/revalidate";
+import { deleteGoogleEventsById } from "@/lib/google/calendar";
 import { getCommentVisibleCount } from "@/lib/settings";
 import { normalizeLinks } from "@/lib/normalize";
 import { listVisiblePartners } from "@/lib/partners";
@@ -91,7 +93,7 @@ export async function createProject(
     ]),
   );
 
-  await prisma.project.create({
+  const created = await prisma.project.create({
     data: {
       partnerId,
       parentId,
@@ -106,7 +108,7 @@ export async function createProject(
     },
   });
 
-  await revalidateProjectViews(partnerId);
+  await revalidateProjectViews(partnerId, { syncProjectIds: [created.id] });
 }
 
 export async function deriveProject(
@@ -129,7 +131,7 @@ export async function deriveProject(
   const dueDateRaw = formData.get("dueDate") as string | null;
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
 
-  await prisma.project.create({
+  const created = await prisma.project.create({
     data: {
       partnerId: parent.partnerId,
       parentId: parent.id,
@@ -154,7 +156,7 @@ export async function deriveProject(
     });
   }
 
-  await revalidateProjectViews(parent.partnerId);
+  await revalidateProjectViews(parent.partnerId, { syncProjectIds: [created.id] });
 }
 
 export async function duplicateProject(projectId: string) {
@@ -164,7 +166,7 @@ export async function duplicateProject(projectId: string) {
   const { project, canView } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   if (!project || !canView) throw new Error("접근할 수 없습니다.");
 
-  await prisma.project.create({
+  const created = await prisma.project.create({
     data: {
       partnerId: project.partnerId,
       parentId: project.parentId,
@@ -178,7 +180,7 @@ export async function duplicateProject(projectId: string) {
     },
   });
 
-  await revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: [created.id] });
 }
 
 export async function moveProject(projectId: string, formData: FormData) {
@@ -364,10 +366,11 @@ export async function completeProject(projectId: string) {
     data: { status: "DONE", completedAt: new Date() },
   });
 
+  let nextProjectId: string | undefined;
   if (project.recurrence === "WEEKLY") {
     const base = project.dueDate ?? new Date();
     const nextDueDate = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000);
-    await prisma.project.create({
+    const next = await prisma.project.create({
       data: {
         partnerId: project.partnerId,
         title: project.title,
@@ -380,9 +383,12 @@ export async function completeProject(projectId: string) {
         participants: { create: { userId: project.masterId } },
       },
     });
+    nextProjectId = next.id;
   }
 
-  await revalidateProjectViews(project.partnerId);
+  // 완료 자체(status/completedAt)는 구글에 내보내는 내용에 영향을 주지 않는다 —
+  // 다음 회차가 새로 생겼을 때만 그걸 내보낸다.
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: nextProjectId ? [nextProjectId] : [] });
 }
 
 export async function reopenProject(projectId: string) {
@@ -445,7 +451,7 @@ export async function extendDueDate(
   if (!dueDateRaw) return "날짜를 입력하세요.";
 
   await prisma.project.update({ where: { id: projectId }, data: { dueDate: new Date(dueDateRaw) } });
-  await revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
 }
 
 export async function updateProjectInfo(
@@ -470,7 +476,7 @@ export async function updateProjectInfo(
     where: { id: projectId },
     data: { title, memo, links },
   });
-  await revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
 }
 
 // 워크플로우 노드의 더블클릭 인라인 이름수정 전용 — updateProjectInfo는 memo·links까지
@@ -487,7 +493,7 @@ export async function renameProject(projectId: string, title: string) {
   if (project.completedAt) throw new Error("완료된 프로젝트는 수정할 수 없습니다.");
 
   await prisma.project.update({ where: { id: projectId }, data: { title: trimmed } });
-  await revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
 }
 
 export async function updateProjectVisibility(projectId: string, formData: FormData) {
@@ -499,7 +505,7 @@ export async function updateProjectVisibility(projectId: string, formData: FormD
 
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   await prisma.project.update({ where: { id: projectId }, data: { visibility } });
-  await revalidateProjectViews(project.partnerId);
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
 }
 
 export async function transferMaster(projectId: string, formData: FormData) {
@@ -720,7 +726,9 @@ export async function archiveProject(
     }),
   ]);
 
-  await revalidateProjectViews(project.partnerId);
+  // 보관된 프로젝트는 구글에 내보내지 않는다 — 하위 트리 전부에서 기존에 나가 있던
+  // 이벤트를 지운다.
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: subtreeIds });
 }
 
 // 보관함에서 복구. 함께 보관됐던 하위 트리를 같이 되돌린다. getProjectAccess는 보관된
@@ -744,7 +752,8 @@ export async function restoreProject(projectId: string) {
   const subtreeIds = [projectId, ...collectDescendantIds(all, projectId)];
 
   await prisma.project.updateMany({ where: { id: { in: subtreeIds } }, data: { deletedAt: null } });
-  await revalidateProjectViews(project.partnerId);
+  // 복구된 항목 중 공개+마감일 있는 것들은 다시 구글로 내보낸다.
+  await revalidateProjectViews(project.partnerId, { syncProjectIds: subtreeIds });
   revalidatePath("/settings");
 }
 
@@ -774,6 +783,12 @@ export async function hardDeleteProject(
   });
   const subtreeIds = [projectId, ...collectDescendantIds(all, projectId)];
 
+  // 행이 지워지고 나면 googleEventId를 다시 조회할 수 없으니 미리 챙겨 둔다.
+  const withGoogleEvent = await prisma.project.findMany({
+    where: { id: { in: subtreeIds }, googleEventId: { not: null } },
+    select: { googleEventId: true },
+  });
+
   await prisma.$transaction([
     prisma.project.deleteMany({ where: { id: { in: subtreeIds } } }),
     prisma.auditLog.create({
@@ -790,6 +805,11 @@ export async function hardDeleteProject(
       },
     }),
   ]);
+
+  if (withGoogleEvent.length > 0) {
+    const eventIds = withGoogleEvent.map((p) => p.googleEventId!);
+    after(() => deleteGoogleEventsById(eventIds));
+  }
 
   revalidatePath("/settings");
 }

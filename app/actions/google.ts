@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptToken, getValidAccessToken, revokeGoogleToken } from "@/lib/google/client";
-import { listCalendars, type GoogleCalendarListItem } from "@/lib/google/calendar";
+import { listCalendars, syncProjectToGoogle, type GoogleCalendarListItem } from "@/lib/google/calendar";
 
 async function requireSuperAdmin() {
   const session = await auth();
@@ -70,4 +70,27 @@ export async function updateEnabledCalendarSelection(calendarIds: string[]) {
   });
   revalidatePath("/settings/google");
   revalidatePath("/calendar");
+}
+
+// 드리프트 복구용 수동 재동기화. 평소엔 revalidateProjectViews가 바뀐 프로젝트만
+// 즉시 내보내지만(G4), 구글 쪽 실패가 누적됐거나 DB를 직접 건드린 경우를 대비해
+// "공개+마감일 있는 프로젝트 전부"와 "예전에 내보낸 적 있는 프로젝트 전부"를 다시 맞춘다.
+// 관리자가 명시적으로 누른 조작이라 결과를 바로 보여줘야 하므로 after()로 미루지 않는다.
+export async function resyncAllProjects(): Promise<{ synced: number; failed: number }> {
+  await requireSuperAdmin();
+
+  const targets = await prisma.project.findMany({
+    where: {
+      OR: [
+        { visibility: "PUBLIC", dueDate: { not: null }, deletedAt: null },
+        { googleEventId: { not: null } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  const results = await Promise.allSettled(targets.map((p) => syncProjectToGoogle(p.id)));
+  const failed = results.filter((r) => r.status === "rejected").length;
+  revalidatePath("/calendar");
+  return { synced: results.length - failed, failed };
 }

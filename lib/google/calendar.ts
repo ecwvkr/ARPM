@@ -159,3 +159,119 @@ export async function getSyncedGoogleEvents(rangeStart: Date, rangeEnd: Date): P
   });
   return events;
 }
+
+function toDateOnlyString(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+async function createEvent(accessToken: string, calendarId: string, body: object): Promise<string> {
+  const res = await fetch(`${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`이벤트 생성 실패: ${await res.text()}`);
+  const data = await res.json();
+  return data.id as string;
+}
+
+// 실패 시 false만 돌려준다 — 외부에서 이벤트가 지워진 경우(404) 등 호출부가 새로
+// 만들지 판단하도록, 여기서 예외를 던지지 않는다.
+async function updateEvent(accessToken: string, calendarId: string, eventId: string, body: object): Promise<boolean> {
+  const res = await fetch(
+    `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  return res.ok;
+}
+
+async function deleteEvent(accessToken: string, calendarId: string, eventId: string): Promise<void> {
+  // 이미 지워졌거나(410) 네트워크 오류여도 로컬 정리(googleEventId 비우기)는 계속 진행한다.
+  await fetch(
+    `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } },
+  ).catch(() => {});
+}
+
+// 다른 사람이 직접 발급받은 이벤트 id로 구글에서 지운다. hardDeleteProject처럼 DB 행이
+// 이미 사라져 syncProjectToGoogle로 다시 조회할 수 없는 경우에 쓴다.
+export async function deleteGoogleEventsById(eventIds: string[]): Promise<void> {
+  if (eventIds.length === 0) return;
+  const conn = await prisma.googleConnection.findFirst();
+  if (!conn || !conn.syncCalendarId) return;
+
+  let accessToken: string | null;
+  try {
+    accessToken = await getValidAccessToken();
+  } catch (e) {
+    if (e instanceof GoogleAuthError) return;
+    throw e;
+  }
+  if (!accessToken) return;
+
+  await Promise.allSettled(eventIds.map((id) => deleteEvent(accessToken!, conn.syncCalendarId!, id)));
+}
+
+// 프로젝트 하나를 구글 보조 캘린더("AR_PM 업무")와 맞춘다. 공개 + 마감일 있음 + 보관 안 됨
+// 조건을 만족하면 만들거나 갱신하고, 아니면(비공개 전환·보관·마감일 삭제) 이미 나가 있던
+// 이벤트를 지운다. 연결이 없거나 구글 호출이 실패해도 조용히 넘어간다 — 구글 쪽 문제가
+// 웹앱 저장 자체를 막으면 안 된다(호출부에서 이미 응답 이후로 분리했다).
+export async function syncProjectToGoogle(projectId: string): Promise<void> {
+  const conn = await prisma.googleConnection.findFirst();
+  if (!conn || !conn.syncCalendarId) return;
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      title: true,
+      dueDate: true,
+      startDate: true,
+      visibility: true,
+      deletedAt: true,
+      googleEventId: true,
+    },
+  });
+  if (!project) return;
+
+  let accessToken: string | null;
+  try {
+    accessToken = await getValidAccessToken();
+  } catch (e) {
+    if (e instanceof GoogleAuthError) return;
+    throw e;
+  }
+  if (!accessToken) return;
+
+  const eligible = project.visibility === "PUBLIC" && project.dueDate !== null && project.deletedAt === null;
+
+  if (!eligible) {
+    if (project.googleEventId) {
+      await deleteEvent(accessToken, conn.syncCalendarId, project.googleEventId);
+      await prisma.project.update({ where: { id: project.id }, data: { googleEventId: null } });
+    }
+    return;
+  }
+
+  // 구글 종일 일정의 종료일은 배타적이라 실제 마지막 날(dueDate)의 다음 날을 넣는다.
+  const endExclusive = new Date(project.dueDate!);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+  const body = {
+    summary: project.title,
+    start: { date: toDateOnlyString(project.startDate ?? project.dueDate!) },
+    end: { date: toDateOnlyString(endExclusive) },
+  };
+
+  if (project.googleEventId) {
+    const updated = await updateEvent(accessToken, conn.syncCalendarId, project.googleEventId, body);
+    if (updated) return;
+    // 외부에서 이벤트가 지워졌거나 한 경우 — 새로 만든다.
+  }
+
+  const newEventId = await createEvent(accessToken, conn.syncCalendarId, body);
+  await prisma.project.update({ where: { id: project.id }, data: { googleEventId: newEventId } });
+}

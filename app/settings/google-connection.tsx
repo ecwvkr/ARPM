@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { disconnectGoogleAccount, updateEnabledCalendarSelection } from "@/app/actions/google";
+import { disconnectGoogleAccount, updateEnabledCalendarSelection, resyncAllProjects } from "@/app/actions/google";
 import type { GoogleCalendarListItem } from "@/lib/google/calendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { IconBrandGoogle } from "@tabler/icons-react";
+import { showToast } from "@/components/ui/global-toast";
+import { IconBrandGoogle, IconRefresh } from "@tabler/icons-react";
 
 type Status = { googleEmail: string; connectedAt: Date; connectedByName: string } | null;
 
@@ -43,8 +44,34 @@ export function GoogleConnectionPanel({ status }: { status: Status }) {
           {formatDate(status.connectedAt)} · {status.connectedByName}님이 연결
         </span>
       </div>
-      <DisconnectConfirmDialog email={status.googleEmail} />
+      <div className="flex flex-wrap gap-2">
+        <ResyncButton />
+        <DisconnectConfirmDialog email={status.googleEmail} />
+      </div>
     </div>
+  );
+}
+
+// 평소엔 프로젝트를 바꿀 때마다 자동으로 내보내지만(G4), 구글 쪽 실패가 쌓였거나
+// DB를 직접 손댄 경우를 대비한 수동 복구 버튼.
+function ResyncButton() {
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={isPending}
+      onClick={() =>
+        startTransition(async () => {
+          const { synced, failed } = await resyncAllProjects();
+          showToast(failed > 0 ? `${synced}건 동기화, ${failed}건 실패` : `${synced}건 동기화 완료`);
+        })
+      }
+    >
+      <IconRefresh className="size-4" />
+      전체 재동기화
+    </Button>
   );
 }
 
