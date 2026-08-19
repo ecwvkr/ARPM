@@ -36,6 +36,7 @@ model User {
   savedFilters         SavedFilter[]
   auditLogs            AuditLog[]
   googleConnections     GoogleConnection[]
+  createdTasks         TaskItem[]
 }
 
 model Partner {
@@ -127,6 +128,7 @@ model Project {
   priorities   ProjectPriority[]
   comments     Comment[]
   reads        ProjectRead[]
+  tasks        TaskItem[]
 
   // 목록 조회는 항상 partnerId로 좁힌 뒤 createdAt으로 정렬하므로 복합 인덱스로 둘 다 태운다.
   @@index([partnerId, createdAt])
@@ -171,6 +173,26 @@ model ProjectRead {
 
   @@id([projectId, userId])
   @@index([userId])
+}
+
+// 프로젝트 안의 체크리스트 항목(구글 Tasks/애플 미리알림 스타일). 담당자 개념 없이
+// 프로젝트 참여자 누구나 추가·체크·삭제할 수 있는 공유 할 일 목록이다.
+// 모델명이 TaskItem인 이유: D1 리네임(Task→Project) 당시 Postgres가 인덱스/제약 이름까지
+// 자동으로 바꿔주지 않아 "Task_pkey" 등 옛 이름이 지금도 Project 테이블에 붙어 있다.
+// 순수 "Task"로 만들면 그 좀비 인덱스 이름과 충돌한다.
+model TaskItem {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  done        Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([projectId, createdAt])
 }
 
 model Comment {

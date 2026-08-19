@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createPartner } from "@/app/actions/partners";
+import { listAllUsers } from "@/app/actions/users";
 import { IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,19 +53,30 @@ export function NewPartnerDialog({ currentUserId }: { currentUserId: string }) {
             <select
               id="visibility"
               name="visibility"
-              defaultValue="PRIVATE"
+              defaultValue="PUBLIC"
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
             >
-              <option value="PRIVATE">비공개</option>
               <option value="PUBLIC">공개</option>
+              <option value="PRIVATE">비공개</option>
             </select>
           </div>
-          <UserPicker
-            excludeIds={[currentUserId]}
-            selected={members}
-            onChange={setMembers}
-            label="+ 참여자 설정"
-          />
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>+ 참여자 설정</Label>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline underline-offset-2"
+                onClick={() =>
+                  listAllUsers().then((users) =>
+                    setMembers(users.filter((u) => u.id !== currentUserId).map((u) => u.id)),
+                  )
+                }
+              >
+                모두참여
+              </button>
+            </div>
+            <UserPicker excludeIds={[currentUserId]} selected={members} onChange={setMembers} label="" />
+          </div>
           {errorMessage && (
             <p className="text-sm text-destructive">{errorMessage}</p>
           )}

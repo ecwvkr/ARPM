@@ -27,7 +27,34 @@ export async function getProjectDetail(projectId: string) {
   const access = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   const commentVisibleCount = await getCommentVisibleCount();
 
+  // 도트 알림(D3)이 "신규"인지 "수정"인지 상세 화면에서도 구분해 보여준다(요청 8) —
+  // 읽음 upsert보다 먼저 기존 읽음 기록을 조회해야 방금 막 읽은 것으로 덮이지 않는다.
+  let isNew = false;
+  let isEdited = false;
+  let recentChanges: { id: string; message: string; actorName: string; createdAt: Date }[] = [];
+
   if (access.project) {
+    const existingRead = await prisma.projectRead.findUnique({
+      where: { projectId_userId: { projectId, userId: session.user.id } },
+    });
+    isNew = !existingRead;
+    isEdited = !!existingRead && access.project.updatedAt > existingRead.lastReadAt;
+
+    if (isEdited) {
+      const logs = await prisma.auditLog.findMany({
+        where: { targetId: projectId, targetType: "PROJECT" },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { actor: true },
+      });
+      recentChanges = logs.map((l) => ({
+        id: l.id,
+        message: l.message,
+        actorName: l.actor.name,
+        createdAt: l.createdAt,
+      }));
+    }
+
     await prisma.projectRead.upsert({
       where: { projectId_userId: { projectId, userId: session.user.id } },
       update: {},
@@ -41,6 +68,9 @@ export async function getProjectDetail(projectId: string) {
     currentUserId: session.user.id,
     isSuperAdmin: !!session.user.isSuperAdmin,
     commentVisibleCount,
+    isNew,
+    isEdited,
+    recentChanges,
   };
 }
 
@@ -71,7 +101,8 @@ export async function createProject(
   const title = (formData.get("title") as string | null)?.trim();
   if (!title) return "제목을 입력하세요.";
 
-  const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const memo = (formData.get("memo") as string | null)?.trim();
+  if (!memo) return "상세를 입력하세요.";
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
   const dueDateRaw = formData.get("dueDate") as string | null;
@@ -139,7 +170,8 @@ export async function deriveProject(
   const title = (formData.get("title") as string | null)?.trim();
   if (!title) return "제목을 입력하세요.";
 
-  const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const memo = (formData.get("memo") as string | null)?.trim();
+  if (!memo) return "상세를 입력하세요.";
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
   const dueDateRaw = formData.get("dueDate") as string | null;
@@ -464,8 +496,38 @@ export async function extendDueDate(
   const dueDateRaw = formData.get("dueDate") as string | null;
   if (!dueDateRaw) return "날짜를 입력하세요.";
 
-  await prisma.project.update({ where: { id: projectId }, data: { dueDate: new Date(dueDateRaw) } });
+  await prisma.$transaction([
+    prisma.project.update({ where: { id: projectId }, data: { dueDate: new Date(dueDateRaw) } }),
+    prisma.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        action: "UPDATE_DUE_DATE",
+        targetType: "PROJECT",
+        targetId: projectId,
+        partnerId: project.partnerId,
+        message: `마감일을 ${new Date(dueDateRaw).toLocaleDateString("ko-KR")}(으)로 변경`,
+      },
+    }),
+  ]);
   await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
+}
+
+export async function updateCreatedDate(
+  projectId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { project, canManage } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!project || !canManage) return "master만 수정할 수 있습니다.";
+
+  const createdAtRaw = formData.get("createdAt") as string | null;
+  if (!createdAtRaw) return "날짜를 입력하세요.";
+
+  await prisma.project.update({ where: { id: projectId }, data: { createdAt: new Date(createdAtRaw) } });
+  await revalidateProjectViews(project.partnerId);
 }
 
 export async function updateProjectInfo(
@@ -482,14 +544,27 @@ export async function updateProjectInfo(
 
   const title = (formData.get("title") as string | null)?.trim();
   if (!title) return "제목을 입력하세요.";
-  const memo = (formData.get("memo") as string | null)?.trim() || null;
+  const memo = (formData.get("memo") as string | null)?.trim();
+  if (!memo) return "상세를 입력하세요.";
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
 
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { title, memo, links },
-  });
+  await prisma.$transaction([
+    prisma.project.update({
+      where: { id: projectId },
+      data: { title, memo, links },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        action: "UPDATE_PROJECT_INFO",
+        targetType: "PROJECT",
+        targetId: projectId,
+        partnerId: project.partnerId,
+        message: `"${title}" 프로젝트 정보(제목/상세/링크)를 수정`,
+      },
+    }),
+  ]);
   await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
 }
 

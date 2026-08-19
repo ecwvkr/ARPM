@@ -42,6 +42,10 @@ export function ProjectFilters({
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    // f=1: 필터를 한 번이라도 직접 건드렸다는 표시. 이게 있어야 담당자 필터를
+    // 전부 해제해 빈 배열이 됐을 때도(요청 13의 기본값과 URL이 똑같이 "없음"이라
+    // 서버가 다시 기본값(내 프로젝트)을 되살리지 않는다.
+    params.set("f", "1");
     if (value) params.set(key, value);
     else params.delete(key);
     router.push(`/projects?${params.toString()}`);
@@ -72,7 +76,11 @@ export function ProjectFilters({
 
   const selectedPartners = toArray(searchParams.get("partners"));
   const selectedStatuses = toArray(searchParams.get("status"));
-  const selectedAssignees = toArray(searchParams.get("assignee"));
+  // page.tsx의 기본값 로직과 맞춘다 — f 없이 assignee도 없는 순수 진입이면
+  // "내 프로젝트" 칩이 눌린 상태로 보여야 실제 필터링 결과와 화면이 일치한다.
+  const rawAssignee = searchParams.get("assignee");
+  const touched = searchParams.get("f") !== null;
+  const selectedAssignees = rawAssignee !== null ? toArray(rawAssignee) : touched ? [] : [currentUserId];
   const selectedDue = toArray(searchParams.get("due"));
   const mine = selectedAssignees.includes(currentUserId);
 
@@ -82,6 +90,18 @@ export function ProjectFilters({
       mine ? selectedAssignees.filter((id) => id !== currentUserId) : [...selectedAssignees, currentUserId],
     );
   }
+
+  // 요청 12: 파트너·담당자 선택지는 가나다순, 담당자 중 본인은 항상 맨 위에 고정.
+  const partnerOptions = [...partners]
+    .map((p) => ({ value: p.id, label: p.name }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  const assigneeOptions = [...assignees]
+    .map((a) => ({ value: a.id, label: a.id === currentUserId ? `${a.name} (나)` : a.name }))
+    .sort((a, b) => {
+      if (a.value === currentUserId) return -1;
+      if (b.value === currentUserId) return 1;
+      return a.label.localeCompare(b.label, "ko");
+    });
 
   function handleSave() {
     const name = window.prompt("즐겨찾기 이름");
@@ -107,7 +127,7 @@ export function ProjectFilters({
 
         <MultiSelectFilter
           label="파트너"
-          options={partners.map((p) => ({ value: p.id, label: p.name }))}
+          options={partnerOptions}
           selected={selectedPartners}
           onChange={(v) => setArrayParam("partners", v)}
         />
@@ -119,7 +139,7 @@ export function ProjectFilters({
         />
         <MultiSelectFilter
           label="담당자"
-          options={assignees.map((a) => ({ value: a.id, label: a.id === currentUserId ? `${a.name} (나)` : a.name }))}
+          options={assigneeOptions}
           selected={selectedAssignees}
           onChange={(v) => setArrayParam("assignee", v)}
         />
@@ -155,7 +175,15 @@ export function ProjectFilters({
               <ul className="space-y-0.5">
                 {savedFilters.map((f) => (
                   <li key={f.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
-                    <button type="button" onClick={() => router.push(`/projects?${f.query}`)} className="truncate text-left text-sm">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const params = new URLSearchParams(f.query);
+                        params.set("f", "1");
+                        router.push(`/projects?${params.toString()}`);
+                      }}
+                      className="truncate text-left text-sm"
+                    >
                       {f.name}
                     </button>
                     <button

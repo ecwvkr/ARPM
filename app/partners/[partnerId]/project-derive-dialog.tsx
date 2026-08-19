@@ -66,8 +66,8 @@ export function DeriveDialog({
             <Input id="derive-title" name="title" required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="derive-memo">메모</Label>
-            <Textarea id="derive-memo" name="memo" rows={3} />
+            <Label htmlFor="derive-memo">상세</Label>
+            <Textarea id="derive-memo" name="memo" rows={3} required />
           </div>
           <div className="space-y-1.5">
             <Label>링크</Label>

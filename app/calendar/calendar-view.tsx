@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priority";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog";
-import { IconBrandGoogle, IconArrowRight, IconCheck } from "@tabler/icons-react";
+import { IconBrandGoogle, IconArrowRight, IconCheck, IconChevronRight } from "@tabler/icons-react";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 // 주간 뷰는 월간 뷰와 보여주는 게 겹쳐 없앴다.
@@ -24,6 +24,7 @@ export type CalendarProject = {
   status: "TODO" | "IN_PROGRESS" | "DONE";
   visibility: "PUBLIC" | "PRIVATE";
   dueDate: Date | null;
+  startDate: Date | null;
   createdAt: Date;
   partnerName: string;
   partnerColor: string | null;
@@ -32,6 +33,23 @@ export type CalendarProject = {
   links: string[];
   unread: boolean;
 };
+
+const PRIORITY_RANK: Record<string, number> = { URGENT: 3, NORMAL: 2, HOLD: 1 };
+
+// 하단 목록 정렬(요청 7): 마감일 임박순 → 내 우선순위(긴급>보통>보류) → 가나다순.
+function sortCalendarProjects(projects: CalendarProject[], currentUserId: string): CalendarProject[] {
+  return [...projects].sort((a, b) => {
+    const aDue = a.dueDate ? a.dueDate.getTime() : Infinity;
+    const bDue = b.dueDate ? b.dueDate.getTime() : Infinity;
+    if (aDue !== bDue) return aDue - bDue;
+
+    const aLevel = a.participants.find((p) => p.userId === currentUserId)?.level ?? "HOLD";
+    const bLevel = b.participants.find((p) => p.userId === currentUserId)?.level ?? "HOLD";
+    if (aLevel !== bLevel) return PRIORITY_RANK[bLevel] - PRIORITY_RANK[aLevel];
+
+    return a.title.localeCompare(b.title, "ko");
+  });
+}
 
 // lib/google/calendar.ts의 NormalizedGoogleEvent와 같은 모양 — 서버 컴포넌트에서
 // Date 필드를 그대로 넘겨받는다(CalendarProject도 같은 방식).
@@ -221,24 +239,6 @@ function GoogleEventChip({
   );
 }
 
-function DayItemChip({
-  item,
-  compact = false,
-  partners,
-  currentUserId,
-}: {
-  item: DayItem;
-  compact?: boolean;
-  partners?: { id: string; name: string }[];
-  currentUserId?: string;
-}) {
-  return item.kind === "project" ? (
-    <ProjectChip project={item.data} compact={compact} />
-  ) : (
-    <GoogleEventChip event={item.data} compact={compact} partners={partners} currentUserId={currentUserId} />
-  );
-}
-
 // 주 그리드 안에서 여러 칸에 걸쳐 놓이는 바. 프로젝트는 항상 하루짜리라 기존
 // ProjectChip을 그대로 쓰고, 구글 일정만 실제 시작/끝 여부에 따라 모서리를 다르게 둔다.
 function WeekBarItem({ item }: { item: WeekItem }) {
@@ -260,6 +260,27 @@ function WeekBarItem({ item }: { item: WeekItem }) {
       {item.isActualStart && (converted ? <IconCheck className="size-3 shrink-0" /> : <IconBrandGoogle className="size-3 shrink-0" />)}
       <span className="truncate">{e.title}</span>
     </div>
+  );
+}
+
+// 요청 6: 하단 목록을 프로젝트/캘린더 일정으로 나눠 각각 아코디언으로 접고 펼친다.
+function AccordionSection({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group" open>
+      <summary className="flex cursor-pointer list-none items-center gap-1 text-sm font-bold">
+        {title} ({count})
+        <IconChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+      </summary>
+      <div className="mt-2 space-y-1">{children}</div>
+    </details>
   );
 }
 
@@ -293,9 +314,16 @@ export function CalendarView({
     const map = new Map<string, DayItem[]>();
     const push = (key: string, item: DayItem) => map.set(key, [...(map.get(key) ?? []), item]);
 
+    // 요청 5: 마감일 하루만이 아니라 시작일(없으면 생성일)부터 마감일까지 진행 기간
+    // 전체에 걸쳐 하단 목록에 노출한다 — 구글 일정의 기간 표시와 같은 방식.
     for (const t of projects) {
       if (!t.dueDate) continue;
-      push(dateKey(new Date(t.dueDate)), { kind: "project", data: t });
+      const start = dateOnly(new Date(t.startDate ?? t.createdAt));
+      const end = dateOnly(new Date(t.dueDate));
+      const rangeStart = start > end ? end : start;
+      for (let d = rangeStart; d <= end; d = addDays(d, 1)) {
+        push(dateKey(d), { kind: "project", data: t });
+      }
     }
     for (const e of googleEvents) {
       // 일간뷰·선택 패널은 걸치는 날마다 항목을 하나씩 둔다(단순 목록이라 레인이 필요 없다).
@@ -341,9 +369,17 @@ export function CalendarView({
       : `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
 
   const dayItems = itemsByDate.get(cursorKey) ?? [];
-  const dayProjects = dayItems.filter((i) => i.kind === "project").map((i) => i.data);
+  const dayProjects = sortCalendarProjects(
+    dayItems.filter((i) => i.kind === "project").map((i) => i.data),
+    currentUserId,
+  );
   const dayGoogleEvents = dayItems.filter((i) => i.kind === "google").map((i) => i.data);
-  const selectedItems = itemsByDate.get(selectedKey) ?? [];
+  const selectedItemsAll = itemsByDate.get(selectedKey) ?? [];
+  const selectedProjects = sortCalendarProjects(
+    selectedItemsAll.filter((i) => i.kind === "project").map((i) => i.data),
+    currentUserId,
+  );
+  const selectedGoogleEvents = selectedItemsAll.filter((i) => i.kind === "google").map((i) => i.data);
 
   return (
     <div className="space-y-4">
@@ -424,36 +460,39 @@ export function CalendarView({
             })}
           </div>
 
-          {dayProjects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">이 날 마감인 프로젝트가 없습니다.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {dayProjects.map((t) => (
-                <ProjectCard
-                  key={t.id}
-                  projectId={t.id}
-                  partnerId={t.partnerId}
-                  title={t.title}
-                  status={t.status}
-                  visibility={t.visibility}
-                  overdue={isOverdue(t.dueDate, t.status)}
-                  createdAt={t.createdAt}
-                  dueDate={t.dueDate}
-                  participants={t.participants}
-                  commentCount={t.commentCount}
-                  currentUserId={currentUserId}
-                  partnerName={t.partnerName}
-                  partnerColor={t.partnerColor}
-                  links={t.links}
-                  unread={t.unread}
-                />
-              ))}
-            </div>
-          )}
+          <AccordionSection title="프로젝트 일정" count={dayProjects.length}>
+            {dayProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {dayProjects.map((t) => (
+                  <ProjectCard
+                    key={t.id}
+                    projectId={t.id}
+                    partnerId={t.partnerId}
+                    title={t.title}
+                    status={t.status}
+                    visibility={t.visibility}
+                    overdue={isOverdue(t.dueDate, t.status)}
+                    createdAt={t.createdAt}
+                    dueDate={t.dueDate}
+                    participants={t.participants}
+                    commentCount={t.commentCount}
+                    currentUserId={currentUserId}
+                    partnerName={t.partnerName}
+                    partnerColor={t.partnerColor}
+                    links={t.links}
+                    unread={t.unread}
+                  />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
 
-          {dayGoogleEvents.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-bold">구글 일정</h3>
+          <AccordionSection title="캘린더 일정" count={dayGoogleEvents.length}>
+            {dayGoogleEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">이 날 구글 일정이 없습니다.</p>
+            ) : (
               <div className="space-y-1">
                 {dayGoogleEvents.map((e) => (
                   <GoogleEventChip
@@ -464,8 +503,8 @@ export function CalendarView({
                   />
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </AccordionSection>
         </>
       ) : (
         <div className="overflow-hidden rounded-4xl bg-card p-3 shadow-md ring-1 ring-foreground/5 sm:p-4 dark:ring-foreground/10">
@@ -548,24 +587,39 @@ export function CalendarView({
       )}
 
       {view === "month" && (
-        <section className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
-          <h3 className="text-sm font-bold">
-            {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")} ({selectedItems.length}건)
+        <section className="space-y-3 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
+          <h3 className="text-sm font-bold text-muted-foreground">
+            {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")}
           </h3>
-          {selectedItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">이 날 마감인 프로젝트가 없습니다.</p>
-          ) : (
-            <div className="space-y-1">
-              {selectedItems.map((item) => (
-                <DayItemChip
-                  key={item.kind === "project" ? item.data.id : `${item.data.calendarId}-${item.data.id}`}
-                  item={item}
-                  partners={partners}
-                  currentUserId={currentUserId}
-                />
-              ))}
-            </div>
-          )}
+
+          <AccordionSection title="프로젝트 일정" count={selectedProjects.length}>
+            {selectedProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
+            ) : (
+              <div className="space-y-1">
+                {selectedProjects.map((p) => (
+                  <ProjectChip key={p.id} project={p} />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
+
+          <AccordionSection title="캘린더 일정" count={selectedGoogleEvents.length}>
+            {selectedGoogleEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">이 날 구글 일정이 없습니다.</p>
+            ) : (
+              <div className="space-y-1">
+                {selectedGoogleEvents.map((e) => (
+                  <GoogleEventChip
+                    key={`${e.calendarId}-${e.id}`}
+                    event={e}
+                    partners={partners}
+                    currentUserId={currentUserId}
+                  />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
         </section>
       )}
     </div>

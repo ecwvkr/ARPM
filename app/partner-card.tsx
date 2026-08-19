@@ -53,11 +53,15 @@ export function PartnerCard({
           글자당 한 줄씩 세로로 접히므로, 버튼 줄은 항상 제목 아래로 내린다. */}
       <div className="relative z-10 flex flex-col gap-1.5">
         <h3 className="pointer-events-none break-keep text-base font-bold">{partner.name}</h3>
-        <div className="flex flex-wrap items-center gap-0.5">
+        {/* 이 행 자체는 pointer-events-none이라 버튼/태그 사이 빈 공간은 클릭이 아래 배경
+            링크로 투과돼 카드 전체가 파트너 페이지로 넘어간다. 버튼은 실제 인터랙티브
+            요소라 자체 pointer-events로 항상 클릭되고, 상태 태그만 별도로 다시 막아
+            눌러도 아무 동작 없이 그 자리에 머문다. */}
+        <div className="pointer-events-none flex flex-wrap items-center gap-0.5">
           <PartnerPinButton partnerId={partner.id} pinned={(partner.pinnedBy?.length ?? 0) > 0} />
           <Badge
             variant={partner.visibility === "PUBLIC" ? "secondary" : "outline"}
-            className="pointer-events-none rounded-full bg-background px-2"
+            className="pointer-events-auto rounded-full bg-background px-2"
           >
             {partner.visibility === "PUBLIC" ? "공개" : "비공개"}
           </Badge>

@@ -6,6 +6,7 @@ import {
   completeProject,
   reopenProject,
   extendDueDate,
+  updateCreatedDate,
   duplicateProject,
   listMovableTargets,
   moveProject,
@@ -15,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DeriveDialog } from "./project-derive-dialog";
+import { ProjectParentPicker } from "@/components/project-parent-picker";
 import { IconDotsVertical, IconPlus, IconCopy, IconArrowsMove, IconCalendar } from "@tabler/icons-react";
 
 function formatDate(date: Date) {
@@ -25,6 +27,7 @@ export function ProjectDetailStatus({
   projectId,
   status,
   dueDate,
+  createdAt,
   parentId,
   canParticipantAct,
   canManage,
@@ -35,6 +38,7 @@ export function ProjectDetailStatus({
   projectId: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
   dueDate: Date | null;
+  createdAt: Date;
   parentId: string | null;
   canParticipantAct: boolean;
   canManage: boolean;
@@ -99,7 +103,10 @@ export function ProjectDetailStatus({
         {canManage && <MoreMenu projectId={projectId} parentId={parentId} onDone={onDone} />}
       </div>
 
-      {canParticipantAct && <DueDateControl projectId={projectId} dueDate={dueDate} onDone={onDone} />}
+      <div className="flex flex-wrap items-center gap-3">
+        {canParticipantAct && <DueDateControl projectId={projectId} dueDate={dueDate} onDone={onDone} />}
+        {canManage && <CreatedDateControl projectId={projectId} createdAt={createdAt} onDone={onDone} />}
+      </div>
     </div>
   );
 }
@@ -147,6 +154,62 @@ function DueDateControl({
             name="dueDate"
             type="date"
             defaultValue={dueDate ? new Date(dueDate).toISOString().slice(0, 10) : undefined}
+            className="w-auto"
+            required
+          />
+          <Button type="submit" size="sm" disabled={isPending}>
+            저장
+          </Button>
+        </form>
+        {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// 생성일 텍스트도 마감일과 같은 방식 — 눌러서 바로 달력을 열어 수정한다(master 전용).
+function CreatedDateControl({
+  projectId,
+  createdAt,
+  onDone,
+}: {
+  projectId: string;
+  createdAt: Date;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const action = updateCreatedDate.bind(null, projectId);
+  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+  const submitted = useRef(false);
+
+  useEffect(() => {
+    if (submitted.current && !isPending && !errorMessage) {
+      submitted.current = false;
+      setOpen(false);
+      onDone();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPending, errorMessage]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground underline decoration-dashed underline-offset-4 hover:text-foreground"
+          >
+            <IconCalendar className="size-4" />
+            생성일 {formatDate(createdAt)}
+          </button>
+        }
+      />
+      <PopoverContent className="w-auto gap-2 p-3">
+        <form action={formAction} onSubmit={() => { submitted.current = true; }} className="flex items-center gap-2">
+          <Input
+            name="createdAt"
+            type="date"
+            defaultValue={new Date(createdAt).toISOString().slice(0, 10)}
             className="w-auto"
             required
           />
@@ -277,19 +340,12 @@ function MoveForm({
       }
       className="flex items-center gap-2"
     >
-      <select
+      <ProjectParentPicker
         name="parentId"
-        aria-label="부모 프로젝트"
-        defaultValue={currentParentId ?? ""}
-        className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
-      >
-        <option value="">(최상위)</option>
-        {targets.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.title}
-          </option>
-        ))}
-      </select>
+        options={targets}
+        defaultId={currentParentId}
+        placeholder="상위 프로젝트 검색 (비우면 최상위)"
+      />
       <Button type="submit" size="sm" variant="outline" disabled={isPending}>
         이동
       </Button>

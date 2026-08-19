@@ -40,7 +40,7 @@ export function UserPicker({
 
   return (
     <div className="space-y-1.5">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      {label && <p className="text-xs text-muted-foreground">{label}</p>}
       {candidates.length > SEARCH_THRESHOLD && (
         <Input
           value={query}

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ProjectDetailHeader } from "./project-detail-header";
 import { ProjectDetailStatus } from "./project-detail-status";
 import { ProjectDetailParticipants } from "./project-detail-participants";
+import { ProjectDetailTasks } from "./project-detail-tasks";
 import { ProjectDetailComments } from "./project-detail-comments";
 import { useSavedToast } from "@/components/ui/saved-toast";
 import { IconArchive } from "@tabler/icons-react";
@@ -54,6 +55,9 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
     currentUserId,
     isSuperAdmin,
     commentVisibleCount,
+    isNew,
+    isEdited,
+    recentChanges,
   } = detail;
   const locked = project.completedAt !== null;
   const participantChips = buildParticipantChips(project);
@@ -71,6 +75,9 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
           canManage={canManage}
           locked={locked}
           isViewer={isViewer}
+          isNew={isNew}
+          isEdited={isEdited}
+          recentChanges={recentChanges}
           onSaved={reload}
         />
       </SectionCard>
@@ -80,6 +87,7 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
           projectId={projectId}
           status={project.status}
           dueDate={project.dueDate}
+          createdAt={project.createdAt}
           parentId={project.parentId}
           canParticipantAct={canParticipantAct}
           canManage={canManage}
@@ -98,6 +106,15 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
           canJoin={canJoin}
           canLeave={canLeave}
           excludeIds={[project.master.id, ...project.participants.map((p) => p.userId)]}
+          onDone={reload}
+        />
+      </SectionCard>
+
+      <SectionCard title={`테스크 (${project.tasks.filter((t) => !t.done).length}/${project.tasks.length})`}>
+        <ProjectDetailTasks
+          projectId={projectId}
+          tasks={project.tasks}
+          canEdit={canParticipantAct && !locked}
           onDone={reload}
         />
       </SectionCard>

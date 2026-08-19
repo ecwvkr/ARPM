@@ -17,6 +17,7 @@ export async function revalidateProjectViews(
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/projects");
   revalidatePath("/calendar");
+  revalidatePath("/tasks");
   revalidatePath("/");
   if (touch) {
     await prisma.partner.update({ where: { id: partnerId }, data: { lastActivityAt: new Date() } });

@@ -57,7 +57,6 @@ export default async function PartnerDetailPage({
               />
             )}
             <h1 className="text-base font-bold">{partner.name}</h1>
-            <span className="text-sm text-muted-foreground">owner: {partner.owner.name}</span>
             <Badge variant={partner.visibility === "PUBLIC" ? "secondary" : "outline"}>
               {partner.visibility === "PUBLIC" ? "공개" : "비공개"}
             </Badge>

@@ -46,7 +46,13 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
     | "IN_PROGRESS"
     | "DONE"
   )[];
-  const selectedAssigneeIds = toArray(typeof params.assignee === "string" ? params.assignee : undefined);
+  // 요청 13: 필터를 한 번도 안 건드린 순수 진입(=f 없음, assignee도 없음)이면 "내 프로젝트"를
+  // 기본값으로 켠다. f=1이 붙었다면 사용자가 의도적으로 담당자 필터를 전부 비운 것이므로
+  // 빈 배열(전체 보기)을 그대로 존중한다.
+  const touched = typeof params.f === "string";
+  const rawAssignee = typeof params.assignee === "string" ? params.assignee : undefined;
+  const selectedAssigneeIds =
+    rawAssignee !== undefined ? toArray(rawAssignee) : touched ? [] : [session.user.id];
   const selectedDueBuckets = toArray(typeof params.due === "string" ? params.due : undefined) as DueBucket[];
   const q = typeof params.q === "string" ? params.q : undefined;
   const sort = typeof params.sort === "string" ? (params.sort as ProjectSort) : undefined;

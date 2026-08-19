@@ -17,6 +17,9 @@ export function ProjectDetailHeader({
   canManage,
   locked,
   isViewer,
+  isNew,
+  isEdited,
+  recentChanges,
   onSaved,
 }: {
   projectId: string;
@@ -33,6 +36,9 @@ export function ProjectDetailHeader({
   canManage: boolean;
   locked: boolean;
   isViewer: boolean;
+  isNew: boolean;
+  isEdited: boolean;
+  recentChanges: { id: string; message: string; actorName: string; createdAt: Date }[];
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -69,7 +75,7 @@ export function ProjectDetailHeader({
             </Button>
           </div>
         </div>
-        <Textarea name="memo" defaultValue={project.memo ?? ""} placeholder="메모" rows={3} />
+        <Textarea name="memo" defaultValue={project.memo ?? ""} placeholder="상세" rows={3} required />
         <LinkFields defaultLinks={project.links} />
         {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
       </form>
@@ -80,6 +86,8 @@ export function ProjectDetailHeader({
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          {isNew && <Badge variant="destructive">신규</Badge>}
+          {isEdited && <Badge variant="outline">수정됨</Badge>}
           <h2 className="text-lg font-bold">{project.title}</h2>
           <Badge variant={project.status === "DONE" ? "secondary" : "default"}>
             {STATUS_LABEL[project.status]}
@@ -119,6 +127,19 @@ export function ProjectDetailHeader({
         </a>
       ))}
       {project.parent && <p className="text-xs text-muted-foreground">상위 프로젝트: {project.parent.title}</p>}
+      {isEdited && recentChanges.length > 0 && (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer underline underline-offset-2">수정 내역</summary>
+          <ul className="mt-1.5 space-y-1">
+            {recentChanges.map((c) => (
+              <li key={c.id}>
+                <span className="text-foreground">{c.actorName}</span> · {c.message} ·{" "}
+                {new Date(c.createdAt).toLocaleString("ko-KR")}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

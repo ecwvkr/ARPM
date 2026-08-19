@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { IconLayoutGrid, IconChecklist, IconBuilding, IconCalendar, IconSettings } from "@tabler/icons-react";
+import { IconLayoutGrid, IconChecklist, IconListCheck, IconBuilding, IconCalendar, IconSettings } from "@tabler/icons-react";
 import { getRecentPartner, subscribeRecentPartner } from "@/lib/recent-partner";
 import { useSavedToast } from "@/components/ui/saved-toast";
 
@@ -11,8 +11,8 @@ function getServerSnapshot() {
   return null;
 }
 
-// 5탭은 라벨 폭이 빡빡하므로 파트너명이 길면 줄인다.
-function abbreviatePartnerName(name: string, max = 4) {
+// 6탭은 라벨 폭이 빡빡하므로 파트너명이 길면 줄인다.
+function abbreviatePartnerName(name: string, max = 3) {
   return name.length > max ? `${name.slice(0, max)}···` : name;
 }
 
@@ -51,6 +51,7 @@ export function BottomNav() {
           </li>
 
           <NavLink label="전체 프로젝트" href="/projects" Icon={IconChecklist} active={pathname.startsWith("/projects")} />
+          <NavLink label="태스크" href="/tasks" Icon={IconListCheck} active={pathname.startsWith("/tasks")} />
           <NavLink label="캘린더" href="/calendar" Icon={IconCalendar} active={pathname.startsWith("/calendar")} />
           <NavLink label="설정" href="/settings" Icon={IconSettings} active={pathname.startsWith("/settings")} />
         </ul>

@@ -42,6 +42,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     status: t.status,
     visibility: t.visibility,
     dueDate: t.dueDate,
+    startDate: t.startDate,
     createdAt: t.createdAt,
     partnerName: t.partnerName,
     partnerColor: t.partnerColor,

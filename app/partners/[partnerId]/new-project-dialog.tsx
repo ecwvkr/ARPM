@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UserPicker } from "@/components/user-picker";
 import { LinkFields } from "@/components/link-fields";
+import { ProjectParentPicker } from "@/components/project-parent-picker";
 import {
   Dialog,
   DialogContent,
@@ -105,8 +106,8 @@ export function NewProjectDialog({
             <Input id="title" name="title" defaultValue={initial?.title} required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="memo">메모</Label>
-            <Textarea id="memo" name="memo" rows={3} />
+            <Label htmlFor="memo">상세</Label>
+            <Textarea id="memo" name="memo" rows={3} required />
           </div>
           <div className="space-y-1.5">
             <Label>링크</Label>
@@ -118,20 +119,8 @@ export function NewProjectDialog({
           </div>
           {projectOptions.length > 0 && (
             <div className="space-y-1.5">
-              <Label htmlFor="parentId">+ 상위 프로젝트 설정</Label>
-              <select
-                id="parentId"
-                name="parentId"
-                defaultValue=""
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
-              >
-                <option value="">(없음)</option>
-                {projectOptions.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
+              <Label>+ 상위 프로젝트 설정</Label>
+              <ProjectParentPicker name="parentId" options={projectOptions} />
             </div>
           )}
           <UserPicker
