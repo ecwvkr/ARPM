@@ -71,6 +71,7 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
       <SectionCard>
         <ProjectDetailHeader
           projectId={projectId}
+          partnerId={project.partnerId}
           project={project}
           canManage={canManage}
           locked={locked}
@@ -118,6 +119,7 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
           canEdit={canParticipantAct && !locked}
           currentUserId={currentUserId}
           isMaster={canManage}
+          participants={participantChips.map((p) => ({ userId: p.userId, userName: p.userName }))}
           onDone={reload}
         />
       </SectionCard>

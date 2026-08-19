@@ -95,8 +95,11 @@ export async function createProject(
   const partnerId = formData.get("partnerId") as string | null;
   if (!partnerId) return "파트너를 선택하세요.";
 
-  const { canView } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
+  // 프로젝트 생성은 그 파트너에 직접 참여 중인 사람만 할 수 있다(공개 파트너를 볼 수만 있는
+  // 사람은 '업무 참여하기'로 먼저 합류해야 한다).
+  const { canView, isMember } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
   if (!canView) return "파트너에 접근할 수 없습니다.";
+  if (!isMember) return "이 파트너에 참여한 뒤에 프로젝트를 만들 수 있습니다. '업무 참여하기'로 참여를 신청하세요.";
 
   const title = (formData.get("title") as string | null)?.trim();
   if (!title) return "제목을 입력하세요.";
@@ -549,10 +552,31 @@ export async function updateProjectInfo(
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
 
+  // 상위 프로젝트 변경도 이 폼에서 함께 처리한다(별도 '상위 프로젝트 변경' 팝업을 없앰).
+  // 순환 참조를 만들지 않도록 moveProject와 같은 규칙으로 검증한다.
+  const parentIdRaw = formData.get("parentId") as string | null;
+  const newParentId = parentIdRaw ? parentIdRaw : null;
+  if (newParentId !== project.parentId) {
+    if (newParentId === projectId) return "자기 자신을 상위 프로젝트로 지정할 수 없습니다.";
+    if (newParentId) {
+      const partnerProjects = await listProjectsForPartner(
+        project.partnerId,
+        session.user.id,
+        !!session.user.isSuperAdmin,
+      );
+      if (!partnerProjects.some((t) => t.id === newParentId)) {
+        return "같은 파트너 내에서만 지정할 수 있습니다.";
+      }
+      if (collectDescendantIds(partnerProjects, projectId).has(newParentId)) {
+        return "하위 프로젝트를 상위로 지정할 수 없습니다.";
+      }
+    }
+  }
+
   await prisma.$transaction([
     prisma.project.update({
       where: { id: projectId },
-      data: { title, memo, links },
+      data: { title, memo, links, parentId: newParentId },
     }),
     prisma.auditLog.create({
       data: {

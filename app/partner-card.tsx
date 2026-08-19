@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/ui/avatar-stack";
 import { PartnerSettingsDialog } from "@/app/partners/[partnerId]/partner-settings-dialog";
 import { PartnerPinButton } from "@/app/partner-pin-button";
+import { PartnerJoinButton } from "@/components/partner-join-button";
 
 type PartnerCardData = {
   id: string;
@@ -22,15 +23,21 @@ type PartnerCardData = {
 export function PartnerCard({
   partner,
   currentUserId,
+  isSuperAdmin = false,
+  joined = true,
+  joinRequested = false,
   hasUnread,
 }: {
   partner: PartnerCardData;
   currentUserId: string;
+  isSuperAdmin?: boolean;
+  joined?: boolean;
+  joinRequested?: boolean;
   hasUnread?: boolean;
 }) {
   // 숨김은 개인 설정이라(D2) 카드에는 보관함(deletedAt) 여부만 표시한다.
   const hidden = partner.deletedAt !== null;
-  const isOwner = partner.ownerId === currentUserId;
+  const isOwner = partner.ownerId === currentUserId || isSuperAdmin;
   const todoCount = partner.projects.filter((t) => t.status === "TODO").length;
   const inProgressCount = partner.projects.filter((t) => t.status === "IN_PROGRESS").length;
 
@@ -87,6 +94,12 @@ export function PartnerCard({
       )}
 
       <div className="pointer-events-none relative z-10 space-y-0.5 text-sm text-muted-foreground">
+        {/* 총관리자는 이미 모든 파트너에 접근할 수 있어 신청할 대상이 아니다. */}
+        {!joined && !isSuperAdmin && (
+          <div className="pointer-events-auto mb-1.5">
+            <PartnerJoinButton partnerId={partner.id} requested={joinRequested} size="xs" />
+          </div>
+        )}
         {hidden && (
           <Badge variant="destructive" className="mb-1 rounded-full">
             보관됨

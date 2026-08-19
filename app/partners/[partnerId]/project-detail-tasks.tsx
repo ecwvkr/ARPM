@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createTask, toggleTask, deleteTask, updateTask } from "@/app/actions/tasks";
+import { createTask, toggleTask, deleteTask, updateTask, transferTaskOwner } from "@/app/actions/tasks";
 import { Avatar } from "@/components/ui/avatar-stack";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { IconCircle, IconCircleCheckFilled, IconPlus, IconX, IconPencil } from "@tabler/icons-react";
 
 type Task = {
@@ -23,6 +24,7 @@ export function ProjectDetailTasks({
   canEdit,
   currentUserId,
   isMaster,
+  participants,
   onDone,
 }: {
   projectId: string;
@@ -30,6 +32,7 @@ export function ProjectDetailTasks({
   canEdit: boolean;
   currentUserId: string;
   isMaster: boolean;
+  participants: { userId: string; userName: string }[];
   onDone: () => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -70,6 +73,7 @@ export function ProjectDetailTasks({
           canCheck={canEdit}
           // 내용 수정·삭제는 작성자 본인 또는 master만(프로젝트 10·11).
           canEditContent={canEdit && (t.createdById === currentUserId || isMaster)}
+          participants={participants}
           onDone={onDone}
         />
       ))}
@@ -121,15 +125,73 @@ export function ProjectDetailTasks({
   );
 }
 
+// 작성자 칩을 눌러 다른 참여자에게 태스크를 넘긴다.
+function OwnerChip({
+  task,
+  participants,
+  onDone,
+}: {
+  task: Task;
+  participants: { userId: string; userName: string }[];
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const others = participants.filter((p) => p.userId !== task.createdById);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            title={`${task.createdBy.name} · 눌러서 담당 넘기기`}
+            className="flex shrink-0 items-center gap-1 rounded-full bg-muted py-0.5 pr-2 pl-0.5 text-xs text-muted-foreground hover:bg-muted/70"
+          >
+            <Avatar id={task.createdById} name={task.createdBy.name} size="xs" />
+            {task.createdBy.name}
+          </button>
+        }
+      />
+      <PopoverContent className="w-44 gap-0.5 p-1.5" align="end">
+        <p className="px-2 pt-1 text-xs text-muted-foreground">담당 넘기기</p>
+        {others.length === 0 ? (
+          <p className="px-2 py-1.5 text-sm text-muted-foreground">넘길 참여자가 없습니다.</p>
+        ) : (
+          others.map((p) => (
+            <button
+              key={p.userId}
+              type="button"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  await transferTaskOwner(task.id, p.userId);
+                  setOpen(false);
+                  onDone();
+                })
+              }
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted"
+            >
+              {p.userName}
+            </button>
+          ))
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function TaskRow({
   task,
   canCheck,
   canEditContent,
+  participants,
   onDone,
 }: {
   task: Task;
   canCheck: boolean;
   canEditContent: boolean;
+  participants: { userId: string; userName: string }[];
   onDone: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -193,14 +255,18 @@ function TaskRow({
         </span>
       )}
 
-      {/* 누가 만든 항목인지 칩으로 간단히 표기(프로젝트 8). */}
-      <span
-        title={task.createdBy.name}
-        className="flex shrink-0 items-center gap-1 rounded-full bg-muted py-0.5 pr-2 pl-0.5 text-xs text-muted-foreground"
-      >
-        <Avatar id={task.createdById} name={task.createdBy.name} size="xs" />
-        {task.createdBy.name}
-      </span>
+      {/* 누가 만든 항목인지 칩으로 표기하고, 권한이 있으면 눌러서 다른 참여자에게 넘긴다. */}
+      {canEditContent ? (
+        <OwnerChip task={task} participants={participants} onDone={onDone} />
+      ) : (
+        <span
+          title={task.createdBy.name}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-muted py-0.5 pr-2 pl-0.5 text-xs text-muted-foreground"
+        >
+          <Avatar id={task.createdById} name={task.createdBy.name} size="xs" />
+          {task.createdBy.name}
+        </span>
+      )}
 
       {canEditContent && !editing && (
         <>

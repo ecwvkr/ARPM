@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { getPartnerAccess } from "@/lib/permissions";
+import { PartnerJoinButton } from "@/components/partner-join-button";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/app/notification-bell";
 import { PartnerSettingsDialog } from "./partner-settings-dialog";
@@ -26,13 +28,21 @@ export default async function PartnerDetailPage({
   const session = await auth();
   if (!session?.user?.id) notFound();
 
-  const { partner, isOwner, canView } = await getPartnerAccess(
+  const { partner, isOwner, isMember, canView } = await getPartnerAccess(
     partnerId,
     session.user.id,
     !!session.user.isSuperAdmin,
   );
 
   if (!partner || !canView) notFound();
+
+  // 아직 참여하지 않은 사람에게는 '업무 참여하기'를 띄운다(이미 신청했으면 대기중 표시).
+  const pendingRequest = isMember
+    ? null
+    : await prisma.partnerJoinRequest.findUnique({
+        where: { partnerId_userId: { partnerId, userId: session.user.id } },
+        select: { status: true },
+      });
 
   // 숨김은 개인 설정으로 옮겨갔다(D2) — 여기서는 보관함(deletedAt) 여부만 다룬다.
   const hidden = partner.deletedAt !== null;
@@ -63,7 +73,10 @@ export default async function PartnerDetailPage({
             {hidden && <Badge variant="destructive">보관됨</Badge>}
           </div>
           <div className="flex items-center gap-2">
-            <NewProjectDialog partnerId={partner.id} currentUserId={session.user.id} />
+            {!isMember && (
+              <PartnerJoinButton partnerId={partner.id} requested={pendingRequest?.status === "PENDING"} />
+            )}
+            {isMember && <NewProjectDialog partnerId={partner.id} currentUserId={session.user.id} />}
             <PartnerSettingsDialog
               partner={{ ...partner, members }}
               isOwner={isOwner}

@@ -22,12 +22,14 @@ export function NewProjectDialog({
   partnerId,
   partners,
   currentUserId,
+  currentUserName = "나",
   trigger,
   initial,
 }: {
   partnerId?: string;
   partners?: { id: string; name: string }[];
   currentUserId: string;
+  currentUserName?: string;
   trigger?: React.ReactElement;
   // 구글 일정을 업무로 전환할 때(G5) 제목·기간을 미리 채워 연다. startDate는 생성 폼에는
   // 노출하지 않고 hidden input으로만 넘긴다 — 일반 생성에는 없는 개념이라서다.
@@ -123,6 +125,13 @@ export function NewProjectDialog({
               <ProjectParentPicker name="parentId" options={projectOptions} />
             </div>
           )}
+          {/* 생성자는 서버에서 항상 참여자로 등록되므로 고정 칩으로 먼저 보여준다. */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">참여자</p>
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs text-primary-foreground">
+              {currentUserName} (생성자)
+            </span>
+          </div>
           <UserPicker
             excludeIds={[currentUserId]}
             selected={participants}

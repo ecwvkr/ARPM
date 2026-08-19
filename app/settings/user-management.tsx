@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { toggleUserSuperAdmin, toggleUserActive } from "@/app/actions/admin";
+import { useActionState, useMemo, useState, useTransition } from "react";
+import { toggleUserSuperAdmin, toggleUserActive, deleteUserAccount } from "@/app/actions/admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,9 +79,13 @@ export function UserManagement({ users }: { users: AdminUser[] }) {
                   onConfirm={() => run(() => toggleUserActive(u.id))}
                 />
               ) : (
-                <Button size="xs" variant="outline" disabled={isPending} onClick={() => run(() => toggleUserActive(u.id))}>
-                  활성화
-                </Button>
+                <>
+                  <Button size="xs" variant="outline" disabled={isPending} onClick={() => run(() => toggleUserActive(u.id))}>
+                    활성화
+                  </Button>
+                  {/* 삭제는 비활성 계정에만 노출한다 — 실수로 쓰는 사고를 한 단계 더 막는다. */}
+                  <DeleteUserDialog userId={u.id} userName={u.name} />
+                </>
               )}
             </div>
           </li>
@@ -111,6 +115,44 @@ function CreateAccountDialog() {
           <DialogTitle>계정 발급</DialogTitle>
         </DialogHeader>
         <CreateAccountForm onCreated={() => setOpen(false)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteUserDialog({ userId, userName }: { userId: string; userName: string }) {
+  const [open, setOpen] = useState(false);
+  const action = deleteUserAccount.bind(null, userId);
+  const [errorMessage, formAction, isPending] = useActionState(action, undefined);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button size="xs" variant="destructive">
+            삭제
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>계정 영구 삭제</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          {userName} 님의 계정을 영구 삭제합니다. 되돌릴 수 없습니다.
+        </p>
+        <form action={formAction} className="space-y-2">
+          <Input name="confirm" placeholder="확인을 위해 '삭제'를 입력하세요." />
+          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => setOpen(false)}>
+              취소
+            </Button>
+            <Button type="submit" size="sm" variant="destructive" disabled={isPending}>
+              영구 삭제
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

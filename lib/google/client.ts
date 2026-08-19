@@ -7,11 +7,15 @@ const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 
 // 최소 권한만 요청한다: openid/email은 연결된 계정 표시용, calendar.readonly는 기존 일정 조회,
 // calendar.app.created는 앱이 만든 캘린더(보조 캘린더)에만 쓰기 — 전체 캘린더 쓰기 권한은 요청하지 않는다.
+// calendar.app.created는 '앱이 만든 캘린더'에만 쓸 수 있어, 사용자가 원래 쓰던 캘린더
+// (예: X-allrounder)에 일정을 추가하려면 calendar.events가 필요하다.
+// 이 스코프를 추가한 뒤에는 기존 연결을 끊고 다시 연결해야 새 권한이 적용된다.
 export const GOOGLE_SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.app.created",
+  "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
 // 로그인(AUTH_URL)과 같은 origin을 쓴다 — 콜백 주소가 구글 콘솔에 등록한 값과 정확히 일치해야 한다.

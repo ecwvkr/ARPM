@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priority";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog";
+import { AddEventDialog } from "./add-event-dialog";
 import { IconBrandGoogle, IconArrowRight, IconCheck, IconChevronRight } from "@tabler/icons-react";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -439,6 +440,7 @@ export function CalendarView({
         >
           오늘로 돌아가기
         </button>
+        <AddEventDialog defaultDate={view === "day" ? cursorKey : selectedKey} />
       </div>
 
       <div className="flex items-center justify-between">

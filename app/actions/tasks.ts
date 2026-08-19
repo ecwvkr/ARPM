@@ -82,3 +82,22 @@ export async function deleteTask(taskId: string) {
   await prisma.taskItem.delete({ where: { id: taskId } });
   await revalidateProjectViews(task.project.partnerId);
 }
+
+// 태스크 담당(작성자)을 다른 참여자에게 넘긴다. 작성자 본인 또는 프로젝트 master만 가능하고,
+// 넘길 대상은 그 프로젝트에 참여 중인 사람으로 제한한다.
+export async function transferTaskOwner(taskId: string, newOwnerId: string) {
+  const task = await assertCanEditTask(taskId);
+  if (!task) return;
+  if (task.createdById === newOwnerId) return;
+
+  const eligible =
+    newOwnerId === task.project.masterId ||
+    (await prisma.projectParticipant.findUnique({
+      where: { projectId_userId: { projectId: task.projectId, userId: newOwnerId } },
+      select: { userId: true },
+    })) !== null;
+  if (!eligible) throw new Error("이 프로젝트 참여자에게만 넘길 수 있습니다.");
+
+  await prisma.taskItem.update({ where: { id: taskId }, data: { createdById: newOwnerId } });
+  await revalidateProjectViews(task.project.partnerId);
+}

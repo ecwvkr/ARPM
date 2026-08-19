@@ -219,6 +219,31 @@ async function deleteEvent(accessToken: string, calendarId: string, eventId: str
   ).catch(() => {});
 }
 
+// 캘린더 뷰의 '일정 추가' — 관리자가 표시 대상으로 고른 캘린더 중 하나에 종일 일정을 만든다.
+// 종일 일정의 end.date는 배타적이라 마지막 날 +1일로 넣는다(조회 쪽 normalizeEvent와 짝).
+export async function createGoogleCalendarEvent(
+  calendarId: string,
+  { title, startDate, endDate }: { title: string; startDate: Date; endDate: Date },
+): Promise<string> {
+  const conn = await prisma.googleConnection.findFirst();
+  if (!conn) throw new Error("연결된 구글 계정이 없습니다.");
+  if (!conn.enabledCalendarIds.includes(calendarId) && calendarId !== conn.syncCalendarId) {
+    throw new Error("표시 대상으로 선택된 캘린더에만 추가할 수 있습니다.");
+  }
+
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) throw new Error("연결된 구글 계정이 없습니다.");
+
+  const endExclusive = new Date(endDate);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  return createEvent(accessToken, calendarId, {
+    summary: title,
+    start: { date: toDateOnlyString(startDate) },
+    end: { date: toDateOnlyString(endExclusive) },
+  });
+}
+
 // 다른 사람이 직접 발급받은 이벤트 id로 구글에서 지운다. hardDeleteProject처럼 DB 행이
 // 이미 사라져 syncProjectToGoogle로 다시 조회할 수 없는 경우에 쓴다.
 export async function deleteGoogleEventsById(eventIds: string[]): Promise<void> {

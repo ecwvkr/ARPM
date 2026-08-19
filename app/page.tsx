@@ -31,22 +31,27 @@ export default async function DashboardPage({
   const filter: PartnerFilter =
     params.filter === "mine" || params.filter === "inprogress" ? params.filter : "all";
 
-  // ponytail: 서로 의존하지 않는 세 조회(알림 점검·파트너 목록·내 프로젝트)를 순차 대기
-  // 대신 한 번에 날려 왕복 시간을 줄인다.
-  const [, allPartners, myProjects] = await Promise.all([
+  // ponytail: 서로 의존하지 않는 네 조회(알림 점검·파트너 목록·내 프로젝트·전체 프로젝트)를
+  // 순차 대기 대신 한 번에 날려 왕복 시간을 줄인다.
+  const [, allPartners, myProjects, allProjects] = await Promise.all([
     ensureDeadlineNotifications(userId),
     listVisiblePartnersWithUnread(userId, isSuperAdmin, sort),
     listAllProjectsForUser(userId, isSuperAdmin, { assigneeIds: [userId] }),
+    listAllProjectsForUser(userId, isSuperAdmin, {}),
   ]);
 
   // 개인별 숨김(D2)·즐겨찾기는 같은 조회 결과에서 갈라낸다 — 별도 쿼리 없이 한 번에 온
   // 목록을 화면에서 두 묶음(안 숨김/숨김)으로 나누고, 각 묶음 안에서는 즐겨찾기를 맨 위로.
   const visibleAll = allPartners.filter((p) => (p.hiddenBy?.length ?? 0) === 0);
-  const ownedCount = visibleAll.filter((p) => p.ownerId === userId).length;
   const inProgressCount = visibleAll.filter((p) => p.projects.some((t) => t.status === "IN_PROGRESS")).length;
 
+  // 내가 직접 참여 중인 파트너인지 — 카드 묶음(참여/미참여)과 '업무 참여하기' 노출 기준.
+  // 총관리자는 모든 파트너를 관리할 수 있지만, 이 구분은 "실제로 참여 중인가"를 보여주는
+  // 개인 화면 정리 용도라 소유·멤버 여부만 본다.
+  const isJoined = (p: (typeof allPartners)[number]) =>
+    p.ownerId === userId || p.members.some((m) => m.userId === userId);
+
   const byFilter = (p: (typeof allPartners)[number]) => {
-    if (filter === "mine") return p.ownerId === userId;
     if (filter === "inprogress") return p.projects.some((t) => t.status === "IN_PROGRESS");
     return true;
   };
@@ -54,7 +59,10 @@ export default async function DashboardPage({
     ...list.filter((p) => (p.pinnedBy?.length ?? 0) > 0),
     ...list.filter((p) => (p.pinnedBy?.length ?? 0) === 0),
   ];
-  const partners = sortPinnedFirst(visibleAll.filter(byFilter));
+  const shown = sortPinnedFirst(visibleAll.filter(byFilter));
+  // 참여 중인 파트너를 위로, 참여하지 않은 파트너는 아래 아코디언으로 접어 둔다.
+  const partners = shown.filter(isJoined);
+  const notJoinedPartners = shown.filter((p) => !isJoined(p));
   const hiddenPartners = sortPinnedFirst(allPartners.filter((p) => (p.hiddenBy?.length ?? 0) > 0 && byFilter(p)));
 
   function widgetHref(next: PartnerFilter) {
@@ -95,13 +103,15 @@ export default async function DashboardPage({
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <SummaryCard label="전체 파트너" value={visibleAll.length} href={widgetHref("all")} active={filter === "all"} />
-          <SummaryCard label="나의 파트너" value={ownedCount} href={widgetHref("mine")} active={filter === "mine"} />
           <SummaryCard
             label="진행중인 파트너"
             value={inProgressCount}
             href={widgetHref("inprogress")}
             active={filter === "inprogress"}
           />
+          {/* 프로젝트 태그 둘은 파트너 필터가 아니라 전체 프로젝트 화면으로 넘겨주는 버튼이다. */}
+          <SummaryCard label="전체 프로젝트" value={allProjects.length} href="/projects?f=1" active={false} />
+          <SummaryCard label="참여중인 프로젝트" value={myProjects.length} href="/projects" active={false} />
         </div>
 
         {dueSoon.length > 0 && (
@@ -137,7 +147,7 @@ export default async function DashboardPage({
 
         {partners.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {filter === "all" ? "아직 파트너가 없습니다." : "조건에 맞는 파트너가 없습니다."}
+            {filter === "all" ? "참여 중인 파트너가 없습니다." : "조건에 맞는 파트너가 없습니다."}
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -146,10 +156,34 @@ export default async function DashboardPage({
                 key={partner.id}
                 partner={partner}
                 currentUserId={userId}
+                isSuperAdmin={isSuperAdmin}
+                joined
                 hasUnread={partner.projects.some((t) => isProjectUnread(t, userId))}
               />
             ))}
           </div>
+        )}
+
+        {notJoinedPartners.length > 0 && (
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground underline underline-offset-2">
+              참여하지 않은 파트너 보기 ({notJoinedPartners.length})
+              <IconChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {notJoinedPartners.map((partner) => (
+                <PartnerCard
+                  key={partner.id}
+                  partner={partner}
+                  currentUserId={userId}
+                  isSuperAdmin={isSuperAdmin}
+                  joined={false}
+                  joinRequested={(partner.joinRequests?.length ?? 0) > 0}
+                  hasUnread={false}
+                />
+              ))}
+            </div>
+          </details>
         )}
 
         {hiddenPartners.length > 0 && (
@@ -164,6 +198,9 @@ export default async function DashboardPage({
                   key={partner.id}
                   partner={partner}
                   currentUserId={userId}
+                  isSuperAdmin={isSuperAdmin}
+                  joined={isJoined(partner)}
+                  joinRequested={(partner.joinRequests?.length ?? 0) > 0}
                   hasUnread={partner.projects.some((t) => isProjectUnread(t, userId))}
                 />
               ))}

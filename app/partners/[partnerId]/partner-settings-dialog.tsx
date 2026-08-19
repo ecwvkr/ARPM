@@ -8,6 +8,8 @@ import {
   transferPartnerOwner,
   updatePartnerSettings,
   checkPartnerName,
+  listPartnerJoinRequests,
+  respondToPartnerJoin,
 } from "@/app/actions/partners";
 import { listAllUsers } from "@/app/actions/users";
 import { Button } from "@/components/ui/button";
@@ -17,9 +19,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InviteForm } from "./invite-form";
 import { useSavedToast } from "@/components/ui/saved-toast";
-import { IconDotsVertical, IconX, IconCheck } from "@tabler/icons-react";
+import { IconDotsVertical, IconX, IconCheck, IconChevronDown } from "@tabler/icons-react";
 
-// 파스텔 프리셋 6~8개 + '색상 없음'. 색상표 대신 한 번 탭으로 고르게 한다(P5).
+// 파스텔 프리셋 + '색상 없음'. 색상표 대신 한 번 탭으로 고르게 한다(P5).
+// 첫 줄 8개만 기본 노출하고 나머지는 '더보기'로 펼친다.
 const COLOR_PRESETS = [
   "#F2A8A8",
   "#F5C99B",
@@ -29,6 +32,25 @@ const COLOR_PRESETS = [
   "#A8C6F0",
   "#C9B6E4",
   "#F0B8D9",
+];
+
+const MORE_COLOR_PRESETS = [
+  "#E88B8B",
+  "#EFAE72",
+  "#E3CE6E",
+  "#93CC88",
+  "#7FC4C7",
+  "#7FA8E0",
+  "#AE93D6",
+  "#E093C4",
+  "#C9A227",
+  "#8AA37B",
+  "#6E8CA0",
+  "#9C8AA6",
+  "#B58C7A",
+  "#7F8C8D",
+  "#5D6D7E",
+  "#4A4A4A",
 ];
 
 type PartnerMember = { userId: string; role: "OWNER" | "MEMBER"; user: { id: string; name: string } };
@@ -59,6 +81,10 @@ export function PartnerSettingsDialog({
   const settingsAction = updatePartnerSettings.bind(null, partner.id);
   const [errorMessage, formAction, isSaving] = useActionState(settingsAction, undefined);
   const [color, setColor] = useState(partner.color);
+  // 저장된 색이 확장 팔레트에 있으면 처음부터 펼쳐 둬야 선택된 칩이 보인다.
+  const [showMoreColors, setShowMoreColors] = useState(
+    !!partner.color && MORE_COLOR_PRESETS.includes(partner.color),
+  );
   const submitted = useRef(false);
   const { toast, trigger: showSavedToast } = useSavedToast();
 
@@ -153,18 +179,7 @@ export function PartnerSettingsDialog({
                   <input type="hidden" name="color" value={color ?? ""} />
                   <div className="flex flex-wrap items-center gap-2">
                     {COLOR_PRESETS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        title={c}
-                        aria-label={c}
-                        aria-pressed={color === c}
-                        onClick={() => setColor(c)}
-                        style={{ backgroundColor: c }}
-                        className="flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-card outline-none aria-pressed:ring-2 aria-pressed:ring-foreground"
-                      >
-                        {color === c && <IconCheck className="size-4 text-foreground/70" />}
-                      </button>
+                      <ColorSwatch key={c} color={c} selected={color === c} onSelect={setColor} />
                     ))}
                     <button
                       type="button"
@@ -175,6 +190,23 @@ export function PartnerSettingsDialog({
                       색상 없음
                     </button>
                   </div>
+                  {showMoreColors && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {MORE_COLOR_PRESETS.map((c) => (
+                        <ColorSwatch key={c} color={c} selected={color === c} onSelect={setColor} />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreColors((v) => !v)}
+                    aria-expanded={showMoreColors}
+                    aria-label={showMoreColors ? "색상 접기" : "색상 더보기"}
+                    className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {showMoreColors ? "접기" : "더보기"}
+                    <IconChevronDown className={`size-3.5 transition-transform ${showMoreColors ? "rotate-180" : ""}`} />
+                  </button>
                 </div>
 
                 {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
@@ -210,6 +242,8 @@ export function PartnerSettingsDialog({
                   ))
                 )}
               </div>
+
+              {isOwner && <JoinRequestList partnerId={partner.id} />}
 
               {isOwner && (
                 <div className="pt-1">
@@ -274,6 +308,78 @@ export function PartnerSettingsDialog({
       </Dialog>
       {toast}
     </>
+  );
+}
+
+function ColorSwatch({
+  color,
+  selected,
+  onSelect,
+}: {
+  color: string;
+  selected: boolean;
+  onSelect: (c: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={color}
+      aria-label={color}
+      aria-pressed={selected}
+      onClick={() => onSelect(color)}
+      style={{ backgroundColor: color }}
+      className="flex size-8 items-center justify-center rounded-full ring-offset-2 ring-offset-card outline-none aria-pressed:ring-2 aria-pressed:ring-foreground"
+    >
+      {selected && <IconCheck className="size-4 text-foreground/70" />}
+    </button>
+  );
+}
+
+// '업무 참여하기' 신청 목록. 관리자만 보이며 여기서 바로 수락/거부한다.
+function JoinRequestList({ partnerId }: { partnerId: string }) {
+  const [requests, setRequests] = useState<{ userId: string; userName: string }[] | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    listPartnerJoinRequests(partnerId).then(setRequests);
+  }, [partnerId]);
+
+  if (!requests || requests.length === 0) return null;
+
+  function respond(userId: string, accept: boolean) {
+    startTransition(async () => {
+      await respondToPartnerJoin(partnerId, userId, accept);
+      setRequests((prev) => prev?.filter((r) => r.userId !== userId) ?? null);
+    });
+  }
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      <p className="text-xs text-muted-foreground">참여 신청 ({requests.length})</p>
+      {requests.map((r) => (
+        <div key={r.userId} className="flex items-center justify-between gap-2 rounded-md bg-muted/60 px-2.5 py-1.5 text-xs">
+          <span>{r.userName}</span>
+          <span className="flex gap-1.5">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => respond(r.userId, true)}
+              className="font-medium text-primary underline underline-offset-2"
+            >
+              수락
+            </button>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => respond(r.userId, false)}
+              className="text-muted-foreground underline underline-offset-2 hover:text-destructive"
+            >
+              거부
+            </button>
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

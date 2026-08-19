@@ -37,6 +37,7 @@ model User {
   auditLogs            AuditLog[]
   googleConnections     GoogleConnection[]
   createdTasks         TaskItem[]
+  joinRequests         PartnerJoinRequest[]
 }
 
 model Partner {
@@ -54,8 +55,25 @@ model Partner {
   projects Project[]
   hiddenBy PartnerHide[] // 이 파트너를 숨긴 사용자들 (D2)
   pinnedBy PartnerPin[] // 이 파트너를 즐겨찾기 고정한 사용자들
+  joinRequests PartnerJoinRequest[]
 
   @@index([ownerId])
+}
+
+// '업무 참여하기' 요청. 아무 계정이나 참여를 신청할 수 있고, 파트너 관리자가 수락/거부한다.
+// 거부 이력도 남겨야 같은 사람이 무한정 다시 신청하는지 알 수 있으므로 행을 지우지 않고
+// status만 바꾼다(재신청은 PENDING으로 되돌린다).
+model PartnerJoinRequest {
+  partnerId   String
+  userId      String
+  status      String    @default("PENDING") // PENDING | ACCEPTED | REJECTED
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+  partner     Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([partnerId, userId])
+  @@index([userId])
 }
 
 model PartnerMember {

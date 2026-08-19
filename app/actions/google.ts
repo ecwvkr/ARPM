@@ -4,12 +4,82 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptToken, getValidAccessToken, revokeGoogleToken } from "@/lib/google/client";
-import { listCalendars, syncProjectToGoogle, type GoogleCalendarListItem } from "@/lib/google/calendar";
+import { redirect } from "next/navigation";
+import {
+  listCalendars,
+  syncProjectToGoogle,
+  createGoogleCalendarEvent,
+  type GoogleCalendarListItem,
+} from "@/lib/google/calendar";
 
 async function requireSuperAdmin() {
   const session = await auth();
   if (!session?.user?.isSuperAdmin) throw new Error("총관리자만 접근할 수 있습니다.");
   return session;
+}
+
+// 캘린더 뷰의 '일정 추가'에서 고를 수 있는 캘린더 목록. 관리자가 표시 대상으로 고른
+// 캘린더만 후보이므로 총관리자 전용인 listAvailableCalendars와 달리 모든 로그인 사용자가 쓴다.
+export async function listWritableCalendars(): Promise<
+  { calendars: { id: string; summary: string }[] } | { error: "not_connected" | "no_selection" | "reconnect_needed" }
+> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const conn = await prisma.googleConnection.findFirst();
+  if (!conn) return { error: "not_connected" };
+  if (conn.enabledCalendarIds.length === 0) return { error: "no_selection" };
+  // 일정 쓰기에는 calendar.events 스코프가 필요하다 — 그 전에 연결된 계정은 다시 연결해야 한다.
+  if (!conn.scope.includes("calendar.events")) return { error: "reconnect_needed" };
+
+  let accessToken: string | null;
+  try {
+    accessToken = await getValidAccessToken();
+  } catch {
+    return { error: "reconnect_needed" };
+  }
+  if (!accessToken) return { error: "not_connected" };
+
+  try {
+    const all = await listCalendars(accessToken);
+    return {
+      calendars: all
+        .filter((c) => conn.enabledCalendarIds.includes(c.id))
+        .map((c) => ({ id: c.id, summary: c.summary })),
+    };
+  } catch {
+    return { error: "reconnect_needed" };
+  }
+}
+
+export async function addCalendarEvent(_prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const calendarId = (formData.get("calendarId") as string | null)?.trim();
+  const title = (formData.get("title") as string | null)?.trim();
+  const startRaw = formData.get("startDate") as string | null;
+  const endRaw = formData.get("endDate") as string | null;
+
+  if (!calendarId) return "캘린더를 선택하세요.";
+  if (!title) return "일정 제목을 입력하세요.";
+  if (!startRaw) return "시작일을 입력하세요.";
+
+  const startDate = new Date(`${startRaw}T00:00:00`);
+  const endDate = endRaw ? new Date(`${endRaw}T00:00:00`) : startDate;
+  if (endDate < startDate) return "종료일은 시작일보다 빠를 수 없습니다.";
+
+  try {
+    await createGoogleCalendarEvent(calendarId, { title, startDate, endDate });
+  } catch (e) {
+    // 스코프가 모자라면 구글이 403/404를 준다 — 재연결이 필요하다는 걸 알려준다.
+    const message = e instanceof Error ? e.message : "일정을 추가할 수 없습니다.";
+    return /401|403|404|insufficient|permission|credential/i.test(message)
+      ? "이 캘린더에 쓸 권한이 없습니다. 설정 > 구글 연동에서 계정을 다시 연결해 주세요."
+      : message;
+  }
+
+  revalidatePath("/calendar");
 }
 
 export async function getGoogleConnectionStatus() {

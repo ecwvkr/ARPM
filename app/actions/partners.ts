@@ -233,6 +233,94 @@ export async function transferPartnerOwner(partnerId: string, newOwnerId: string
   revalidatePath("/");
 }
 
+// '업무 참여하기': 볼 수는 있지만 아직 참여하지 않은 파트너에 참여를 신청한다.
+// 관리자가 수락해야 실제 멤버가 되므로 여기서는 요청 행과 알림만 만든다.
+export async function requestPartnerJoin(partnerId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { partner, canView, isMember } = await getPartnerAccess(
+    partnerId,
+    session.user.id,
+    !!session.user.isSuperAdmin,
+  );
+  if (!partner || !canView) throw new Error("접근할 수 없는 파트너입니다.");
+  if (isMember) throw new Error("이미 참여 중인 파트너입니다.");
+
+  await prisma.$transaction([
+    prisma.partnerJoinRequest.upsert({
+      where: { partnerId_userId: { partnerId, userId: session.user.id } },
+      // 거부됐던 요청도 다시 신청하면 대기 상태로 되돌린다.
+      update: { status: "PENDING", respondedAt: null, createdAt: new Date() },
+      create: { partnerId, userId: session.user.id },
+    }),
+    prisma.notification.create({
+      data: {
+        userId: partner.ownerId,
+        type: "PARTNER_JOIN_REQUESTED",
+        refId: partnerId,
+        message: `${session.user.name}님이 "${partner.name}" 파트너 업무 참여를 신청했습니다.`,
+      },
+    }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath(`/partners/${partnerId}`);
+}
+
+export async function listPartnerJoinRequests(partnerId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
+  if (!isOwner) return [];
+
+  const requests = await prisma.partnerJoinRequest.findMany({
+    where: { partnerId, status: "PENDING" },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return requests.map((r) => ({ userId: r.userId, userName: r.user.name, createdAt: r.createdAt }));
+}
+
+// accept=true면 멤버로 추가하고, false면 거부 이력만 남긴다. 어느 쪽이든 신청자에게 알린다.
+export async function respondToPartnerJoin(partnerId: string, userId: string, accept: boolean) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { partner, isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
+  if (!partner || !isOwner) throw new Error("파트너 관리자만 처리할 수 있습니다.");
+
+  await prisma.$transaction([
+    prisma.partnerJoinRequest.update({
+      where: { partnerId_userId: { partnerId, userId } },
+      data: { status: accept ? "ACCEPTED" : "REJECTED", respondedAt: new Date() },
+    }),
+    ...(accept
+      ? [
+          prisma.partnerMember.upsert({
+            where: { partnerId_userId: { partnerId, userId } },
+            update: {},
+            create: { partnerId, userId, role: "MEMBER" },
+          }),
+        ]
+      : []),
+    prisma.notification.create({
+      data: {
+        userId,
+        type: "PARTNER_INVITED",
+        refId: partnerId,
+        message: accept
+          ? `"${partner.name}" 파트너 업무 참여가 수락되었습니다.`
+          : `"${partner.name}" 파트너 업무 참여가 거부되었습니다.`,
+      },
+    }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath(`/partners/${partnerId}`);
+}
+
 // 숨김은 계정별 개인 설정이다(D2) — 이 파트너를 볼 수 있는 사람이면 누구나 자신의
 // 대시보드에서만 켜고 끌 수 있고, 다른 사람의 화면에는 영향을 주지 않는다.
 export async function togglePartnerHide(partnerId: string) {

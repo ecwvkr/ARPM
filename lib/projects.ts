@@ -151,6 +151,7 @@ export async function getProjectAccess(projectId: string, userId: string, isSupe
     include: {
       master: true,
       parent: { select: { id: true, title: true } },
+      children: { where: { deletedAt: null }, select: { id: true, title: true, status: true }, orderBy: { createdAt: "asc" } },
       participants: { include: { user: true } },
       priorities: { include: { user: true } },
       comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
@@ -178,7 +179,7 @@ export async function getProjectAccess(projectId: string, userId: string, isSupe
   // 조상이 이미 true로 포함하고 있는데 이 노드에 false grant가 있다면 "가지 제외"로 보고
   // 이 노드부터 차단한다. 조상 grant가 없다면(=단독 초대) false는 "이 프로젝트만 공유"로 취급한다.
   // ponytail: 서로 의존하지 않는 두 조회를 병렬로 실행해 순차 왕복을 줄인다.
-  const [{ canView: canViewPartner }, inherited] = await Promise.all([
+  const [{ canView: canViewPartner, isMember: isPartnerMember }, inherited] = await Promise.all([
     getPartnerAccess(project.partnerId, userId, isSuperAdmin),
     isMaster ? Promise.resolve(null) : hasInheritedAccess(project.partnerId, project.parentId, userId),
   ]);
@@ -197,12 +198,16 @@ export async function getProjectAccess(projectId: string, userId: string, isSupe
       ? canViewPartner
       : isMaster || grantedAccess;
 
-  const canManage = isMaster;
+  // 총관리자는 담당자·참여자 여부와 무관하게 모든 프로젝트를 수정·삭제할 수 있다(절대 권한).
+  const canManage = isMaster || isSuperAdmin;
   // VIEWER는 조회·코멘트만 가능하고 상태 변경·우선순위·마감 연장 등은 할 수 없다(D4).
-  const canParticipantAct = (isMaster || grantedAccess) && !isViewer;
+  const canParticipantAct = isSuperAdmin || ((isMaster || grantedAccess) && !isViewer);
+  // 코멘트는 공개 프로젝트라면 볼 수 있는 사람 누구에게나 열어 둔다.
   const canComment = canView;
   const locked = project.completedAt !== null;
-  const canJoin = canView && !isMaster && !grantedAccess && !locked;
+  // 프로젝트 참여는 상위 파트너에 직접 참여 중인 사람만 할 수 있다 — 공개 파트너를 '볼 수만'
+  // 있는 사람이 프로젝트로 바로 들어오는 경로를 막는다('업무 참여하기'로 파트너부터 합류).
+  const canJoin = canView && isPartnerMember && !isMaster && !grantedAccess && !locked;
   const canLeave = isParticipant && !isMaster && !locked;
 
   return {

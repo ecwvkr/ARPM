@@ -67,6 +67,8 @@ export function listVisiblePartnersWithUnread(
       members: { include: { user: { select: { id: true, name: true } } } },
       hiddenBy: { where: { userId }, select: { userId: true } },
       pinnedBy: { where: { userId }, select: { userId: true } },
+      // 참여 여부/신청 상태에 따라 카드를 나눠 보여주기 위해 내 것만 함께 읽는다.
+      joinRequests: { where: { userId, status: "PENDING" }, select: { userId: true } },
       projects: {
         select: {
           status: true,
