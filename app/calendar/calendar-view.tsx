@@ -36,9 +36,14 @@ export type CalendarProject = {
 
 const PRIORITY_RANK: Record<string, number> = { URGENT: 3, NORMAL: 2, HOLD: 1 };
 
-// 하단 목록 정렬(요청 7): 마감일 임박순 → 내 우선순위(긴급>보통>보류) → 가나다순.
+// 하단 목록 정렬: 완료는 항상 맨 아래로 내리고, 그 안에서 마감일 임박순 →
+// 내 우선순위(긴급>보통>보류) → 가나다순.
 function sortCalendarProjects(projects: CalendarProject[], currentUserId: string): CalendarProject[] {
   return [...projects].sort((a, b) => {
+    const aDone = a.status === "DONE";
+    const bDone = b.status === "DONE";
+    if (aDone !== bDone) return aDone ? 1 : -1;
+
     const aDue = a.dueDate ? a.dueDate.getTime() : Infinity;
     const bDue = b.dueDate ? b.dueDate.getTime() : Infinity;
     if (aDue !== bDue) return aDue - bDue;
