@@ -643,6 +643,28 @@ export async function transferMaster(projectId: string, formData: FormData) {
   await revalidateProjectViews(project.partnerId);
 }
 
+// 참여자 추가 UI가 "이 파트너에 참여 중" / "미참여"를 나눠 보여줄 수 있도록 후보를
+// 두 묶음으로 갈라서 준다. 미참여자를 고르면 초대 시 파트너에도 자동 참여시킨다.
+export async function listProjectInviteCandidates(projectId: string, excludeIds: string[]) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { project, canManage } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!project || !canManage) return { partnerMembers: [], outsiders: [] };
+
+  const [users, members] = await Promise.all([
+    prisma.user.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.partnerMember.findMany({ where: { partnerId: project.partnerId }, select: { userId: true } }),
+  ]);
+  const memberIds = new Set([...members.map((m) => m.userId), project.partner.ownerId]);
+  const candidates = users.filter((u) => !excludeIds.includes(u.id));
+
+  return {
+    partnerMembers: candidates.filter((u) => memberIds.has(u.id)),
+    outsiders: candidates.filter((u) => !memberIds.has(u.id)),
+  };
+}
+
 export async function inviteToProject(
   projectId: string,
   _prevState: string | undefined,
@@ -677,8 +699,20 @@ export async function inviteToProject(
     if (!validIds.has(g.projectId)) return "잘못된 요청입니다.";
   }
 
-  await prisma.$transaction(
-    userIds.flatMap((userId) => [
+  // 프로젝트에만 넣고 파트너 멤버가 아니면 그 사람은 파트너 화면 어디에도 못 들어간다.
+  // 초대 시 파트너에도 자동으로 참여시킨다(클라이언트는 이 사실을 미리 안내한다).
+  const existingMembers = await prisma.partnerMember.findMany({
+    where: { partnerId: project.partnerId, userId: { in: userIds } },
+    select: { userId: true },
+  });
+  const alreadyMember = new Set([...existingMembers.map((m) => m.userId), project.partner.ownerId]);
+  const toAddAsPartnerMember = userIds.filter((id) => !alreadyMember.has(id));
+
+  await prisma.$transaction([
+    ...toAddAsPartnerMember.map((userId) =>
+      prisma.partnerMember.create({ data: { partnerId: project.partnerId, userId, role: "MEMBER" } }),
+    ),
+    ...userIds.flatMap((userId) => [
       ...grants.map((g) =>
         prisma.projectParticipant.upsert({
           where: { projectId_userId: { projectId: g.projectId, userId } },
@@ -695,9 +729,10 @@ export async function inviteToProject(
         },
       }),
     ]),
-  );
+  ]);
 
   await revalidateProjectViews(project.partnerId);
+  revalidatePath("/");
 }
 
 export async function addComment(

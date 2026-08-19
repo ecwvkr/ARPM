@@ -154,7 +154,7 @@ export async function getProjectAccess(projectId: string, userId: string, isSupe
       participants: { include: { user: true } },
       priorities: { include: { user: true } },
       comments: { include: { author: true }, orderBy: { createdAt: "asc" } },
-      tasks: { orderBy: { createdAt: "asc" } },
+      tasks: { include: { createdBy: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
       partner: true,
     },
   });

@@ -110,7 +110,11 @@ type WeekItem =
 
 const MAX_LANES = 2; // 기존 칸당 2건 표시 예산과 동일하게 맞춘다.
 const NUMBER_ROW_H = 24;
-const LANE_H = 20;
+// 레인 높이에 상하 1px씩(py-px) 여백을 더해, 바가 세로로 붙어도 서로 구분된다(캘린더 2).
+const LANE_H = 22;
+
+// 월간뷰 바에 마우스를 올리면 그 자리에 바로 상세를 띄운다(캘린더 1).
+type HoverInfo = { x: number; y: number; lines: string[] } | null;
 
 function layoutWeek(weekDays: Date[], projects: CalendarProject[], googleEvents: CalendarGoogleEvent[]) {
   const weekStart = weekDays[0];
@@ -239,6 +243,29 @@ function GoogleEventChip({
   );
 }
 
+// 호버 시 보여줄 상세 줄. title 속성은 뜨기까지 1초 넘게 걸려 "바로 뜨는" 요구를 못 맞춘다.
+function hoverLinesFor(item: WeekItem): string[] {
+  if (item.kind === "project") {
+    const p = item.data;
+    return [
+      p.title,
+      `파트너: ${p.partnerName}`,
+      `상태: ${STATUS_LABEL[p.status]}`,
+      p.dueDate ? `마감: ${new Date(p.dueDate).toLocaleDateString("ko-KR")}` : "마감일 없음",
+    ];
+  }
+  const e = item.data;
+  const sameDay = e.startDate.getTime() === e.endDate.getTime();
+  return [
+    e.title,
+    `캘린더: ${e.calendarSummary}`,
+    sameDay
+      ? e.startDate.toLocaleDateString("ko-KR")
+      : `${e.startDate.toLocaleDateString("ko-KR")} ~ ${e.endDate.toLocaleDateString("ko-KR")}`,
+    ...(e.convertedProjectId ? ["업무로 전환됨"] : []),
+  ];
+}
+
 // 주 그리드 안에서 여러 칸에 걸쳐 놓이는 바. 프로젝트는 항상 하루짜리라 기존
 // ProjectChip을 그대로 쓰고, 구글 일정만 실제 시작/끝 여부에 따라 모서리를 다르게 둔다.
 function WeekBarItem({ item }: { item: WeekItem }) {
@@ -303,6 +330,7 @@ export function CalendarView({
   const [view, setView] = useState<CalendarView>(initialView);
   const [cursor, setCursor] = useState(() => new Date(`${initialDate}T00:00:00`));
   const [selectedKey, setSelectedKey] = useState(initialDate);
+  const [hover, setHover] = useState<HoverInfo>(null);
 
   const cursorKey = dateKey(cursor);
 
@@ -460,7 +488,25 @@ export function CalendarView({
             })}
           </div>
 
-          <AccordionSection title="프로젝트 일정" count={dayProjects.length}>
+          {/* 캘린더 일정 → 진행 중인 프로젝트 순서(캘린더 3). */}
+          <AccordionSection title="캘린더 일정" count={dayGoogleEvents.length}>
+            {dayGoogleEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">이 날 구글 일정이 없습니다.</p>
+            ) : (
+              <div className="space-y-1">
+                {dayGoogleEvents.map((e) => (
+                  <GoogleEventChip
+                    key={`${e.calendarId}-${e.id}`}
+                    event={e}
+                    partners={partners}
+                    currentUserId={currentUserId}
+                  />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
+
+          <AccordionSection title="진행 중인 프로젝트" count={dayProjects.length}>
             {dayProjects.length === 0 ? (
               <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
             ) : (
@@ -483,23 +529,6 @@ export function CalendarView({
                     partnerColor={t.partnerColor}
                     links={t.links}
                     unread={t.unread}
-                  />
-                ))}
-              </div>
-            )}
-          </AccordionSection>
-
-          <AccordionSection title="캘린더 일정" count={dayGoogleEvents.length}>
-            {dayGoogleEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">이 날 구글 일정이 없습니다.</p>
-            ) : (
-              <div className="space-y-1">
-                {dayGoogleEvents.map((e) => (
-                  <GoogleEventChip
-                    key={`${e.calendarId}-${e.id}`}
-                    event={e}
-                    partners={partners}
-                    currentUserId={currentUserId}
                   />
                 ))}
               </div>
@@ -562,7 +591,10 @@ export function CalendarView({
                       <div
                         key={item.key}
                         style={{ gridColumn: `${item.startCol + 1} / ${item.endCol + 2}`, gridRow: lane + 2 }}
-                        className="pointer-events-auto min-w-0"
+                        className="pointer-events-auto min-w-0 py-px"
+                        onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, lines: hoverLinesFor(item) })}
+                        onMouseMove={(e) => setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))}
+                        onMouseLeave={() => setHover(null)}
                       >
                         <WeekBarItem item={item} />
                       </div>
@@ -592,18 +624,7 @@ export function CalendarView({
             {selectedKey.replace(/^(\d+)-(\d+)-(\d+)$/, "$2월 $3일")}
           </h3>
 
-          <AccordionSection title="프로젝트 일정" count={selectedProjects.length}>
-            {selectedProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
-            ) : (
-              <div className="space-y-1">
-                {selectedProjects.map((p) => (
-                  <ProjectChip key={p.id} project={p} />
-                ))}
-              </div>
-            )}
-          </AccordionSection>
-
+          {/* 캘린더 일정 → 진행 중인 프로젝트 순서(캘린더 3). */}
           <AccordionSection title="캘린더 일정" count={selectedGoogleEvents.length}>
             {selectedGoogleEvents.length === 0 ? (
               <p className="text-sm text-muted-foreground">이 날 구글 일정이 없습니다.</p>
@@ -620,7 +641,50 @@ export function CalendarView({
               </div>
             )}
           </AccordionSection>
+
+          {/* 일간 뷰와 같은 카드 형태로 통일한다(캘린더 4). */}
+          <AccordionSection title="진행 중인 프로젝트" count={selectedProjects.length}>
+            {selectedProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {selectedProjects.map((t) => (
+                  <ProjectCard
+                    key={t.id}
+                    projectId={t.id}
+                    partnerId={t.partnerId}
+                    title={t.title}
+                    status={t.status}
+                    visibility={t.visibility}
+                    overdue={isOverdue(t.dueDate, t.status)}
+                    createdAt={t.createdAt}
+                    dueDate={t.dueDate}
+                    participants={t.participants}
+                    commentCount={t.commentCount}
+                    currentUserId={currentUserId}
+                    partnerName={t.partnerName}
+                    partnerColor={t.partnerColor}
+                    links={t.links}
+                    unread={t.unread}
+                  />
+                ))}
+              </div>
+            )}
+          </AccordionSection>
         </section>
+      )}
+
+      {hover && (
+        <div
+          className="pointer-events-none fixed z-100 max-w-64 rounded-xl bg-foreground px-3 py-2 text-xs text-background shadow-lg"
+          style={{ left: hover.x + 14, top: hover.y + 14 }}
+        >
+          {hover.lines.map((line, i) => (
+            <p key={i} className={i === 0 ? "font-medium" : "opacity-80"}>
+              {line}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   );

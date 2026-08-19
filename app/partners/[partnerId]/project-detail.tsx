@@ -93,6 +93,7 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
           canManage={canManage}
           isSuperAdmin={isSuperAdmin}
           locked={locked}
+          myPriority={project.priorities.find((p) => p.userId === currentUserId)?.level ?? "HOLD"}
           onDone={reload}
         />
       </SectionCard>
@@ -115,6 +116,8 @@ export function ProjectDetail({ projectId, onDeleted }: { projectId: string; onD
           projectId={projectId}
           tasks={project.tasks}
           canEdit={canParticipantAct && !locked}
+          currentUserId={currentUserId}
+          isMaster={canManage}
           onDone={reload}
         />
       </SectionCard>

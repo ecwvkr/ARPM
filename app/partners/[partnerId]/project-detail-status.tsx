@@ -10,6 +10,7 @@ import {
   duplicateProject,
   listMovableTargets,
   moveProject,
+  setMyPriority,
 } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DeriveDialog } from "./project-derive-dialog";
 import { ProjectParentPicker } from "@/components/project-parent-picker";
+import { PriorityDot } from "./project-priority-picker";
+import { showToast } from "@/components/ui/global-toast";
+import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/priority";
 import { IconDotsVertical, IconPlus, IconCopy, IconArrowsMove, IconCalendar } from "@tabler/icons-react";
+
+const PRIORITY_LEVELS = ["URGENT", "NORMAL", "HOLD"] as const;
 
 function formatDate(date: Date) {
   return new Date(date).toLocaleDateString("ko-KR");
@@ -33,6 +39,7 @@ export function ProjectDetailStatus({
   canManage,
   isSuperAdmin,
   locked,
+  myPriority,
   onDone,
 }: {
   projectId: string;
@@ -44,12 +51,14 @@ export function ProjectDetailStatus({
   canManage: boolean;
   isSuperAdmin: boolean;
   locked: boolean;
+  myPriority: string;
   onDone: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [pendingStatus, setPendingStatus] = useState<"TODO" | "IN_PROGRESS" | null>(null);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           {canParticipantAct && !locked && (
@@ -58,12 +67,7 @@ export function ProjectDetailStatus({
                 size="sm"
                 variant={status === "TODO" ? "default" : "outline"}
                 disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await updateProjectStatus(projectId, "TODO");
-                    onDone();
-                  })
-                }
+                onClick={() => status !== "TODO" && setPendingStatus("TODO")}
               >
                 진행전
               </Button>
@@ -71,12 +75,7 @@ export function ProjectDetailStatus({
                 size="sm"
                 variant={status === "IN_PROGRESS" ? "default" : "outline"}
                 disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await updateProjectStatus(projectId, "IN_PROGRESS");
-                    onDone();
-                  })
-                }
+                onClick={() => status !== "IN_PROGRESS" && setPendingStatus("IN_PROGRESS")}
               >
                 진행중
               </Button>
@@ -91,6 +90,7 @@ export function ProjectDetailStatus({
               onClick={() =>
                 startTransition(async () => {
                   await reopenProject(projectId);
+                  showToast("완료가 취소되었습니다");
                   onDone();
                 })
               }
@@ -103,10 +103,71 @@ export function ProjectDetailStatus({
         {canManage && <MoreMenu projectId={projectId} parentId={parentId} onDone={onDone} />}
       </div>
 
+      {/* 참여자 칩에 붙어 있던 우선순위 설정을 상태 아래 별도 그룹으로 분리했다(프로젝트 13).
+          칩 옆 색상 점 '표기'는 참여자 섹션에 그대로 남아 있다. */}
+      {canParticipantAct && !locked && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">나의 긴급도 설정하기</span>
+          {PRIORITY_LEVELS.map((level) => (
+            <button
+              key={level}
+              type="button"
+              disabled={isPending}
+              aria-pressed={myPriority === level}
+              onClick={() =>
+                startTransition(async () => {
+                  await setMyPriority(projectId, level);
+                  onDone();
+                })
+              }
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors ${
+                myPriority === level ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-muted/70"
+              }`}
+            >
+              <PriorityDot level={level} />
+              {PRIORITY_LABEL[level]}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         {canParticipantAct && <DueDateControl projectId={projectId} dueDate={dueDate} onDone={onDone} />}
         {canManage && <CreatedDateControl projectId={projectId} createdAt={createdAt} onDone={onDone} />}
       </div>
+
+      {/* 상태 변경도 되돌리기 전에 다른 사람 화면에 즉시 반영되므로 한 번 확인한다(프로젝트 12). */}
+      <Dialog open={!!pendingStatus} onOpenChange={(next) => !next && setPendingStatus(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>진행 상태 변경</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            진행 상태를 &apos;{pendingStatus ? STATUS_LABEL[pendingStatus] : ""}&apos;(으)로 변경하시겠습니까?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPendingStatus(null)}>
+              아니요
+            </Button>
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={() => {
+                const target = pendingStatus;
+                if (!target) return;
+                startTransition(async () => {
+                  await updateProjectStatus(projectId, target);
+                  setPendingStatus(null);
+                  showToast(`'${STATUS_LABEL[target]}'(으)로 변경되었습니다`);
+                  onDone();
+                });
+              }}
+            >
+              확인
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -293,8 +354,9 @@ function MoreMenu({
         </PopoverContent>
       </Popover>
 
+      {/* 검색 드롭다운이 펼쳐질 자리를 확보해 팝업 안에서 다시 스크롤하지 않게 한다(프로젝트 14). */}
       <Dialog open={showMove} onOpenChange={setShowMove}>
-        <DialogContent>
+        <DialogContent className="min-h-[22rem] content-start">
           <DialogHeader>
             <DialogTitle>상위 프로젝트 변경</DialogTitle>
           </DialogHeader>
@@ -376,6 +438,7 @@ function CompleteConfirmDialog({ projectId, onDone }: { projectId: string; onDon
               startTransition(async () => {
                 await completeProject(projectId);
                 setOpen(false);
+                showToast("'완료'로 변경되었습니다");
                 onDone();
               })
             }

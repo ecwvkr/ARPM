@@ -88,9 +88,6 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
       <header className="px-6 py-4 shadow-sm">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="space-y-1">
-            <Link href="/" className="text-xs text-muted-foreground underline underline-offset-2">
-              ← 전체 파트너
-            </Link>
             <h1 className="text-base font-bold">
               {(isCanvas ? activePartner : singleSelectedPartner)
                 ? `${(isCanvas ? activePartner : singleSelectedPartner)!.name} 프로젝트`

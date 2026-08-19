@@ -14,11 +14,13 @@ export function UserPicker({
   selected,
   onChange,
   label = "초대할 계정",
+  emptyMessage = "초대할 수 있는 계정이 없습니다.",
 }: {
   excludeIds: string[];
   selected: string[];
   onChange: (ids: string[]) => void;
   label?: string;
+  emptyMessage?: string;
 }) {
   const [users, setUsers] = useState<{ id: string; name: string }[] | null>(null);
   const [query, setQuery] = useState("");
@@ -31,7 +33,7 @@ export function UserPicker({
 
   const candidates = users.filter((u) => !excludeIds.includes(u.id));
   if (candidates.length === 0) {
-    return <p className="text-sm text-muted-foreground">초대할 수 있는 계정이 없습니다.</p>;
+    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
   }
 
   const filtered = query.trim()

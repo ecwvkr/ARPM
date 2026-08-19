@@ -6,6 +6,47 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getPartnerAccess } from "@/lib/permissions";
 
+// 파트너 이름은 중복을 허용하지 않는다. 보관함(deletedAt)에 있는 것도 복구하면 되살아나므로
+// 중복 판정에 포함한다. excludeId는 이름 수정 시 자기 자신을 제외하기 위한 것.
+async function findDuplicateName(name: string, excludeId?: string) {
+  return prisma.partner.findFirst({
+    where: { name, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true },
+  });
+}
+
+// "이름" 이 이미 있으면 "이름 (1)", 그것도 있으면 "이름 (2)"... 로 비어 있는 첫 번호를 찾는다.
+async function suggestUniqueName(baseName: string, excludeId?: string) {
+  const taken = await prisma.partner.findMany({
+    where: {
+      name: { startsWith: baseName },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: { name: true },
+  });
+  const takenSet = new Set(taken.map((p) => p.name));
+  for (let i = 1; i < 1000; i++) {
+    const candidate = `${baseName} (${i})`;
+    if (!takenSet.has(candidate)) return candidate;
+  }
+  return `${baseName} (${Date.now()})`;
+}
+
+// 생성/수정 폼이 저장 전에 중복 여부를 물어보는 용도. 중복이면 제안 이름을 함께 돌려줘
+// 클라이언트가 "'이름 (1)'로 만들까요?" 안내를 띄울 수 있게 한다.
+export async function checkPartnerName(name: string, excludeId?: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const trimmed = name.trim();
+  if (!trimmed) return { duplicate: false, suggested: trimmed };
+
+  const existing = await findDuplicateName(trimmed, excludeId);
+  if (!existing) return { duplicate: false, suggested: trimmed };
+
+  return { duplicate: true, suggested: await suggestUniqueName(trimmed, excludeId) };
+}
+
 export async function createPartner(
   _prevState: string | undefined,
   formData: FormData,
@@ -15,6 +56,7 @@ export async function createPartner(
 
   const name = (formData.get("name") as string | null)?.trim();
   if (!name) return "파트너 이름을 입력하세요.";
+  if (await findDuplicateName(name)) return "이미 같은 이름의 파트너가 있습니다.";
 
   const visibility = formData.get("visibility") === "PUBLIC" ? "PUBLIC" : "PRIVATE";
   const memberIds = formData
@@ -67,6 +109,7 @@ export async function updatePartnerSettings(
 
   const name = (formData.get("name") as string | null)?.trim();
   if (!name) return "파트너 이름을 입력하세요.";
+  if (await findDuplicateName(name, partnerId)) return "이미 같은 이름의 파트너가 있습니다.";
 
   const visibility = formData.get("visibility") === "PUBLIC" ? "PUBLIC" : "PRIVATE";
 
@@ -121,7 +164,13 @@ export async function inviteMember(
   revalidatePath("/");
 }
 
-export async function removeMember(partnerId: string, userId: string) {
+// alsoRemoveFromProjects: 파트너에서만 빼는 게 아니라 이 파트너의 프로젝트 참여자에서도
+// 함께 빼낸다. 다만 어떤 프로젝트의 master인 경우는 그 프로젝트가 주인 없이 남으므로 건너뛴다.
+export async function removeMember(
+  partnerId: string,
+  userId: string,
+  alsoRemoveFromProjects = false,
+) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -130,6 +179,56 @@ export async function removeMember(partnerId: string, userId: string) {
   if (userId === partner.ownerId) throw new Error("owner는 제외할 수 없습니다.");
 
   await prisma.partnerMember.deleteMany({ where: { partnerId, userId } });
+
+  if (alsoRemoveFromProjects) {
+    const masteredIds = (
+      await prisma.project.findMany({ where: { partnerId, masterId: userId }, select: { id: true } })
+    ).map((p) => p.id);
+    await prisma.projectParticipant.deleteMany({
+      where: { userId, project: { partnerId }, projectId: { notIn: masteredIds } },
+    });
+  }
+
+  revalidatePath(`/partners/${partnerId}`);
+  revalidatePath("/projects");
+  revalidatePath("/tasks");
+  revalidatePath("/");
+}
+
+// 파트너 관리자(owner) 변경. 새 owner가 멤버가 아니면 멤버로 함께 올린다.
+export async function transferPartnerOwner(partnerId: string, newOwnerId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { partner, isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
+  if (!partner) throw new Error("존재하지 않는 파트너입니다.");
+  if (!isOwner && !session.user.isSuperAdmin) throw new Error("파트너 owner만 변경할 수 있습니다.");
+  if (newOwnerId === partner.ownerId) return;
+
+  const newOwner = await prisma.user.findUnique({ where: { id: newOwnerId }, select: { id: true, name: true } });
+  if (!newOwner) throw new Error("존재하지 않는 사용자입니다.");
+
+  await prisma.$transaction([
+    prisma.partner.update({ where: { id: partnerId }, data: { ownerId: newOwnerId } }),
+    prisma.partnerMember.upsert({
+      where: { partnerId_userId: { partnerId, userId: newOwnerId } },
+      update: { role: "OWNER" },
+      create: { partnerId, userId: newOwnerId, role: "OWNER" },
+    }),
+    prisma.partnerMember.updateMany({
+      where: { partnerId, userId: partner.ownerId },
+      data: { role: "MEMBER" },
+    }),
+    prisma.notification.create({
+      data: {
+        userId: newOwnerId,
+        type: "PARTNER_OWNER_CHANGED",
+        refId: partnerId,
+        message: `"${partner.name}" 파트너의 관리자로 지정되었습니다.`,
+      },
+    }),
+  ]);
+
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
 }
@@ -177,15 +276,22 @@ export async function togglePartnerPin(partnerId: string) {
   revalidatePath("/");
 }
 
-export async function softDeletePartner(partnerId: string) {
+// 프로젝트 보관(archiveProject)과 같이 typed confirm으로 한 번 더 확인받는다.
+export async function softDeletePartner(
+  partnerId: string,
+  _prevState: string | undefined,
+  formData: FormData,
+) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   // 소프트 삭제라 총관리자가 언제든 복구할 수 있으므로 owner에게도 연다.
   const { isOwner } = await getPartnerAccess(partnerId, session.user.id, !!session.user.isSuperAdmin);
   if (!isOwner && !session.user.isSuperAdmin) {
-    throw new Error("파트너 owner 또는 총관리자만 삭제할 수 있습니다.");
+    return "파트너 owner 또는 총관리자만 삭제할 수 있습니다.";
   }
+
+  if ((formData.get("confirm") as string | null) !== "보관함") return "'보관함'을 정확히 입력하세요.";
 
   await prisma.partner.update({
     where: { id: partnerId },

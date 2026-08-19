@@ -27,6 +27,7 @@ export async function createTask(projectId: string, formData: FormData) {
   await revalidateProjectViews(project.partnerId);
 }
 
+// 체크(완료 토글)는 프로젝트 참여자 누구나 할 수 있는 공유 체크리스트 동작이다.
 export async function toggleTask(taskId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -46,15 +47,37 @@ export async function toggleTask(taskId: string) {
   await revalidateProjectViews(task.project.partnerId);
 }
 
-export async function deleteTask(taskId: string) {
+// 내용 수정·삭제는 체크와 달리 "내가 쓴 것" 또는 프로젝트 master(+총관리자)만 가능하다.
+async function assertCanEditTask(taskId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const task = await prisma.taskItem.findUnique({ where: { id: taskId }, include: { project: true } });
-  if (!task) return;
+  if (!task) return null;
 
-  const { canParticipantAct } = await getProjectAccess(task.projectId, session.user.id, !!session.user.isSuperAdmin);
-  if (!canParticipantAct) throw new Error("권한이 없습니다.");
+  const isAuthor = task.createdById === session.user.id;
+  const isMaster = task.project.masterId === session.user.id;
+  if (!isAuthor && !isMaster && !session.user.isSuperAdmin) {
+    throw new Error("작성자 또는 master만 수정·삭제할 수 있습니다.");
+  }
+  return task;
+}
+
+export async function updateTask(taskId: string, formData: FormData) {
+  const task = await assertCanEditTask(taskId);
+  if (!task) return;
+  if (task.project.completedAt) throw new Error("완료된 프로젝트는 수정할 수 없습니다.");
+
+  const title = (formData.get("title") as string | null)?.trim();
+  if (!title) return;
+
+  await prisma.taskItem.update({ where: { id: taskId }, data: { title } });
+  await revalidateProjectViews(task.project.partnerId);
+}
+
+export async function deleteTask(taskId: string) {
+  const task = await assertCanEditTask(taskId);
+  if (!task) return;
 
   await prisma.taskItem.delete({ where: { id: taskId } });
   await revalidateProjectViews(task.project.partnerId);
