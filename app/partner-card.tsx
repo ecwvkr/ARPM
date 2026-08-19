@@ -51,12 +51,12 @@ export function PartnerCard({
 
       {/* 카드는 2~4열 그리드라 어느 폭에서도 좁다. 제목과 버튼을 한 줄에 두면 제목이
           글자당 한 줄씩 세로로 접히므로, 버튼 줄은 항상 제목 아래로 내린다. */}
-      <div className="relative z-10 flex flex-col gap-1.5">
-        <h3 className="pointer-events-none break-keep text-base font-bold">{partner.name}</h3>
+      <div className="pointer-events-none relative z-10 flex flex-col gap-1.5">
+        <h3 className="break-keep text-base font-bold">{partner.name}</h3>
         {/* 이 행 자체는 pointer-events-none이라 버튼/태그 사이 빈 공간은 클릭이 아래 배경
-            링크로 투과돼 카드 전체가 파트너 페이지로 넘어간다. 버튼은 실제 인터랙티브
-            요소라 자체 pointer-events로 항상 클릭되고, 상태 태그만 별도로 다시 막아
-            눌러도 아무 동작 없이 그 자리에 머문다. */}
+            링크로 투과돼 카드 전체가 파트너 페이지로 넘어간다. pointer-events:none은
+            자식에게 상속되므로, 클릭을 받아야 하는 요소(고정·설정 버튼)와 클릭을 막아야
+            하는 상태 태그는 각각 pointer-events-auto로 되돌려 준다. */}
         <div className="pointer-events-none flex flex-wrap items-center gap-0.5">
           <PartnerPinButton partnerId={partner.id} pinned={(partner.pinnedBy?.length ?? 0) > 0} />
           <Badge
@@ -70,7 +70,7 @@ export function PartnerCard({
             isOwner={isOwner}
             canDelete={isOwner && !hidden}
             isHidden={(partner.hiddenBy?.length ?? 0) > 0}
-            triggerClassName="relative z-10 bg-background"
+            triggerClassName="pointer-events-auto relative z-10 bg-background"
           />
         </div>
       </div>

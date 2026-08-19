@@ -10,7 +10,8 @@ export default function NotFound() {
           주소가 잘못되었거나 삭제된 페이지일 수 있습니다.
         </p>
         <div className="flex justify-center pt-1">
-          <Button size="sm" render={<Link href="/">대시보드로 돌아가기</Link>} />
+          {/* render 대상이 <a>라 nativeButton을 꺼야 Base UI가 경고하지 않는다. */}
+          <Button size="sm" nativeButton={false} render={<Link href="/">대시보드로 돌아가기</Link>} />
         </div>
       </div>
     </div>

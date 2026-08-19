@@ -15,7 +15,7 @@ export function PartnerPinButton({ partnerId, pinned }: { partnerId: string; pin
       aria-label={pinned ? "즐겨찾기 해제" : "즐겨찾기 고정"}
       aria-pressed={pinned}
       onClick={() => startTransition(() => togglePartnerPin(partnerId))}
-      className={`relative z-10 flex size-7 items-center justify-center rounded-full bg-background ${
+      className={`pointer-events-auto relative z-10 flex size-7 items-center justify-center rounded-full bg-background ${
         pinned ? "text-primary" : "text-muted-foreground"
       }`}
     >

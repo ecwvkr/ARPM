@@ -136,14 +136,18 @@ function TaskCardRow({
   }
   if (showAuthor) metaParts.push(task.createdByName);
 
+  const doneRow = task.done ? "text-muted-foreground line-through" : "";
+
   return (
-    <div className="flex items-start gap-2 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
+    <div
+      className={`flex items-start gap-2 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10 ${doneRow}`}
+    >
       <span className="mt-0.5 w-4 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{index}</span>
-      <span className="mt-0.5">
+      <span className="mt-0.5 no-underline">
         <TaskCheckButton done={task.done} isPending={isPending} onClick={toggle} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm break-words ${task.done ? "text-muted-foreground line-through" : ""}`}>{task.title}</p>
+        <p className="text-sm break-words">{task.title}</p>
         {metaParts.length > 0 && (
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
             {metaParts.map((part, i) => (
@@ -175,8 +179,11 @@ function TaskTableRow({
   const { task } = row;
   const { isPending, toggle } = useTaskToggle(task.id);
 
+  // 완료 행은 행 전체를 회색 + 취소선으로 처리한다(체크 버튼만 예외 — 다시 눌러야 하므로).
+  const doneRow = task.done ? "text-muted-foreground line-through" : "";
+
   return (
-    <tr className="border-b border-foreground/5 last:border-0 hover:bg-muted/40">
+    <tr className={`border-b border-foreground/5 last:border-0 hover:bg-muted/40 ${doneRow}`}>
       <td className="px-4 py-2 text-right text-xs tabular-nums text-muted-foreground">{index}</td>
       {showPartner && <td className="max-w-32 truncate px-4 py-2 text-muted-foreground">{row.partnerName}</td>}
       {showProject && (
@@ -191,8 +198,10 @@ function TaskTableRow({
       )}
       <td className="min-w-40 px-4 py-2">
         <div className="flex items-center gap-2">
-          <TaskCheckButton done={task.done} isPending={isPending} onClick={toggle} />
-          <span className={task.done ? "text-muted-foreground line-through" : ""}>{task.title}</span>
+          <span className="no-underline">
+            <TaskCheckButton done={task.done} isPending={isPending} onClick={toggle} />
+          </span>
+          <span>{task.title}</span>
         </div>
       </td>
       {showAuthor && <td className="max-w-24 truncate px-4 py-2 text-muted-foreground">{task.createdByName}</td>}

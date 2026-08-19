@@ -125,7 +125,8 @@ export type FlatTaskRow = {
 };
 
 // 테이블 뷰용: 파트너 > 프로젝트 그룹을 한 줄(=태스크 1건)짜리 평면 목록으로 편다.
-// 정렬 순서는 listGroupedTasksForUser가 이미 잡아둔 순서를 그대로 따른다.
+// 그룹 안이 아니라 목록 전체에서 완료 항목을 맨 아래로 내린다 — 한 줄짜리 표에서는
+// 프로젝트별로 완료가 흩어져 있으면 "완료는 아래"라는 규칙이 눈에 안 보이기 때문.
 export function flattenGroupedTasks(partners: GroupedTaskPartner[]): FlatTaskRow[] {
   const rows: FlatTaskRow[] = [];
   for (const partner of partners) {
@@ -141,5 +142,6 @@ export function flattenGroupedTasks(partners: GroupedTaskPartner[]): FlatTaskRow
       }
     }
   }
-  return rows;
+  // Array.prototype.sort는 안정 정렬이라 미완료/완료 각 묶음 안의 기존 순서는 유지된다.
+  return rows.sort((a, b) => Number(a.task.done) - Number(b.task.done));
 }
