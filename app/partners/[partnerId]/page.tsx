@@ -28,13 +28,15 @@ export default async function PartnerDetailPage({
   const session = await auth();
   if (!session?.user?.id) notFound();
 
-  const { partner, isOwner, isMember, canView } = await getPartnerAccess(
+  const { partner, isOwner, isMember, canView, canDiscover } = await getPartnerAccess(
     partnerId,
     session.user.id,
     !!session.user.isSuperAdmin,
   );
 
-  if (!partner || !canView) notFound();
+  // 비공개+노출 파트너는 카드에서 넘어올 수 있으므로 페이지 자체는 열되(canDiscover),
+  // 내부 프로젝트는 참여 승인 뒤에만 보여준다(canView).
+  if (!partner || !canDiscover) notFound();
 
   // 아직 참여하지 않은 사람에게는 '업무 참여하기'를 띄운다(이미 신청했으면 대기중 표시).
   const pendingRequest = isMember
@@ -74,7 +76,11 @@ export default async function PartnerDetailPage({
           </div>
           <div className="flex items-center gap-2">
             {!isMember && (
-              <PartnerJoinButton partnerId={partner.id} requested={pendingRequest?.status === "PENDING"} />
+              <PartnerJoinButton
+                partnerId={partner.id}
+                isPublic={partner.visibility === "PUBLIC"}
+                requested={pendingRequest?.status === "PENDING"}
+              />
             )}
             {isMember && <NewProjectDialog partnerId={partner.id} currentUserId={session.user.id} />}
             <PartnerSettingsDialog
@@ -89,6 +95,16 @@ export default async function PartnerDetailPage({
       </header>
 
       <WidthContainer mainClassName="space-y-8 px-6 py-6">
+        {!canView ? (
+          <section className="space-y-2 rounded-4xl bg-card p-6 text-center shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">
+            <h2 className="text-sm font-bold">비공개 파트너입니다</h2>
+            <p className="text-sm text-muted-foreground">
+              {pendingRequest?.status === "PENDING"
+                ? "참여 신청이 접수되었습니다. 관리자가 수락하면 프로젝트를 볼 수 있습니다."
+                : "참여 요청 후 관리자가 수락하면 프로젝트를 볼 수 있습니다."}
+            </p>
+          </section>
+        ) : (
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs">
             <Link href={`/partners/${partner.id}`} className={chipClass(!view)}>
@@ -120,9 +136,11 @@ export default async function PartnerDetailPage({
               partnerId={partner.id}
               userId={session.user.id}
               isSuperAdmin={!!session.user.isSuperAdmin}
+              isPartnerMember={isMember}
             />
           )}
         </section>
+        )}
 
         {canViewAudit && auditLog.length > 0 && (
           <details className="space-y-2 rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 dark:ring-foreground/10">

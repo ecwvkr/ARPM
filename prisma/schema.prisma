@@ -44,6 +44,9 @@ model Partner {
   id         String     @id @default(cuid())
   name       String
   visibility Visibility @default(PRIVATE)
+  // 비공개 파트너를 미참여자 목록에도 띄울지. true면 카드는 보이지만 내부 프로젝트는
+  // 참여 승인 후에만 볼 수 있다. false면 참여자·관리자 외에는 존재 자체가 안 보인다.
+  discoverable Boolean @default(false)
   deletedAt      DateTime? // 소프트 삭제(보관함/휴지통). 총관리자·owner가 복구하거나 영구 삭제할 수 있다.
   color          String? // 대시보드/캘린더/워크플로우에서 파트너를 구분하는 색상
   ownerId        String

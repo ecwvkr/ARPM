@@ -15,6 +15,7 @@ import { ProjectStatusBadge } from "./project-status-badge";
 import { DeriveDialog } from "./project-derive-dialog";
 import { DeleteDialog } from "./project-delete-dialog";
 import { ProjectDetail } from "./project-detail";
+import { ProjectJoinButton } from "@/components/project-join-button";
 import {
   IconDotsVertical,
   IconPlus,
@@ -59,6 +60,7 @@ export function ProjectCard({
   partnerColor,
   links = [],
   unread,
+  canJoin = false,
 }: {
   projectId: string;
   partnerId: string;
@@ -75,6 +77,7 @@ export function ProjectCard({
   partnerColor?: string | null;
   links?: string[];
   unread?: boolean;
+  canJoin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -232,6 +235,8 @@ export function ProjectCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <ProjectStatusBadge projectId={projectId} status={status} />
             {overdue && <Badge variant="destructive">지연</Badge>}
+            {/* 참여 중이 아니면 카드에서 바로 참여할 수 있게 한다(파트너 카드와 같은 방식). */}
+            {canJoin && <ProjectJoinButton projectId={projectId} />}
           </div>
 
           {participants.length > 0 && (

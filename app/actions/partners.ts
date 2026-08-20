@@ -116,9 +116,12 @@ export async function updatePartnerSettings(
   const rawColor = (formData.get("color") as string | null)?.trim() || null;
   if (rawColor && !HEX_COLOR.test(rawColor)) return "올바른 색상 값을 선택하세요.";
 
+  // 공개 파트너는 어차피 모두에게 보이므로 discoverable 값은 비공개일 때만 의미가 있다.
+  const discoverable = visibility === "PRIVATE" && formData.get("discoverable") === "on";
+
   await prisma.partner.update({
     where: { id: partnerId },
-    data: { name, visibility, color: rawColor, lastActivityAt: new Date() },
+    data: { name, visibility, discoverable, color: rawColor, lastActivityAt: new Date() },
   });
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
@@ -233,19 +236,44 @@ export async function transferPartnerOwner(partnerId: string, newOwnerId: string
   revalidatePath("/");
 }
 
-// '업무 참여하기': 볼 수는 있지만 아직 참여하지 않은 파트너에 참여를 신청한다.
-// 관리자가 수락해야 실제 멤버가 되므로 여기서는 요청 행과 알림만 만든다.
-export async function requestPartnerJoin(partnerId: string) {
+// '업무 참여하기'. 공개 파트너는 승인 단계 없이 바로 참여시키고, 비공개 파트너만
+// 관리자 승인을 거친다(요청 행 + 알림 생성).
+export async function joinPartner(partnerId: string): Promise<{ joined: boolean }> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { partner, canView, isMember } = await getPartnerAccess(
+  const { partner, canDiscover, isMember } = await getPartnerAccess(
     partnerId,
     session.user.id,
     !!session.user.isSuperAdmin,
   );
-  if (!partner || !canView) throw new Error("접근할 수 없는 파트너입니다.");
+  if (!partner || !canDiscover) throw new Error("접근할 수 없는 파트너입니다.");
   if (isMember) throw new Error("이미 참여 중인 파트너입니다.");
+
+  if (partner.visibility === "PUBLIC") {
+    await prisma.$transaction([
+      prisma.partnerMember.upsert({
+        where: { partnerId_userId: { partnerId, userId: session.user.id } },
+        update: {},
+        create: { partnerId, userId: session.user.id, role: "MEMBER" },
+      }),
+      // 요청 이력이 남아 있었다면 함께 정리한다.
+      prisma.partnerJoinRequest.deleteMany({ where: { partnerId, userId: session.user.id } }),
+      prisma.notification.create({
+        data: {
+          userId: partner.ownerId,
+          type: "PARTNER_JOINED",
+          refId: partnerId,
+          message: `${session.user.name}님이 "${partner.name}" 파트너 업무에 참여했습니다.`,
+        },
+      }),
+    ]);
+
+    revalidatePath("/");
+    revalidatePath("/projects");
+    revalidatePath(`/partners/${partnerId}`);
+    return { joined: true };
+  }
 
   await prisma.$transaction([
     prisma.partnerJoinRequest.upsert({
@@ -266,6 +294,7 @@ export async function requestPartnerJoin(partnerId: string) {
 
   revalidatePath("/");
   revalidatePath(`/partners/${partnerId}`);
+  return { joined: false };
 }
 
 export async function listPartnerJoinRequests(partnerId: string) {

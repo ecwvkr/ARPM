@@ -11,6 +11,7 @@ type PartnerCardData = {
   id: string;
   name: string;
   visibility: "PUBLIC" | "PRIVATE";
+  discoverable: boolean;
   deletedAt: Date | null;
   color: string | null;
   ownerId: string;
@@ -97,7 +98,12 @@ export function PartnerCard({
         {/* 총관리자는 이미 모든 파트너에 접근할 수 있어 신청할 대상이 아니다. */}
         {!joined && !isSuperAdmin && (
           <div className="pointer-events-auto mb-1.5">
-            <PartnerJoinButton partnerId={partner.id} requested={joinRequested} size="xs" />
+            <PartnerJoinButton
+              partnerId={partner.id}
+              isPublic={partner.visibility === "PUBLIC"}
+              requested={joinRequested}
+              size="xs"
+            />
           </div>
         )}
         {hidden && (

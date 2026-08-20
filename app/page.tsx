@@ -13,7 +13,7 @@ import { WidthContainer } from "@/components/width-container";
 import { PartnerSortSelect } from "./partner-sort-select";
 import { IconChevronRight } from "@tabler/icons-react";
 
-type PartnerFilter = "all" | "mine" | "inprogress";
+type PartnerFilter = "all" | "joined";
 
 export default async function DashboardPage({
   searchParams,
@@ -28,8 +28,7 @@ export default async function DashboardPage({
   const isSuperAdmin = !!session.user.isSuperAdmin;
   const sort: PartnerSort =
     params.sort === "name" || params.sort === "created" ? params.sort : "activity";
-  const filter: PartnerFilter =
-    params.filter === "mine" || params.filter === "inprogress" ? params.filter : "all";
+  const filter: PartnerFilter = params.filter === "joined" ? "joined" : "all";
 
   // ponytail: 서로 의존하지 않는 네 조회(알림 점검·파트너 목록·내 프로젝트·전체 프로젝트)를
   // 순차 대기 대신 한 번에 날려 왕복 시간을 줄인다.
@@ -43,7 +42,6 @@ export default async function DashboardPage({
   // 개인별 숨김(D2)·즐겨찾기는 같은 조회 결과에서 갈라낸다 — 별도 쿼리 없이 한 번에 온
   // 목록을 화면에서 두 묶음(안 숨김/숨김)으로 나누고, 각 묶음 안에서는 즐겨찾기를 맨 위로.
   const visibleAll = allPartners.filter((p) => (p.hiddenBy?.length ?? 0) === 0);
-  const inProgressCount = visibleAll.filter((p) => p.projects.some((t) => t.status === "IN_PROGRESS")).length;
 
   // 내가 직접 참여 중인 파트너인지 — 카드 묶음(참여/미참여)과 '업무 참여하기' 노출 기준.
   // 총관리자는 모든 파트너를 관리할 수 있지만, 이 구분은 "실제로 참여 중인가"를 보여주는
@@ -51,8 +49,21 @@ export default async function DashboardPage({
   const isJoined = (p: (typeof allPartners)[number]) =>
     p.ownerId === userId || p.members.some((m) => m.userId === userId);
 
+  // 상단 요약 카드 4종.
+  // 전체 파트너 = 나에게 노출된 카드 수 / 참여 파트너 = 그중 내가 참여 중인 수.
+  const joinedPartnerCount = visibleAll.filter(isJoined).length;
+  // 진행 중 프로젝트 = 내가 참여 중인 파트너의 '진행 전'+'진행 중' 프로젝트 총합.
+  // 참여 프로젝트 = 그중 내가 master이거나 참여자인 것.
+  const joinedPartnerIds = new Set(visibleAll.filter(isJoined).map((p) => p.id));
+  const activeProjects = allProjects.filter(
+    (t) => joinedPartnerIds.has(t.partnerId) && t.status !== "DONE",
+  );
+  const myActiveProjectCount = activeProjects.filter(
+    (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),
+  ).length;
+
   const byFilter = (p: (typeof allPartners)[number]) => {
-    if (filter === "inprogress") return p.projects.some((t) => t.status === "IN_PROGRESS");
+    if (filter === "joined") return isJoined(p);
     return true;
   };
   const sortPinnedFirst = (list: typeof allPartners) => [
@@ -104,14 +115,14 @@ export default async function DashboardPage({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <SummaryCard label="전체 파트너" value={visibleAll.length} href={widgetHref("all")} active={filter === "all"} />
           <SummaryCard
-            label="진행중인 파트너"
-            value={inProgressCount}
-            href={widgetHref("inprogress")}
-            active={filter === "inprogress"}
+            label="참여 파트너"
+            value={joinedPartnerCount}
+            href={widgetHref("joined")}
+            active={filter === "joined"}
           />
           {/* 프로젝트 태그 둘은 파트너 필터가 아니라 전체 프로젝트 화면으로 넘겨주는 버튼이다. */}
-          <SummaryCard label="전체 프로젝트" value={allProjects.length} href="/projects?f=1" active={false} />
-          <SummaryCard label="참여중인 프로젝트" value={myProjects.length} href="/projects" active={false} />
+          <SummaryCard label="진행 중 프로젝트" value={activeProjects.length} href="/projects?f=1&status=TODO,IN_PROGRESS" active={false} />
+          <SummaryCard label="참여 프로젝트" value={myActiveProjectCount} href="/projects?status=TODO,IN_PROGRESS" active={false} />
         </div>
 
         {dueSoon.length > 0 && (

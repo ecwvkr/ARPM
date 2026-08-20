@@ -5,10 +5,12 @@ export async function ProjectList({
   partnerId,
   userId,
   isSuperAdmin,
+  isPartnerMember = false,
 }: {
   partnerId: string;
   userId: string;
   isSuperAdmin: boolean;
+  isPartnerMember?: boolean;
 }) {
   const projects = await listProjectsForPartner(partnerId, userId, isSuperAdmin);
 
@@ -16,7 +18,9 @@ export async function ProjectList({
     return <p className="text-sm text-muted-foreground">아직 프로젝트가 없습니다.</p>;
   }
 
-  return <ProjectListFilterable projects={projects} currentUserId={userId} />;
+  return (
+    <ProjectListFilterable projects={projects} currentUserId={userId} isPartnerMember={isPartnerMember} />
+  );
 }
 
 export type PartnerProjectSummary = Awaited<ReturnType<typeof listProjectsForPartner>>[number];

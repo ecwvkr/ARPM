@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { listVisiblePartners } from "@/lib/partners";
 import { listProjectsForPartners, isProjectUnread, type DueBucket, type ProjectSort } from "@/lib/projects";
-import { isOverdue, buildParticipantChips } from "@/lib/priority";
+import { isOverdue, buildParticipantChips, canJoinProject } from "@/lib/priority";
 import { NotificationBell } from "@/app/notification-bell";
 import { LogoutButton } from "@/app/logout-button";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
@@ -64,6 +64,12 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
     listVisiblePartners(session.user.id, isSuperAdmin, false),
     listAllUsers(),
   ]);
+  // 카드의 '참여하기'는 그 파트너에 직접 참여 중인 사람에게만 뜬다(프로젝트 참여 자격 기준).
+  const memberPartnerIds = new Set(
+    partners
+      .filter((p) => isSuperAdmin || p.ownerId === session.user.id || p.members.some((m) => m.userId === session.user.id))
+      .map((p) => p.id),
+  );
   const activePartner = partnerId ? partners.find((p) => p.id === partnerId) : undefined;
   const singleSelectedPartner =
     selectedPartnerIds.length === 1 ? partners.find((p) => p.id === selectedPartnerIds[0]) : undefined;
@@ -188,6 +194,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
                     partnerColor={project.partnerColor}
                     links={project.links}
                     unread={isProjectUnread(project, session.user.id)}
+                    canJoin={canJoinProject(project, session.user.id, memberPartnerIds.has(project.partnerId))}
                   />
                 ))}
               </div>

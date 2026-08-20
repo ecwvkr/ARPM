@@ -10,7 +10,7 @@ export async function getPartnerAccess(partnerId: string, userId: string, isSupe
   });
 
   if (!partner) {
-    return { partner: null, isOwner: false, isMember: false, canView: false };
+    return { partner: null, isOwner: false, isMember: false, canView: false, canDiscover: false };
   }
 
   // 총관리자는 공개/비공개·소유 여부와 무관하게 모든 파트너를 관리할 수 있다(절대 권한).
@@ -22,9 +22,14 @@ export async function getPartnerAccess(partnerId: string, userId: string, isSupe
   // 총관리자와 owner는 복구를 위해 보관된 상태에서도 볼 수 있어야 한다.
   const archived = partner.deletedAt !== null;
 
+  // canView = 내부(프로젝트)까지 볼 수 있는가. 공개 파트너는 누구나, 비공개는 참여자만.
   const canView = archived
     ? isSuperAdmin || isOwner
-    : partner.visibility === "PUBLIC" || isMember || isSuperAdmin;
+    : partner.visibility === "PUBLIC" || isMember;
 
-  return { partner, isOwner, isMember, canView };
+  // canDiscover = 목록에 카드가 뜨는가. 비공개+노출(discoverable) 파트너는 카드만 보이고
+  // 내부는 참여 승인 후에 열린다 — 그래서 canView와 따로 둔다.
+  const canDiscover = archived ? canView : canView || partner.discoverable;
+
+  return { partner, isOwner, isMember, canView, canDiscover };
 }

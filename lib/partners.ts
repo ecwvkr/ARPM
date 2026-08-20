@@ -3,10 +3,15 @@ import { prisma } from "@/lib/prisma";
 
 // includeDeleted: 보관함(휴지통)에 있는 파트너까지 포함할지. 메인 화면들은 항상 false —
 // 보관된 파트너는 설정 > 보관함 화면에서만 다룬다(D3).
+// includeDiscoverable: 비공개+노출 파트너(카드만 보이고 내부는 못 보는 상태)까지 포함할지.
+// 기본값 false가 안전한 쪽이다 — 프로젝트 목록 조회가 이 함수를 통해 파트너를 고르므로,
+// 켜면 아직 참여하지 않은 비공개 파트너의 프로젝트까지 흘러나간다. 대시보드 카드 목록처럼
+// "존재만 보여주는" 화면에서만 true로 켠다.
 function visiblePartnersWhere(
   userId: string,
   isSuperAdmin: boolean,
   includeDeleted: boolean,
+  includeDiscoverable = false,
 ): Prisma.PartnerWhereInput {
   const where: Prisma.PartnerWhereInput = {};
 
@@ -19,6 +24,9 @@ function visiblePartnersWhere(
       { visibility: "PUBLIC" },
       { ownerId: userId },
       { members: { some: { userId } } },
+      ...(includeDiscoverable
+        ? [{ visibility: "PRIVATE" as const, discoverable: true }]
+        : []),
     ];
   }
 
@@ -61,7 +69,8 @@ export function listVisiblePartnersWithUnread(
   sort: PartnerSort = "activity",
 ) {
   return prisma.partner.findMany({
-    where: visiblePartnersWhere(userId, isSuperAdmin, false),
+    // 대시보드는 비공개+노출 파트너의 카드도 보여준다(참여 신청 경로).
+    where: visiblePartnersWhere(userId, isSuperAdmin, false, true),
     include: {
       owner: true,
       members: { include: { user: { select: { id: true, name: true } } } },

@@ -59,6 +59,7 @@ type PartnerSettingsData = {
   id: string;
   name: string;
   visibility: "PUBLIC" | "PRIVATE";
+  discoverable: boolean;
   color: string | null;
   ownerId: string;
   members: PartnerMember[];
@@ -81,6 +82,7 @@ export function PartnerSettingsDialog({
   const settingsAction = updatePartnerSettings.bind(null, partner.id);
   const [errorMessage, formAction, isSaving] = useActionState(settingsAction, undefined);
   const [color, setColor] = useState(partner.color);
+  const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">(partner.visibility);
   // 저장된 색이 확장 팔레트에 있으면 처음부터 펼쳐 둬야 선택된 칩이 보인다.
   const [showMoreColors, setShowMoreColors] = useState(
     !!partner.color && MORE_COLOR_PRESETS.includes(partner.color),
@@ -166,12 +168,27 @@ export function PartnerSettingsDialog({
                   <select
                     name="visibility"
                     aria-label="공개 범위"
-                    defaultValue={partner.visibility}
+                    value={visibility}
+                    onChange={(e) => setVisibility(e.target.value as "PUBLIC" | "PRIVATE")}
                     className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs"
                   >
                     <option value="PRIVATE">비공개</option>
                     <option value="PUBLIC">공개</option>
                   </select>
+                  {/* 공개 파트너는 어차피 모두에게 보이므로 이 선택지는 비공개일 때만 의미가 있다. */}
+                  {visibility === "PRIVATE" && (
+                    <label className="flex items-start gap-2 pt-1 text-xs text-muted-foreground">
+                      <Checkbox
+                        name="discoverable"
+                        defaultChecked={partner.discoverable}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        미참여자에게도 카드를 노출합니다. 카드만 보이고 내부 프로젝트는 참여 요청을
+                        수락한 뒤에 열립니다.
+                      </span>
+                    </label>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { STATUS_LABEL, STATUS_ORDER, isOverdue, buildParticipantChips, isProjectUnread } from "@/lib/priority";
+import {
+  STATUS_LABEL,
+  STATUS_ORDER,
+  isOverdue,
+  buildParticipantChips,
+  isProjectUnread,
+  canJoinProject,
+} from "@/lib/priority";
 import { ProjectCard } from "./project-card";
 import type { PartnerProjectSummary } from "./project-list";
 
@@ -10,9 +17,11 @@ const STATUSES = ["TODO", "IN_PROGRESS", "DONE"] as const;
 export function ProjectListFilterable({
   projects,
   currentUserId,
+  isPartnerMember = false,
 }: {
   projects: PartnerProjectSummary[];
   currentUserId: string;
+  isPartnerMember?: boolean;
 }) {
   const [active, setActive] = useState<Set<string>>(new Set());
 
@@ -68,6 +77,7 @@ export function ProjectListFilterable({
               currentUserId={currentUserId}
               links={project.links}
               unread={isProjectUnread(project, currentUserId)}
+              canJoin={canJoinProject(project, currentUserId, isPartnerMember)}
             />
           ))}
         </div>

@@ -58,6 +58,24 @@ export function isProjectUnread(
   return lastRead < latestActivity;
 }
 
+// 목록 화면의 카드에 '참여하기'를 띄울지. 상세 화면의 canJoin(lib/projects.ts)과 같은 규칙을
+// 목록이 이미 들고 있는 데이터만으로 판정한다 — 카드마다 getProjectAccess를 부르지 않기 위해서다.
+// 비공개 프로젝트는 애초에 미참여자 목록에 뜨지 않으므로 여기서는 나타나지 않는다.
+export function canJoinProject(
+  project: {
+    masterId: string;
+    completedAt: Date | null;
+    participants: { userId: string }[];
+  },
+  userId: string,
+  isPartnerMember: boolean,
+): boolean {
+  if (!isPartnerMember) return false;
+  if (project.completedAt !== null) return false;
+  if (project.masterId === userId) return false;
+  return !project.participants.some((p) => p.userId === userId);
+}
+
 export type ParticipantChipData = {
   userId: string;
   userName: string;
