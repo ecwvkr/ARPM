@@ -517,7 +517,7 @@ export function CalendarView({
             {dayProjects.length === 0 ? (
               <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                 {dayProjects.map((t) => (
                   <ProjectCard
                     key={t.id}
@@ -654,7 +654,7 @@ export function CalendarView({
             {selectedProjects.length === 0 ? (
               <p className="text-sm text-muted-foreground">이 날 진행 중인 프로젝트가 없습니다.</p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                 {selectedProjects.map((t) => (
                   <ProjectCard
                     key={t.id}

@@ -18,9 +18,31 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
-// 로그인(AUTH_URL)과 같은 origin을 쓴다 — 콜백 주소가 구글 콘솔에 등록한 값과 정확히 일치해야 한다.
-export function googleRedirectUri() {
-  return `${process.env.AUTH_URL}/api/google/callback`;
+// 콜백 주소는 인증 시작(connect)과 토큰 교환(callback) 양쪽에서 완전히 같아야 하고,
+// 구글 콘솔에 등록한 값과도 정확히 일치해야 한다.
+// origin은 요청 헤더에서 뽑는 걸 1순위로 둔다 — AUTH_URL을 배포 환경에 넣지 않아도
+// 지금 접속한 도메인 그대로 만들어지기 때문이다(이걸 놓쳐서 redirect_uri=undefined/... 가 됐다).
+// 프록시 뒤(Vercel 등)에서는 x-forwarded-* 가 실제 외부 주소를 담고 있다.
+export function originFromRequest(request: Request): string | null {
+  const headers = request.headers;
+  const host = headers.get("x-forwarded-host") ?? headers.get("host");
+  if (!host) return null;
+  const proto = headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+export function googleRedirectUri(origin?: string | null) {
+  const base =
+    origin ??
+    process.env.AUTH_URL ??
+    // Vercel이 자동으로 넣어주는 '프로덕션 고정 도메인'. VERCEL_URL은 배포마다 바뀌어
+    // 구글 콘솔 등록값과 어긋나므로 쓰지 않는다.
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : undefined);
+
+  if (!base) throw new Error("콜백 주소를 만들 수 없습니다. AUTH_URL 환경변수를 설정해 주세요.");
+  return `${base.replace(/\/$/, "")}/api/google/callback`;
 }
 
 export class GoogleAuthError extends Error {}
@@ -47,10 +69,10 @@ export function decryptToken(encoded: string): string {
   return Buffer.concat([decipher.update(Buffer.from(ciphertextB64, "base64")), decipher.final()]).toString("utf8");
 }
 
-export function buildGoogleAuthUrl(state: string) {
+export function buildGoogleAuthUrl(state: string, origin?: string | null) {
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
-    redirect_uri: googleRedirectUri(),
+    redirect_uri: googleRedirectUri(origin),
     response_type: "code",
     scope: GOOGLE_SCOPES,
     access_type: "offline", // refresh_token을 받으려면 필요
@@ -69,7 +91,8 @@ type TokenResponse = {
   id_token?: string;
 };
 
-export async function exchangeCodeForTokens(code: string): Promise<TokenResponse> {
+// origin은 인증을 시작할 때 쓴 값과 반드시 같아야 한다(구글이 대조한다).
+export async function exchangeCodeForTokens(code: string, origin?: string | null): Promise<TokenResponse> {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -77,7 +100,7 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenResponse
       code,
       client_id: process.env.GOOGLE_CLIENT_ID!,
       client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: googleRedirectUri(),
+      redirect_uri: googleRedirectUri(origin),
       grant_type: "authorization_code",
     }),
   });

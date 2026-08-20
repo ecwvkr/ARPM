@@ -2,12 +2,12 @@ import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { buildGoogleAuthUrl } from "@/lib/google/client";
+import { buildGoogleAuthUrl, originFromRequest } from "@/lib/google/client";
 
 const STATE_COOKIE = "google_oauth_state";
 
 // 총관리자만 회사 공용 구글 계정을 연결할 수 있다.
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.isSuperAdmin) redirect("/settings");
 
@@ -21,5 +21,6 @@ export async function GET() {
     path: "/",
   });
 
-  redirect(buildGoogleAuthUrl(state));
+  // 지금 접속한 도메인 그대로 콜백을 만든다 — 배포 환경에 AUTH_URL이 없어도 동작한다.
+  redirect(buildGoogleAuthUrl(state, originFromRequest(request)));
 }

@@ -129,8 +129,10 @@ export function ProjectCard({
               {partnerName}
             </span>
           )}
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-medium">{title}</h3>
+          {/* 모바일 2열에서는 카드가 좁아 제목과 배지를 한 줄에 두면 제목이 글자당 한 줄씩
+              접힌다. 좁을 때는 배지 줄을 제목 아래로 내린다(파트너 카드와 같은 방식). */}
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+            <h3 className="break-keep text-sm font-medium">{title}</h3>
             <div className="flex shrink-0 items-center gap-1">
               <Badge variant={visibility === "PUBLIC" ? "secondary" : "outline"}>
                 {visibility === "PUBLIC" ? "공개" : "비공개"}
@@ -284,9 +286,9 @@ export function ProjectCard({
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span>코멘트 {commentCount}개</span>
-            <span>
+            <span className="whitespace-nowrap">
               생성 {formatShortDate(createdAt)}
               {dueDate && ` ~ 마감 ${formatShortDate(dueDate)}`}
             </span>

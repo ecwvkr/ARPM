@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { exchangeCodeForTokens, extractEmailFromIdToken, encryptToken } from "@/lib/google/client";
+import {
+  exchangeCodeForTokens,
+  extractEmailFromIdToken,
+  encryptToken,
+  originFromRequest,
+} from "@/lib/google/client";
 import { createSyncCalendar } from "@/lib/google/calendar";
 
 const STATE_COOKIE = "google_oauth_state";
@@ -28,7 +33,8 @@ export async function GET(request: NextRequest) {
 
   if (!errorReason) {
     try {
-      const tokens = await exchangeCodeForTokens(code!);
+      // 인증을 시작할 때와 똑같은 origin으로 redirect_uri를 만들어야 구글이 받아준다.
+      const tokens = await exchangeCodeForTokens(code!, originFromRequest(request));
       if (!tokens.refresh_token) {
         // prompt=consent를 항상 붙이므로 보통 여기 오지 않지만, 혹시 비어 있으면 재연결을 안내한다.
         errorReason = "no_refresh_token";

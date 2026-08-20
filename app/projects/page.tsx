@@ -175,7 +175,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
             ) : projects.length === 0 ? (
               <p className="text-sm text-muted-foreground">조건에 맞는 프로젝트가 없습니다.</p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                 {projects.map((project) => (
                   <ProjectCard
                     key={project.id}
