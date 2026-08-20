@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUS_LABEL, isOverdue, type ParticipantChipData } from "@/lib/priority";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog";
 import { AddEventDialog } from "./add-event-dialog";
+import { EditEventDialog } from "./edit-event-dialog";
+import { moveCalendarEvent } from "@/app/actions/google";
 import { IconBrandGoogle, IconArrowRight, IconCheck, IconChevronRight } from "@tabler/icons-react";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -198,11 +200,13 @@ function GoogleEventChip({
   compact = false,
   partners,
   currentUserId,
+  onEdit,
 }: {
   event: CalendarGoogleEvent;
   compact?: boolean;
   partners?: { id: string; name: string }[];
   currentUserId?: string;
+  onEdit?: (event: CalendarGoogleEvent) => void;
 }) {
   return (
     <div
@@ -211,9 +215,20 @@ function GoogleEventChip({
       title={`${event.title} · ${event.calendarSummary}`}
     >
       <IconBrandGoogle className="size-3 shrink-0" />
-      <span className="min-w-0 flex-1 truncate">
-        {compact ? event.title : `${event.title} · ${event.calendarSummary}`}
-      </span>
+      {/* 태그 본문을 눌러 제목·기간 수정과 삭제 창을 연다. */}
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={() => onEdit(event)}
+          className="min-w-0 flex-1 truncate text-left hover:text-foreground hover:underline"
+        >
+          {compact ? event.title : `${event.title} · ${event.calendarSummary}`}
+        </button>
+      ) : (
+        <span className="min-w-0 flex-1 truncate">
+          {compact ? event.title : `${event.title} · ${event.calendarSummary}`}
+        </span>
+      )}
       {event.convertedProjectId && event.convertedPartnerId ? (
         <Link
           href={`/partners/${event.convertedPartnerId}?project=${event.convertedProjectId}`}
@@ -337,6 +352,11 @@ export function CalendarView({
   const [cursor, setCursor] = useState(() => new Date(`${initialDate}T00:00:00`));
   const [selectedKey, setSelectedKey] = useState(initialDate);
   const [hover, setHover] = useState<HoverInfo>(null);
+  const [editing, setEditing] = useState<CalendarGoogleEvent | null>(null);
+  // 드래그 중인 구글 일정. grabbedKey는 '바에서 잡은 날짜'로, 놓은 날과의 차이만큼 이동시킨다
+  // (여러 날짜에 걸친 일정을 가운데서 잡아도 그 자리를 유지한 채 움직이게 하려는 것).
+  const [dragging, setDragging] = useState<{ event: CalendarGoogleEvent; grabbedKey: string } | null>(null);
+  const [isMoving, startMove] = useTransition();
 
   const cursorKey = dateKey(cursor);
 
@@ -395,6 +415,30 @@ export function CalendarView({
   function go(delta: number) {
     if (view === "day") setCursor(addDays(cursor, delta));
     else setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1));
+  }
+
+  // 잡은 날짜와 놓은 날짜의 차이만큼 일정 전체를 밀어서 기간 길이는 그대로 유지한다.
+  function handleEventDrop(dropKey: string) {
+    const drag = dragging;
+    setDragging(null);
+    if (!drag || drag.grabbedKey === dropKey) return;
+
+    const deltaDays = Math.round(
+      (new Date(`${dropKey}T00:00:00`).getTime() - new Date(`${drag.grabbedKey}T00:00:00`).getTime()) / 86_400_000,
+    );
+    if (deltaDays === 0) return;
+
+    const nextStart = addDays(drag.event.startDate, deltaDays);
+    const nextEnd = addDays(drag.event.endDate, deltaDays);
+
+    startMove(async () => {
+      try {
+        await moveCalendarEvent(drag.event.calendarId, drag.event.id, dateKey(nextStart), dateKey(nextEnd));
+        router.refresh();
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "일정을 옮길 수 없습니다.");
+      }
+    });
   }
 
   const title =
@@ -507,6 +551,7 @@ export function CalendarView({
                     event={e}
                     partners={partners}
                     currentUserId={currentUserId}
+                    onEdit={setEditing}
                   />
                 ))}
               </div>
@@ -532,7 +577,7 @@ export function CalendarView({
                     participants={t.participants}
                     commentCount={t.commentCount}
                     currentUserId={currentUserId}
-                    partnerName={t.partnerName}
+                                        partnerName={t.partnerName}
                     partnerColor={t.partnerColor}
                     links={t.links}
                     unread={t.unread}
@@ -554,7 +599,23 @@ export function CalendarView({
               const { placed, overflowCols } = layoutWeek(weekDays, projects, googleEvents);
               const weekHeight = NUMBER_ROW_H + MAX_LANES * LANE_H + 16;
               return (
-                <div key={dateKey(weekDays[0])} className="relative" style={{ height: weekHeight }}>
+                <div
+                  key={dateKey(weekDays[0])}
+                  className="relative"
+                  style={{ height: weekHeight }}
+                  // 드롭은 이 주 전체에서 받는다 — 칸마다 핸들러를 달면 위에 얹힌 바가
+                  // 히트 테스트를 가로채므로, 놓은 x좌표로 요일 칸을 직접 계산한다.
+                  onDragOver={(e) => {
+                    if (dragging) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    if (!dragging) return;
+                    e.preventDefault();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const col = Math.min(6, Math.max(0, Math.floor(((e.clientX - rect.left) / rect.width) * 7)));
+                    handleEventDrop(dateKey(weekDays[col]));
+                  }}
+                >
                   {/* 배경: 요일별 클릭 선택 영역 + 오늘/이번달 아님/선택 표시. 클릭은 이 레이어가
                       받고, 앞 레이어(숫자·바)는 프로젝트 칩 등 실제 인터랙션이 필요한 부분만
                       pointer-events-auto로 다시 열어준다. */}
@@ -598,7 +659,29 @@ export function CalendarView({
                       <div
                         key={item.key}
                         style={{ gridColumn: `${item.startCol + 1} / ${item.endCol + 2}`, gridRow: lane + 2 }}
-                        className="pointer-events-auto min-w-0 py-px"
+                        className={`pointer-events-auto min-w-0 py-px ${
+                          item.kind === "google" ? "cursor-grab active:cursor-grabbing" : ""
+                        }`}
+                        // 구글 일정만 옮길 수 있다 — 프로젝트 칩의 날짜는 프로젝트 마감일이라
+                        // 여기서 끌어 바꾸면 업무 데이터가 조용히 바뀐다.
+                        draggable={item.kind === "google"}
+                        onDragStart={(e) => {
+                          if (item.kind !== "google") return;
+                          setHover(null);
+                          e.dataTransfer.effectAllowed = "move";
+                          // 바 안에서 잡은 지점이 어느 날짜인지 계산해 그 상대 위치를 유지한다.
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const cols = item.endCol - item.startCol + 1;
+                          const offset = Math.min(
+                            cols - 1,
+                            Math.max(0, Math.floor(((e.clientX - rect.left) / rect.width) * cols)),
+                          );
+                          setDragging({
+                            event: item.data,
+                            grabbedKey: dateKey(weekDays[item.startCol + offset]),
+                          });
+                        }}
+                        onDragEnd={() => setDragging(null)}
                         onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, lines: hoverLinesFor(item) })}
                         onMouseMove={(e) => setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))}
                         onMouseLeave={() => setHover(null)}
@@ -643,6 +726,7 @@ export function CalendarView({
                     event={e}
                     partners={partners}
                     currentUserId={currentUserId}
+                    onEdit={setEditing}
                   />
                 ))}
               </div>
@@ -669,7 +753,7 @@ export function CalendarView({
                     participants={t.participants}
                     commentCount={t.commentCount}
                     currentUserId={currentUserId}
-                    partnerName={t.partnerName}
+                                        partnerName={t.partnerName}
                     partnerColor={t.partnerColor}
                     links={t.links}
                     unread={t.unread}
@@ -681,7 +765,15 @@ export function CalendarView({
         </section>
       )}
 
-      {hover && (
+      <EditEventDialog event={editing} onClose={() => setEditing(null)} />
+
+      {isMoving && (
+        <div className="fixed bottom-6 left-1/2 z-100 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs text-background shadow-lg">
+          일정을 옮기는 중...
+        </div>
+      )}
+
+      {hover && !dragging && (
         <div
           className="pointer-events-none fixed z-100 max-w-64 rounded-xl bg-foreground px-3 py-2 text-xs text-background shadow-lg"
           style={{ left: hover.x + 14, top: hover.y + 14 }}

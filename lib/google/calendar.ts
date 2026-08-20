@@ -234,14 +234,61 @@ export async function createGoogleCalendarEvent(
   const accessToken = await getValidAccessToken();
   if (!accessToken) throw new Error("연결된 구글 계정이 없습니다.");
 
+  return createEvent(accessToken, calendarId, { summary: title, ...allDayRange(startDate, endDate) });
+}
+
+// 캘린더 뷰에서 손댈 수 있는 대상인지 확인하고 액세스 토큰을 돌려준다.
+// 앱이 프로젝트를 내보내는 동기화 캘린더는 여기서 제외한다 — 직접 고치면 다음 동기화 때
+// 프로젝트 내용으로 되돌아가 사용자 입장에서는 수정이 사라진 것처럼 보이기 때문이다.
+async function requireEditableCalendar(calendarId: string): Promise<string> {
+  const conn = await prisma.googleConnection.findFirst();
+  if (!conn) throw new Error("연결된 구글 계정이 없습니다.");
+  if (calendarId === conn.syncCalendarId) {
+    throw new Error("웹앱 업무 캘린더의 일정은 프로젝트에서 수정해 주세요.");
+  }
+  if (!conn.enabledCalendarIds.includes(calendarId)) {
+    throw new Error("표시 대상으로 선택된 캘린더의 일정만 수정할 수 있습니다.");
+  }
+
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) throw new Error("연결된 구글 계정이 없습니다.");
+  return accessToken;
+}
+
+// 종일 일정의 end.date는 배타적이라 마지막 날 +1일로 넣는다(조회 쪽 normalizeEvent와 짝).
+function allDayRange(startDate: Date, endDate: Date) {
   const endExclusive = new Date(endDate);
   endExclusive.setDate(endExclusive.getDate() + 1);
+  return { start: { date: toDateOnlyString(startDate) }, end: { date: toDateOnlyString(endExclusive) } };
+}
 
-  return createEvent(accessToken, calendarId, {
+export async function updateGoogleCalendarEvent(
+  calendarId: string,
+  eventId: string,
+  { title, startDate, endDate }: { title: string; startDate: Date; endDate: Date },
+): Promise<void> {
+  const accessToken = await requireEditableCalendar(calendarId);
+  const ok = await updateEvent(accessToken, calendarId, eventId, {
     summary: title,
-    start: { date: toDateOnlyString(startDate) },
-    end: { date: toDateOnlyString(endExclusive) },
+    ...allDayRange(startDate, endDate),
   });
+  if (!ok) throw new Error("일정을 수정할 수 없습니다. 구글에서 삭제되었거나 권한이 없습니다.");
+}
+
+// 드래그로 옮길 때는 제목을 건드리지 않는다 — 기간만 바꾼다.
+export async function moveGoogleCalendarEvent(
+  calendarId: string,
+  eventId: string,
+  { startDate, endDate }: { startDate: Date; endDate: Date },
+): Promise<void> {
+  const accessToken = await requireEditableCalendar(calendarId);
+  const ok = await updateEvent(accessToken, calendarId, eventId, allDayRange(startDate, endDate));
+  if (!ok) throw new Error("일정을 옮길 수 없습니다. 구글에서 삭제되었거나 권한이 없습니다.");
+}
+
+export async function deleteGoogleCalendarEvent(calendarId: string, eventId: string): Promise<void> {
+  const accessToken = await requireEditableCalendar(calendarId);
+  await deleteEvent(accessToken, calendarId, eventId);
 }
 
 // 다른 사람이 직접 발급받은 이벤트 id로 구글에서 지운다. hardDeleteProject처럼 DB 행이

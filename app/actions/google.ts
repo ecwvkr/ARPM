@@ -9,6 +9,9 @@ import {
   listCalendars,
   syncProjectToGoogle,
   createGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+  moveGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
   type GoogleCalendarListItem,
 } from "@/lib/google/calendar";
 
@@ -72,13 +75,69 @@ export async function addCalendarEvent(_prevState: string | undefined, formData:
   try {
     await createGoogleCalendarEvent(calendarId, { title, startDate, endDate });
   } catch (e) {
-    // 스코프가 모자라면 구글이 403/404를 준다 — 재연결이 필요하다는 걸 알려준다.
-    const message = e instanceof Error ? e.message : "일정을 추가할 수 없습니다.";
-    return /401|403|404|insufficient|permission|credential/i.test(message)
-      ? "이 캘린더에 쓸 권한이 없습니다. 설정 > 구글 연동에서 계정을 다시 연결해 주세요."
-      : message;
+    return calendarErrorMessage(e, "일정을 추가할 수 없습니다.");
   }
 
+  revalidatePath("/calendar");
+}
+
+// 스코프가 모자라거나 토큰이 만료되면 구글이 401/403/404를 준다 — 재연결이 필요하다는 걸 알려준다.
+function calendarErrorMessage(e: unknown, fallback: string) {
+  const message = e instanceof Error ? e.message : fallback;
+  return /401|403|insufficient|permission|credential/i.test(message)
+    ? "이 캘린더를 수정할 권한이 없습니다. 설정 > 구글 연동에서 계정을 다시 연결해 주세요."
+    : message;
+}
+
+export async function updateCalendarEvent(_prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const calendarId = (formData.get("calendarId") as string | null)?.trim();
+  const eventId = (formData.get("eventId") as string | null)?.trim();
+  const title = (formData.get("title") as string | null)?.trim();
+  const startRaw = formData.get("startDate") as string | null;
+  const endRaw = formData.get("endDate") as string | null;
+
+  if (!calendarId || !eventId) return "잘못된 요청입니다.";
+  if (!title) return "일정 제목을 입력하세요.";
+  if (!startRaw) return "시작일을 입력하세요.";
+
+  const startDate = new Date(`${startRaw}T00:00:00`);
+  const endDate = endRaw ? new Date(`${endRaw}T00:00:00`) : startDate;
+  if (endDate < startDate) return "종료일은 시작일보다 빠를 수 없습니다.";
+
+  try {
+    await updateGoogleCalendarEvent(calendarId, eventId, { title, startDate, endDate });
+  } catch (e) {
+    return calendarErrorMessage(e, "일정을 수정할 수 없습니다.");
+  }
+
+  revalidatePath("/calendar");
+}
+
+// 월간뷰 드래그 이동 전용 — 제목은 그대로 두고 기간만 옮긴다.
+export async function moveCalendarEvent(
+  calendarId: string,
+  eventId: string,
+  startIso: string,
+  endIso: string,
+) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await moveGoogleCalendarEvent(calendarId, eventId, {
+    startDate: new Date(`${startIso}T00:00:00`),
+    endDate: new Date(`${endIso}T00:00:00`),
+  });
+  revalidatePath("/calendar");
+}
+
+export async function deleteCalendarEvent(calendarId: string, eventId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await deleteGoogleCalendarEvent(calendarId, eventId);
   revalidatePath("/calendar");
 }
 
