@@ -59,7 +59,6 @@ export function KanbanBoard({
                     partnerId={project.partnerId}
                     title={project.title}
                     status={project.status}
-                    visibility={project.visibility}
                     overdue={isOverdue(project.dueDate, project.status)}
                     createdAt={project.createdAt}
                     dueDate={project.dueDate}

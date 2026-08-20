@@ -570,7 +570,6 @@ export function CalendarView({
                     partnerId={t.partnerId}
                     title={t.title}
                     status={t.status}
-                    visibility={t.visibility}
                     overdue={isOverdue(t.dueDate, t.status)}
                     createdAt={t.createdAt}
                     dueDate={t.dueDate}
@@ -746,7 +745,6 @@ export function CalendarView({
                     partnerId={t.partnerId}
                     title={t.title}
                     status={t.status}
-                    visibility={t.visibility}
                     overdue={isOverdue(t.dueDate, t.status)}
                     createdAt={t.createdAt}
                     dueDate={t.dueDate}

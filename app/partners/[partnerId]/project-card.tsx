@@ -35,21 +35,11 @@ function formatShortDate(date: Date) {
   return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// 카드는 좁으므로 전체 URL 대신 도메인만 보여준다(전체는 title 툴팁으로).
-function linkLabel(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
 export function ProjectCard({
   projectId,
   partnerId,
   title,
   status,
-  visibility,
   overdue,
   createdAt,
   dueDate,
@@ -66,7 +56,6 @@ export function ProjectCard({
   partnerId: string;
   title: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
-  visibility: "PUBLIC" | "PRIVATE";
   overdue: boolean;
   createdAt: Date;
   dueDate: Date | null;
@@ -129,14 +118,10 @@ export function ProjectCard({
               {partnerName}
             </span>
           )}
-          {/* 모바일 2열에서는 카드가 좁아 제목과 배지를 한 줄에 두면 제목이 글자당 한 줄씩
-              접힌다. 좁을 때는 배지 줄을 제목 아래로 내린다(파트너 카드와 같은 방식). */}
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-            <h3 className="break-keep text-sm font-medium">{title}</h3>
+          {/* 빠른 작업 버튼은 카드 폭과 상관없이 제목 행 오른쪽에 고정한다. */}
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="min-w-0 break-keep text-sm font-medium">{title}</h3>
             <div className="flex shrink-0 items-center gap-1">
-              <Badge variant={visibility === "PUBLIC" ? "secondary" : "outline"}>
-                {visibility === "PUBLIC" ? "공개" : "비공개"}
-              </Badge>
               <Popover open={menuOpen} onOpenChange={handleMenuOpenChange}>
                 <PopoverTrigger
                   render={
@@ -275,12 +260,10 @@ export function ProjectCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   title={link}
-                  className="pointer-events-auto inline-flex max-w-full items-center gap-1 text-xs text-primary underline underline-offset-2"
+                  aria-label={link}
+                  className="pointer-events-auto inline-flex text-primary"
                 >
-                  <IconLink className="size-3.5 shrink-0" />
-                  {/* flex 자식은 기본 min-width:auto라 끊을 곳 없는 긴 URL이 줄어들지 않고
-                      카드를 밀어내 좌우 스크롤을 만든다. min-w-0이라야 truncate가 먹는다. */}
-                  <span className="min-w-0 truncate">{linkLabel(link)}</span>
+                  <IconLink className="size-4" />
                 </a>
               ))}
             </div>

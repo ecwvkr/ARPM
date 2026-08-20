@@ -8,6 +8,7 @@ import { LogoutButton } from "@/app/logout-button";
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog";
 import { ProjectStatusGroupsView } from "@/app/partners/[partnerId]/project-status-groups";
+import { ProjectPartnerGroupsView } from "./partner-groups";
 import { ProjectCanvas } from "@/app/partners/[partnerId]/canvas-loader";
 import { listSavedFilters } from "@/app/actions/filters";
 import { listAllUsers } from "@/app/actions/users";
@@ -18,6 +19,7 @@ import { chipClass, toArray } from "@/lib/ui";
 const VIEWS = [
   { key: undefined, label: "리스트 뷰" },
   { key: "status", label: "보드 뷰" },
+  { key: "partner", label: "파트너별 보드" },
   { key: "canvas", label: "워크플로우" },
 ] as const;
 
@@ -120,7 +122,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
       </header>
 
       <WidthContainer mainClassName="space-y-4 px-6 py-6">
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           {VIEWS.map((v) => (
             <Link
               key={v.label}
@@ -172,6 +174,12 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
 
             {view === "status" ? (
               <ProjectStatusGroupsView projects={projects} currentUserId={session.user.id} />
+            ) : view === "partner" ? (
+              <ProjectPartnerGroupsView
+                projects={projects}
+                currentUserId={session.user.id}
+                memberPartnerIds={memberPartnerIds}
+              />
             ) : projects.length === 0 ? (
               <p className="text-sm text-muted-foreground">조건에 맞는 프로젝트가 없습니다.</p>
             ) : (
@@ -183,7 +191,6 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
                     partnerId={project.partnerId}
                     title={project.title}
                     status={project.status}
-                    visibility={project.visibility}
                     overdue={isOverdue(project.dueDate, project.status)}
                     createdAt={project.createdAt}
                     dueDate={project.dueDate}
