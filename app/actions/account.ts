@@ -37,3 +37,22 @@ export async function changeMyPassword(_prevState: string | undefined, formData:
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({ where: { id: session.user.id }, data: { passwordHash } });
 }
+
+// 프로필 사진. 클라이언트에서 128px 정사각형 JPEG로 줄여 data URI로 보내오고,
+// 여기서는 형식·크기만 검증해 저장한다(이미지 응답은 /api/avatar/[userId]가 만든다).
+const AVATAR_DATA_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const AVATAR_MAX_LENGTH = 200_000;
+
+export async function updateMyAvatar(dataUrl: string | null) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  if (dataUrl !== null) {
+    if (!AVATAR_DATA_URL.test(dataUrl)) return "이미지 파일을 올려주세요.";
+    if (dataUrl.length > AVATAR_MAX_LENGTH) return "이미지가 너무 큽니다.";
+  }
+
+  await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl: dataUrl } });
+  // 아바타는 모든 화면의 참여자 칩에 나오므로 레이아웃 단위로 다시 그린다.
+  revalidatePath("/", "layout");
+}

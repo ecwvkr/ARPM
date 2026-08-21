@@ -115,11 +115,13 @@ export function ProjectCard({
         <div className="pointer-events-none relative z-10 flex flex-col gap-2">
           {partnerName && (
             <span
-              className="inline-flex w-fit items-center gap-1 text-xs font-medium"
+              title={partnerName}
+              className="flex items-center gap-1 text-xs font-medium"
               style={{ color: partnerColor ?? undefined }}
             >
-              <IconFolder className="size-3.5" />
-              {partnerName}
+              <IconFolder className="size-3.5 shrink-0" />
+              {/* 카드 폭보다 길면 줄바꿈 대신 뒤를 '...'으로 자른다. */}
+              <span className="min-w-0 truncate">{partnerName}</span>
             </span>
           )}
           {/* 빠른 작업 버튼은 카드 폭과 상관없이 제목 행 오른쪽에 고정한다. */}
@@ -225,15 +227,18 @@ export function ProjectCard({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <ProjectStatusBadge projectId={projectId} status={status} />
-            {overdue && <Badge variant="destructive">지연</Badge>}
-            {/* 참여 중이 아니면 카드에서 바로 참여할 수 있게 한다(파트너 카드와 같은 방식). */}
-            {canJoin && <ProjectJoinButton projectId={projectId} />}
-          </div>
-
-          {participants.length > 0 && (
+          {(overdue || canJoin) && (
             <div className="flex flex-wrap items-center gap-1.5">
+              {overdue && <Badge variant="destructive">지연</Badge>}
+              {/* 참여 중이 아니면 카드에서 바로 참여할 수 있게 한다(파트너 카드와 같은 방식). */}
+              {canJoin && <ProjectJoinButton projectId={projectId} />}
+            </div>
+          )}
+
+          {/* 상태 배지는 참여자 칩과 같은 줄의 오른쪽 끝에 붙인다. 참여자가 없어도
+              상태는 늘 보여야 하므로 이 줄 자체는 항상 그린다. */}
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               {participants.slice(0, 4).map((p) => (
                 <span
                   key={p.userId}
@@ -255,7 +260,10 @@ export function ProjectCard({
                 <span className="text-xs text-muted-foreground">+{participants.length - 4}</span>
               )}
             </div>
-          )}
+            <span className="shrink-0">
+              <ProjectStatusBadge projectId={projectId} status={status} />
+            </span>
+          </div>
 
           {links.length > 0 && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

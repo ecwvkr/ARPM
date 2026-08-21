@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { WidthContainer } from "@/components/width-container";
 import { AccentColorForm } from "../accent-color-form";
 import { MyNameForm } from "../my-name-form";
+import { MyAvatarForm } from "../my-avatar-form";
 import { ChangePasswordForm } from "../change-password-form";
 import { UserManagement } from "../user-management";
 import { AppSettingsForm } from "../app-settings-form";
@@ -13,6 +14,7 @@ import { SETTINGS_SECTIONS } from "../sections";
 import { listAllUsersForAdmin } from "@/app/actions/admin";
 import { getGoogleConnectionStatus, listAvailableCalendars } from "@/app/actions/google";
 import { getCommentVisibleCount } from "@/lib/settings";
+import { prisma } from "@/lib/prisma";
 import { listTrashedPartners } from "@/lib/partners";
 import { listTrashedProjects } from "@/lib/projects";
 import { IconChevronLeft } from "@tabler/icons-react";
@@ -63,7 +65,11 @@ export default async function SettingsSectionPage({
           </p>
         )}
         {slug === "account" && (
-          <div className="space-y-2">
+          <div className="space-y-4">
+            <div className="max-w-sm space-y-1">
+              <p className="text-xs text-muted-foreground">프로필 사진</p>
+              <AvatarPanel userId={session.user.id} />
+            </div>
             <div className="max-w-sm space-y-1">
               <p className="text-xs text-muted-foreground">이름</p>
               <MyNameForm name={session.user.name ?? ""} />
@@ -80,6 +86,11 @@ export default async function SettingsSectionPage({
       </WidthContainer>
     </div>
   );
+}
+
+async function AvatarPanel({ userId }: { userId: string }) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
+  return <MyAvatarForm userId={userId} hasAvatar={!!user?.avatarUrl} />;
 }
 
 async function TrashPanel({ userId, isSuperAdmin }: { userId: string; isSuperAdmin: boolean }) {
