@@ -9,7 +9,8 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "generate:favicon": "node scripts/generate-favicon.mjs",
-    "check:chat": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-chat.ts"
+    "check:chat": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-chat.ts",
+    "check:project-read": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-read.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

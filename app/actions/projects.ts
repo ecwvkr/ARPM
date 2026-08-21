@@ -55,10 +55,13 @@ export async function getProjectDetail(projectId: string) {
       }));
     }
 
+    // update를 비워두면 Prisma가 UPDATE를 건너뛰어 lastReadAt이 처음 읽은 시각에
+    // 멈춘다. 읽음 시각은 직접 넣는다.
+    const lastReadAt = new Date();
     await prisma.projectRead.upsert({
       where: { projectId_userId: { projectId, userId: session.user.id } },
-      update: {},
-      create: { projectId, userId: session.user.id },
+      update: { lastReadAt },
+      create: { projectId, userId: session.user.id, lastReadAt },
     });
     await revalidateProjectViews(access.project.partnerId, { touch: false });
   }
