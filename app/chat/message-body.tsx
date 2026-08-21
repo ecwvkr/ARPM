@@ -1,4 +1,6 @@
 import { Fragment } from "react";
+import Link from "next/link";
+import { splitChatMarkup } from "@/lib/chat-markup";
 
 // http/https만 링크로 만든다. 화이트리스트가 아니라 "무엇이든 <a href>로 넣는" 방식은
 // javascript: 같은 주소가 그대로 실행되는 통로가 된다. 정규식이 프로토콜을 강제하므로
@@ -21,7 +23,7 @@ function trimTrailing(url: string): { href: string; rest: string } {
   return { href: url.slice(0, end), rest: url.slice(end) };
 }
 
-export function MessageBody({ text }: { text: string }) {
+function linkifyText(text: string, keyPrefix: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   let cursor = 0;
 
@@ -32,7 +34,7 @@ export function MessageBody({ text }: { text: string }) {
     const { href, rest } = trimTrailing(match[0]);
     parts.push(
       <a
-        key={`${start}-${href}`}
+        key={`${keyPrefix}-${start}`}
         href={href}
         target="_blank"
         rel="noopener noreferrer"
@@ -47,13 +49,53 @@ export function MessageBody({ text }: { text: string }) {
     cursor = start + match[0].length;
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
 
-  // 줄바꿈은 whitespace-pre-wrap이 처리하므로 여기서는 건드리지 않는다.
+// 칩은 말풍선 색을 물려받되 살짝 눌러 구분한다 — 내 말풍선(진한 배경)과 남의
+// 말풍선(연한 배경) 양쪽에서 같은 규칙으로 읽히게 하려는 것.
+const CHIP_CLASS =
+  "rounded-md bg-current/15 px-1 py-0.5 font-medium decoration-current/40 underline-offset-2";
+
+export function MessageBody({
+  text,
+  partnerId,
+  currentUserId,
+}: {
+  text: string;
+  partnerId: string;
+  currentUserId: string;
+}) {
+  const segments = splitChatMarkup(text);
+
   return (
     <>
-      {parts.map((part, i) => (
-        <Fragment key={i}>{part}</Fragment>
-      ))}
+      {segments.map((segment, i) => {
+        if (segment.kind === "mention") {
+          const isMe = segment.userId === currentUserId;
+          return (
+            <span
+              key={i}
+              // 나를 부른 멘션은 더 진하게 — 대화를 훑을 때 내 차례를 먼저 찾게 한다.
+              className={`${CHIP_CLASS} ${isMe ? "bg-current/30" : ""}`}
+            >
+              @{segment.label}
+            </span>
+          );
+        }
+        if (segment.kind === "tag") {
+          return (
+            <Link
+              key={i}
+              href={`/partners/${partnerId}?project=${segment.projectId}`}
+              className={`${CHIP_CLASS} underline`}
+            >
+              /{segment.label}
+            </Link>
+          );
+        }
+        return <Fragment key={i}>{linkifyText(segment.text, String(i))}</Fragment>;
+      })}
     </>
   );
 }

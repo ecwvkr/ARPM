@@ -10,16 +10,28 @@ import {
   countUnreadChat,
   listChatMessages,
   listChatPartners,
+  listComposerTargets,
   requireChatMember,
   toChatMessageView,
   type ChatMessageView,
   type ChatPartner,
+  type ComposerTargets,
 } from "@/lib/chat";
+import { mentionedUserIds, toPlainText } from "@/lib/chat-markup";
 
 async function requireSession() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  return { userId: session.user.id, isSuperAdmin: !!session.user.isSuperAdmin };
+  return {
+    userId: session.user.id,
+    isSuperAdmin: !!session.user.isSuperAdmin,
+    userName: session.user.name ?? "누군가",
+  };
+}
+
+export async function fetchChatComposerTargets(partnerId: string): Promise<ComposerTargets> {
+  const { userId, isSuperAdmin } = await requireSession();
+  return listComposerTargets(partnerId, userId, isSuperAdmin);
 }
 
 export async function fetchChatPartners(): Promise<ChatPartner[]> {
@@ -46,8 +58,8 @@ export async function sendChatMessage(
   body: string,
   replyToId?: string,
 ): Promise<ChatMessageView> {
-  const { userId, isSuperAdmin } = await requireSession();
-  await requireChatMember(partnerId, userId, isSuperAdmin);
+  const { userId, isSuperAdmin, userName } = await requireSession();
+  const partner = await requireChatMember(partnerId, userId, isSuperAdmin);
 
   const text = body.trim();
   if (!text) throw new Error("내용을 입력하세요.");
@@ -70,6 +82,23 @@ export async function sendChatMessage(
 
   // 보낸 사람은 방금 자기 글까지 읽은 상태다(권한은 위에서 이미 확인했으므로 직접 upsert).
   await upsertRead(partnerId, userId);
+
+  // 멘션 알림은 기존 Notification에 얹는다 — 알림 종류가 두 벌이 되면 벨과 뱃지가
+  // 서로 다른 값을 보여준다. 본인 멘션과 이 파트너 멤버가 아닌 대상은 걸러낸다.
+  const memberIds = new Set([partner.ownerId, ...partner.members.map((m) => m.userId)]);
+  const targets = mentionedUserIds(text).filter((id) => id !== userId && memberIds.has(id));
+  if (targets.length > 0) {
+    const preview = toPlainText(text).slice(0, 40);
+    await prisma.notification.createMany({
+      data: targets.map((id) => ({
+        userId: id,
+        type: "CHAT_MENTION",
+        refId: partnerId,
+        message: `${userName}님이 ${partner.name} 대화에서 회원님을 언급했습니다: "${preview}"`,
+      })),
+    });
+  }
+
   return toChatMessageView(created);
 }
 

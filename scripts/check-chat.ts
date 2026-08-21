@@ -6,9 +6,10 @@
 // 기존 데이터는 만들지도, 지우지도 않는다.
 import { prisma } from "../lib/prisma";
 import { listChatMessages, countUnreadChat, listChatPartners, requireChatMember, CHAT_PAGE_SIZE } from "../lib/chat";
+import { findActiveToken, replaceToken, splitChatMarkup, mentionedUserIds, buildMarker } from "../lib/chat-markup";
 
 const created: string[] = [];
-let readKeys: { partnerId: string; userId: string }[] = [];
+const readKeys: { partnerId: string; userId: string }[] = [];
 let ok = 0, fail = 0;
 function check(label: string, cond: boolean, extra = "") {
   if (cond) { ok++; console.log("  OK  ", label, extra); }
@@ -102,6 +103,34 @@ async function main() {
   check("삭제된 글은 안읽음에서 제외",
     !(await countUnreadChat(base, false)).byPartner[partner.id] ||
     (await countUnreadChat(base, false)).byPartner[partner.id]! >= 0);
+
+  console.log("\n[멘션·태그 마크업]");
+  // 커서 왼쪽 토큰 판정 — 이 기능에서 제일 틀리기 쉬운 부분이다.
+  const at = findActiveToken("안녕 @홍", 5);
+  check("@ 뒤 글자를 검색어로 잡는다", at?.trigger === "@" && at.query === "홍", JSON.stringify(at));
+  const slash = findActiveToken("보고서 /경주", 7);
+  check("/ 도 트리거로 잡는다", slash?.trigger === "/" && slash.query === "경주", JSON.stringify(slash));
+  check("이메일 중간의 @는 트리거가 아니다", findActiveToken("a@b", 3) === null);
+  check("주소 안의 /는 트리거가 아니다", findActiveToken("https://ex.com", 14) === null);
+  check("날짜 8/21의 /는 트리거가 아니다", findActiveToken("마감 8/21", 8) === null);
+  check("줄이 바뀌면 닫힌다", findActiveToken("@홍\ndd", 5) === null);
+  check("공백 뒤 트리거는 열린다", findActiveToken("앞 @", 3)?.trigger === "@");
+
+  const token = findActiveToken("안녕 @홍", 5)!;
+  const replaced = replaceToken("안녕 @홍", token, 5, "@", "홍길동", "user1");
+  check("고르면 마커로 바뀐다", replaced.text === "안녕 @[홍길동](user1) ", JSON.stringify(replaced.text));
+  check("커서가 마커 뒤로 간다", replaced.caret === replaced.text.length, String(replaced.caret));
+
+  const body = "@[홍길동](user1) 이거 /[경주 문산리](proj1) 확인 부탁 https://ex.com";
+  const segs = splitChatMarkup(body);
+  check("멘션 조각을 뽑는다", segs.some(x => x.kind === "mention" && x.userId === "user1"));
+  check("태그 조각을 뽑는다", segs.some(x => x.kind === "tag" && x.projectId === "proj1"));
+  check("나머지는 본문으로 남는다",
+    segs.filter(x => x.kind === "text").map(x => (x as { text: string }).text).join("").includes("https://ex.com"));
+  check("멘션 대상 id 목록", JSON.stringify(mentionedUserIds(body)) === JSON.stringify(["user1"]), JSON.stringify(mentionedUserIds(body)));
+  check("중복 멘션은 한 번만", mentionedUserIds("@[A](u1) @[A](u1)").length === 1);
+  check("라벨의 대괄호는 제거된다", buildMarker("@", "홍[길]동", "u1") === "@[홍길동](u1)", buildMarker("@", "홍[길]동", "u1"));
+  check("마커가 아닌 대괄호는 본문 그대로", splitChatMarkup("배열 [0] 확인").every(x => x.kind === "text"));
 
   console.log(`\n결과: 통과 ${ok} / 실패 ${fail}`);
 }

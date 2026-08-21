@@ -133,4 +133,42 @@ export async function countUnreadChat(
   return { total, byPartner };
 }
 
+// 자동완성 후보. 패널을 열 때 한 번만 읽고 이후 타이핑은 클라이언트에서 거른다 —
+// 글자마다 서버를 부르면 호출 수가 그대로 타이핑 수가 된다.
+export type ComposerTargets = {
+  members: { id: string; name: string }[];
+  tags: { projectId: string; label: string; kind: "project" | "task" }[];
+};
+
+export async function listComposerTargets(
+  partnerId: string,
+  userId: string,
+  isSuperAdmin: boolean,
+): Promise<ComposerTargets> {
+  const partner = await requireChatMember(partnerId, userId, isSuperAdmin);
+
+  const memberById = new Map<string, string>([[partner.owner.id, partner.owner.name]]);
+  for (const m of partner.members) memberById.set(m.user.id, m.user.name);
+
+  const projects = await prisma.project.findMany({
+    where: { partnerId, deletedAt: null },
+    select: { id: true, title: true, tasks: { select: { id: true, title: true, done: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const tags: ComposerTargets["tags"] = [];
+  for (const p of projects) {
+    tags.push({ projectId: p.id, label: p.title, kind: "project" });
+    // 태스크도 프로젝트 링크로 이어진다 — 칩 하나에 대상 하나라는 규칙을 유지한다.
+    for (const t of p.tasks) {
+      if (!t.done) tags.push({ projectId: p.id, label: t.title, kind: "task" });
+    }
+  }
+
+  return {
+    members: [...memberById].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "ko")),
+    tags,
+  };
+}
+
 export { toView as toChatMessageView, messageInclude as chatMessageInclude };

@@ -9,11 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   deleteChatMessage,
   editChatMessage,
+  fetchChatComposerTargets,
   fetchChatMessages,
   markChatRead,
   sendChatMessage,
 } from "@/app/actions/chat";
-import type { ChatMessageView, ChatPartner } from "@/lib/chat";
+import type { ChatMessageView, ChatPartner, ComposerTargets } from "@/lib/chat";
+import { findActiveToken, hasChatMarker, replaceToken, type ActiveToken } from "@/lib/chat-markup";
 import { MessageBody } from "./message-body";
 import { IconSend, IconSearch, IconDotsVertical, IconX } from "@tabler/icons-react";
 
@@ -22,6 +24,8 @@ import { IconSend, IconSearch, IconDotsVertical, IconX } from "@tabler/icons-rea
 const POLL_MS = 3000;
 // 같은 사람이 이 시간 안에 이어 쓰면 한 덩어리로 묶어 이름과 아바타를 반복하지 않는다.
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+type SuggestItem = { id: string; label: string; hint?: string; trigger: "@" | "/" };
 
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -68,6 +72,10 @@ export function ChatPanel({
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [targets, setTargets] = useState<ComposerTargets>({ members: [], tags: [] });
+  const [token, setToken] = useState<ActiveToken | null>(null);
+  const [highlight, setHighlight] = useState(0);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestIdRef = useRef<string | null>(null);
@@ -104,6 +112,21 @@ export function ChatPanel({
       cancelled = true;
     };
   }, [partner.id, onRead]);
+
+  // 자동완성 후보도 파트너를 열 때 한 번만 읽는다. 글자마다 서버를 부르지 않는다.
+  useEffect(() => {
+    let cancelled = false;
+    fetchChatComposerTargets(partner.id)
+      .then((t) => {
+        if (!cancelled) setTargets(t);
+      })
+      .catch(() => {
+        // 후보를 못 읽어도 메시지 작성 자체는 되어야 하므로 조용히 넘어간다.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [partner.id]);
 
   // 첫 로드 뒤에는 맨 아래(최신)를 보여준다.
   useEffect(() => {
@@ -156,11 +179,55 @@ export function ChatPanel({
         setMessages((prev) => mergeById(prev, [revived]));
         latestIdRef.current = revived.id;
         setDraft("");
+        setToken(null);
         setErrorMessage(null);
         scrollToBottom();
       } catch (e) {
         setErrorMessage(e instanceof Error ? e.message : "메시지를 보낼 수 없습니다.");
       }
+    });
+  }
+
+  // 커서 위치를 보고 자동완성을 열지 말지 결정한다.
+  function syncToken(text: string, caret: number | null) {
+    setToken(findActiveToken(text, caret ?? text.length));
+    setHighlight(0);
+  }
+
+  // 후보는 이미 받아둔 목록을 걸러서 만든다 — 타이핑마다 서버를 부르지 않는다.
+  const suggestions: SuggestItem[] = (() => {
+    if (!token) return [];
+    const q = token.query.trim().toLowerCase();
+    const matches = (label: string) => q === "" || label.toLowerCase().includes(q);
+
+    if (token.trigger === "@") {
+      return targets.members
+        .filter((m) => matches(m.name))
+        .slice(0, 6)
+        .map((m) => ({ id: m.id, label: m.name, trigger: "@" as const }));
+    }
+    return targets.tags
+      .filter((t) => matches(t.label))
+      .slice(0, 6)
+      .map((t) => ({
+        id: t.projectId,
+        label: t.label,
+        hint: t.kind === "task" ? "태스크" : "프로젝트",
+        trigger: "/" as const,
+      }));
+  })();
+
+  function choose(item: SuggestItem) {
+    const input = inputRef.current;
+    if (!token || !input) return;
+
+    const next = replaceToken(draft, token, input.selectionStart, item.trigger, item.label, item.id);
+    setDraft(next.text);
+    setToken(null);
+    // 값이 화면에 반영된 뒤에야 커서를 옮길 수 있다.
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(next.caret, next.caret);
     });
   }
 
@@ -300,7 +367,15 @@ export function ChatPanel({
                               : "bg-muted"
                         }`}
                       >
-                        {message.deleted ? "삭제된 메시지입니다" : <MessageBody text={message.body} />}
+                        {message.deleted ? (
+                        "삭제된 메시지입니다"
+                      ) : (
+                        <MessageBody
+                          text={message.body}
+                          partnerId={partner.id}
+                          currentUserId={currentUserId}
+                        />
+                      )}
                       </div>
                       <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
                         {formatTime(message.createdAt)}
@@ -323,13 +398,82 @@ export function ChatPanel({
         })}
       </div>
 
-      <div className="shrink-0 border-t border-foreground/10 p-3">
+      <div className="relative shrink-0 border-t border-foreground/10 p-3">
         {errorMessage && <p className="pb-2 text-xs text-destructive">{errorMessage}</p>}
+
+        {suggestions.length > 0 && (
+          <ul
+            role="listbox"
+            aria-label={token?.trigger === "@" ? "멤버 자동완성" : "프로젝트 자동완성"}
+            className="absolute right-3 bottom-full left-3 mb-1 max-h-56 overflow-y-auto rounded-2xl border border-foreground/10 bg-popover p-1 shadow-lg"
+          >
+            {suggestions.map((item, i) => (
+              <li key={`${item.id}-${item.label}-${i}`}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={i === highlight}
+                  // 버튼을 누르면 textarea에서 포커스가 빠져 커서 위치를 잃는다.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => choose(item)}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+                    i === highlight ? "bg-muted" : ""
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.hint && (
+                    <span className="shrink-0 text-xs text-muted-foreground">{item.hint}</span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* 마커를 평문으로 저장하는 대가로 입력창에는 @[이름](id) 원문이 보인다.
+            리치 에디터를 만드는 대신 보낼 모습을 한 줄로 미리 보여준다. */}
+        {hasChatMarker(draft) && (
+          <p className="pb-2 text-xs break-words text-muted-foreground">
+            <span className="mr-1 opacity-70">미리보기</span>
+            <MessageBody text={draft} partnerId={partner.id} currentUserId={currentUserId} />
+          </p>
+        )}
+
         <div className="flex items-end gap-2">
           <Textarea
+            ref={inputRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              syncToken(e.target.value, e.target.selectionStart);
+            }}
+            onClick={(e) => syncToken(draft, e.currentTarget.selectionStart)}
+            onBlur={() => setToken(null)}
             onKeyDown={(e) => {
+              // 자동완성이 떠 있으면 위/아래로 고르고 Enter·Tab으로 넣는다. 이때
+              // Enter가 전송으로 새면 고르려다 메시지가 나가버린다.
+              if (suggestions.length > 0) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setHighlight((h) => (h + 1) % suggestions.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setHighlight((h) => (h - 1 + suggestions.length) % suggestions.length);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setToken(null);
+                  return;
+                }
+                if ((e.key === "Enter" || e.key === "Tab") && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  choose(suggestions[highlight]);
+                  return;
+                }
+              }
               // Enter로 보내고 Shift+Enter로 줄바꿈. 한글 조합 중(Enter로 한자·이모지 확정)에는
               // 보내지 않는다 — isComposing을 안 보면 조합 확정이 전송으로 새어 나간다.
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -337,7 +481,7 @@ export function ChatPanel({
                 send();
               }
             }}
-            placeholder={`${partner.name}에 메시지 보내기`}
+            placeholder={`${partner.name}에 메시지 보내기 (@멤버, /프로젝트)`}
             aria-label="메시지 입력"
             rows={1}
             className="max-h-32 min-h-9 flex-1 resize-none py-2"
