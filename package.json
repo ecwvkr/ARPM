@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "generate:favicon": "node scripts/generate-favicon.mjs"
+    "generate:favicon": "node scripts/generate-favicon.mjs",
+    "check:project-read": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-read.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
