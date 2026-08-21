@@ -233,25 +233,26 @@ function GoogleEventChip({
     <div
       style={{ borderLeftColor: event.calendarColor }}
       className="flex items-center gap-1.5 rounded-md border-l-2 bg-muted py-0.5 pr-1 pl-1.5 text-xs text-muted-foreground"
-      title={`${timeLabel ? `${timeLabel} ` : ""}${event.title} · ${event.calendarSummary}`}
+      title={`${event.title}${timeLabel ? ` · ${timeLabel}` : ""} · ${event.calendarSummary}`}
     >
       <IconBrandGoogle className="size-3 shrink-0" />
-      {/* 시간 지정 일정은 시각을 제목 앞에 붙인다. 종일 일정은 아무것도 붙지 않는다. */}
-      {timeLabel && <span className="shrink-0 font-medium tabular-nums">{timeLabel}</span>}
-      {/* 태그 본문을 눌러 제목·기간 수정과 삭제 창을 연다. */}
+      {/* 제목이 먼저 오고 시각이 뒤따른다 — 무슨 일정인지가 언제인지보다 먼저 읽혀야 한다. */}
       {onEdit ? (
         <button
           type="button"
           onClick={() => onEdit(event)}
-          className="min-w-0 flex-1 truncate text-left hover:text-foreground hover:underline"
+          className="min-w-0 truncate text-left hover:text-foreground hover:underline"
         >
-          {compact ? event.title : `${event.title} · ${event.calendarSummary}`}
+          {event.title}
         </button>
       ) : (
-        <span className="min-w-0 flex-1 truncate">
-          {compact ? event.title : `${event.title} · ${event.calendarSummary}`}
-        </span>
+        <span className="min-w-0 truncate">{event.title}</span>
       )}
+      {timeLabel && <span className="shrink-0 font-medium tabular-nums">{timeLabel}</span>}
+      {!compact && (
+        <span className="min-w-0 flex-1 truncate opacity-70">· {event.calendarSummary}</span>
+      )}
+      {compact && <span className="flex-1" />}
       {event.convertedProjectId && event.convertedPartnerId ? (
         <Link
           href={`/partners/${event.convertedPartnerId}?project=${event.convertedProjectId}`}
@@ -317,8 +318,8 @@ function WeekBarItem({ item }: { item: WeekItem }) {
 
   const e = item.data;
   const converted = !!e.convertedProjectId;
-  // 월간뷰 바는 칸이 좁으므로 시작 시각만 붙인다.
-  const barTime = e.startAt ? eventTimeLabel(e)?.split("~")[0] : null;
+  // 월간뷰 바는 칸이 좁아 제목만 쓴다. 시각은 마우스를 올리면 툴팁으로 보인다.
+  const barTime = eventTimeLabel(e);
   return (
     <div
       style={{
@@ -328,10 +329,9 @@ function WeekBarItem({ item }: { item: WeekItem }) {
       className={`flex h-full items-center gap-1 overflow-hidden px-1.5 text-xs text-foreground ${
         item.isActualStart ? "rounded-l-md border-l-4" : ""
       } ${item.isActualEnd ? "rounded-r-md" : ""} ${converted ? "opacity-60" : ""}`}
-      title={converted ? `${e.title} · ${e.calendarSummary} (업무로 전환됨)` : `${e.title} · ${e.calendarSummary}`}
+      title={`${e.title}${barTime ? ` · ${barTime}` : ""} · ${e.calendarSummary}${converted ? " (업무로 전환됨)" : ""}`}
     >
       {item.isActualStart && (converted ? <IconCheck className="size-3 shrink-0" /> : <IconBrandGoogle className="size-3 shrink-0" />)}
-      {item.isActualStart && barTime && <span className="shrink-0 tabular-nums">{barTime}</span>}
       <span className="truncate">{e.title}</span>
     </div>
   );
