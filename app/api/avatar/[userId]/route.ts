@@ -13,12 +13,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
   const match = user?.avatarUrl?.match(/^data:(image\/[a-z]+);base64,(.+)$/);
 
-  // 사진이 없는 사용자도 칩마다 요청이 오므로 404에도 캐시를 붙여 재요청을 막는다.
+  // 아바타 요청 1건이 곧 Vercel 함수 호출 1건이다. 참여자 칩은 화면마다 반복되므로
+  // 캐시를 짧게 잡으면(예: 5분) 사람 수 × 화면 수만큼 호출이 계속 발생한다. 하루로
+  // 잡아 사실상 한 번만 받게 한다 — 대신 사진을 바꿔도 다른 사람 화면에는 최대 하루
+  // 뒤에 반영된다(본인 설정 화면은 ?v= 로 즉시 갱신된다).
+  // 사진이 없는 사용자도 칩마다 요청이 오므로 404에도 같은 캐시를 붙인다.
+  const cacheControl = "private, max-age=86400";
+
   if (!match) {
-    return new Response(null, { status: 404, headers: { "Cache-Control": "private, max-age=300" } });
+    return new Response(null, { status: 404, headers: { "Cache-Control": cacheControl } });
   }
 
   return new Response(Buffer.from(match[2], "base64"), {
-    headers: { "Content-Type": match[1], "Cache-Control": "private, max-age=300" },
+    headers: { "Content-Type": match[1], "Cache-Control": cacheControl },
   });
 }
