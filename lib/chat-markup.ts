@@ -6,12 +6,12 @@
 export type ChatTrigger = "@" | "/";
 
 // id는 cuid(영숫자)만 나오므로 좁게 잡는다 — 본문에 우연히 섞인 괄호와 헷갈리지 않게.
-const MARKER_PATTERN = /([@/])\[([^\]\n]{1,80})\]\(([A-Za-z0-9_-]{1,40})\)/g;
+const MARKER_PATTERN = /([@/])\[([^\]\n]{1,80})\]\(([A-Za-z0-9_:-]{1,90})\)/g;
 
 export type ChatSegment =
   | { kind: "text"; text: string }
   | { kind: "mention"; label: string; userId: string }
-  | { kind: "tag"; label: string; projectId: string };
+  | { kind: "tag"; label: string; projectId: string; partnerId: string | null };
 
 export function splitChatMarkup(body: string): ChatSegment[] {
   const segments: ChatSegment[] = [];
@@ -22,11 +22,16 @@ export function splitChatMarkup(body: string): ChatSegment[] {
     if (start > cursor) segments.push({ kind: "text", text: body.slice(cursor, start) });
 
     const [, trigger, label, id] = match;
-    segments.push(
-      trigger === "@"
-        ? { kind: "mention", label, userId: id }
-        : { kind: "tag", label, projectId: id },
-    );
+    if (trigger === "@") {
+      segments.push({ kind: "mention", label, userId: id });
+    } else {
+      const [first, second] = id.split(":");
+      segments.push(
+        second
+          ? { kind: "tag", label, partnerId: first, projectId: second }
+          : { kind: "tag", label, partnerId: null, projectId: first },
+      );
+    }
     cursor = start + match[0].length;
   }
   if (cursor < body.length) segments.push({ kind: "text", text: body.slice(cursor) });

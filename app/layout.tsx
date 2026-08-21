@@ -69,7 +69,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </Script>
         {children}
         {session?.user?.id && unreadChat && (
-          <ChatLauncher currentUserId={session.user.id} initialUnread={unreadChat} />
+          <ChatLauncher
+            currentUserId={session.user.id}
+            isSuperAdmin={!!session.user.isSuperAdmin}
+            initialUnread={unreadChat}
+          />
         )}
         {session && <BottomNav />}
         <GlobalToastHost />

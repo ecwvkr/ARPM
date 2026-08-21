@@ -12,18 +12,21 @@ import {
   fetchChatComposerTargets,
   fetchChatMessages,
   markChatRead,
+  openChatRoom,
   sendChatMessage,
+  toggleChatReaction,
 } from "@/app/actions/chat";
-import type { ChatMessageView, ChatPartner, ComposerTargets } from "@/lib/chat";
-import { findActiveToken, hasChatMarker, replaceToken, type ActiveToken } from "@/lib/chat-markup";
+import type { ChatMessageView, ChatRoomSummary, ComposerTargets } from "@/lib/chat";
+import { findActiveToken, hasChatMarker, replaceToken, toPlainText, type ActiveToken } from "@/lib/chat-markup";
 import { MessageBody } from "./message-body";
-import { IconSend, IconSearch, IconDotsVertical, IconX } from "@tabler/icons-react";
+import { IconSend, IconSearch, IconDotsVertical, IconX, IconMoodPlus, IconCornerUpLeft } from "@tabler/icons-react";
 
 // 패널이 열려 있는 동안에만 짧게 폴링한다. 닫혀 있으면 요청이 아예 나가지 않으므로
 // 아무도 대화를 보고 있지 않을 때의 비용이 0이다(무료 플랜의 병목은 호출 수와 CPU 시간).
 const POLL_MS = 3000;
 // 같은 사람이 이 시간 안에 이어 쓰면 한 덩어리로 묶어 이름과 아바타를 반복하지 않는다.
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
+const QUICK_EMOJI = ["👍", "✅", "🙏", "👀", "🎉", "😂"];
 
 type SuggestItem = { id: string; label: string; hint?: string; trigger: "@" | "/" };
 
@@ -55,16 +58,17 @@ function mergeById(prev: ChatMessageView[], incoming: ChatMessageView[]): ChatMe
 }
 
 export function ChatPanel({
-  partner,
+  room,
   currentUserId,
   onRead,
 }: {
-  partner: ChatPartner;
+  room: ChatRoomSummary;
   currentUserId: string;
-  onRead: (partnerId: string) => void;
+  onRead: (roomId: string) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [hasMore, setHasMore] = useState(false);
+  const [memberCount, setMemberCount] = useState(room.memberCount);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -72,12 +76,15 @@ export function ChatPanel({
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<ChatMessageView | null>(null);
   const [targets, setTargets] = useState<ComposerTargets>({ members: [], tags: [] });
   const [token, setToken] = useState<ActiveToken | null>(null);
   const [highlight, setHighlight] = useState(0);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // 방에 들어온 순간의 읽음 기준. 이 뒤 첫 메시지 위에 '여기까지 읽음'을 긋는다.
+  const [markerAt, setMarkerAt] = useState<Date | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestIdRef = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -85,21 +92,24 @@ export function ChatPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
-  // 파트너를 바꾸면 런처가 key로 이 컴포넌트를 다시 마운트하므로, 여기서 상태를
-  // 되돌릴 필요 없이 처음 한 번만 읽으면 된다(효과 본문에서 동기 setState 금지).
+  // 방마다 런처가 key로 이 컴포넌트를 다시 마운트하므로 처음 한 번만 읽으면 된다.
   useEffect(() => {
     let cancelled = false;
 
-    fetchChatMessages(partner.id)
+    openChatRoom(room.id)
       .then((res) => {
         if (cancelled) return;
         const list = reviveDates(res.messages);
         setMessages(list);
         setHasMore(res.hasMore);
+        setMemberCount(res.memberCount);
+        setMarkerAt(res.lastReadAt ? new Date(res.lastReadAt) : null);
         latestIdRef.current = list.at(-1)?.id ?? null;
         setErrorMessage(null);
-        onRead(partner.id);
-        return markChatRead(partner.id);
+        onRead(room.id);
+        // 읽음 처리는 기준값을 받아 화면에 반영한 뒤에 한다. 조회와 같은 호출 안에서
+        // 갱신하면 '여기까지 읽음' 기준이 방금 읽은 시각으로 덮여 마커가 사라진다.
+        return markChatRead(room.id);
       })
       .catch((e) => {
         if (!cancelled) setErrorMessage(e instanceof Error ? e.message : "대화를 불러올 수 없습니다.");
@@ -111,12 +121,12 @@ export function ChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [partner.id, onRead]);
+  }, [room.id, onRead]);
 
-  // 자동완성 후보도 파트너를 열 때 한 번만 읽는다. 글자마다 서버를 부르지 않는다.
+  // 자동완성 후보도 방을 열 때 한 번만 읽는다. 글자마다 서버를 부르지 않는다.
   useEffect(() => {
     let cancelled = false;
-    fetchChatComposerTargets(partner.id)
+    fetchChatComposerTargets(room.id)
       .then((t) => {
         if (!cancelled) setTargets(t);
       })
@@ -126,28 +136,27 @@ export function ChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [partner.id]);
+  }, [room.id]);
 
-  // 첫 로드 뒤에는 맨 아래(최신)를 보여준다.
   useEffect(() => {
     if (!loading) scrollToBottom();
-  }, [loading, partner.id, scrollToBottom]);
+  }, [loading, scrollToBottom]);
 
   // 폴링. 탭이 백그라운드면 멈춘다 — 밤새 열어둔 탭이 호출을 태우지 않게.
   useEffect(() => {
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
       try {
-        const res = await fetchChatMessages(partner.id);
+        const res = await fetchChatMessages(room.id);
         const list = reviveDates(res.messages);
         const newest = list.at(-1)?.id ?? null;
+        // 리액션·읽음 표시는 id가 그대로여도 바뀌므로 목록은 항상 갈아끼운다.
+        setMessages((prev) => mergeById(prev, list));
         if (newest === latestIdRef.current) return;
 
         latestIdRef.current = newest;
-        setMessages((prev) => mergeById(prev, list));
-        // 보고 있는 동안 온 메시지는 읽은 것으로 처리한다.
-        onRead(partner.id);
-        await markChatRead(partner.id);
+        onRead(room.id);
+        await markChatRead(room.id);
         scrollToBottom();
       } catch {
         // 일시적인 실패는 다음 주기에 다시 시도하면 되므로 화면을 건드리지 않는다.
@@ -156,12 +165,12 @@ export function ChatPanel({
 
     const timer = setInterval(tick, POLL_MS);
     return () => clearInterval(timer);
-  }, [partner.id, scrollToBottom, onRead]);
+  }, [room.id, scrollToBottom, onRead]);
 
   function loadOlder() {
     const oldest = messages[0];
     if (!oldest) return;
-    fetchChatMessages(partner.id, oldest.createdAt.toISOString())
+    fetchChatMessages(room.id, oldest.createdAt.toISOString())
       .then((res) => {
         setMessages((prev) => mergeById(prev, reviveDates(res.messages)));
         setHasMore(res.hasMore);
@@ -174,12 +183,13 @@ export function ChatPanel({
     if (!text || isSending) return;
     startSend(async () => {
       try {
-        const created = await sendChatMessage(partner.id, text);
+        const created = await sendChatMessage(room.id, text, replyTo?.id);
         const [revived] = reviveDates([created]);
         setMessages((prev) => mergeById(prev, [revived]));
         latestIdRef.current = revived.id;
         setDraft("");
         setToken(null);
+        setReplyTo(null);
         setErrorMessage(null);
         scrollToBottom();
       } catch (e) {
@@ -188,7 +198,6 @@ export function ChatPanel({
     });
   }
 
-  // 커서 위치를 보고 자동완성을 열지 말지 결정한다.
   function syncToken(text: string, caret: number | null) {
     setToken(findActiveToken(text, caret ?? text.length));
     setHighlight(0);
@@ -210,7 +219,8 @@ export function ChatPanel({
       .filter((t) => matches(t.label))
       .slice(0, 6)
       .map((t) => ({
-        id: t.projectId,
+        // 태그는 파트너까지 담아 저장한다 — 1:1·단체방에서도 링크가 살아 있도록.
+        id: `${t.partnerId}:${t.projectId}`,
         label: t.label,
         hint: t.kind === "task" ? "태스크" : "프로젝트",
         trigger: "/" as const,
@@ -245,18 +255,43 @@ export function ChatPanel({
     deleteChatMessage(messageId)
       .then(() =>
         setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, deleted: true, body: "" } : m)),
+          prev.map((m) => (m.id === messageId ? { ...m, deleted: true, body: "", reactions: [] } : m)),
         ),
       )
       .catch((e) => setErrorMessage(e instanceof Error ? e.message : "메시지를 삭제할 수 없습니다."));
   }
 
-  // 검색은 이미 불러온 메시지만 훑는다. 파트너당 메시지가 수백 건 수준이라 서버로
-  // 내릴 이유가 없고, 이렇게 하면 타이핑마다 요청이 나가지도 않는다.
+  function react(messageId: string, emoji: string) {
+    // 응답을 기다리지 않고 먼저 반영한다 — 리액션은 되돌려도 손해가 없는 조작이다.
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const found = m.reactions.find((r) => r.emoji === emoji);
+        const reactions = found
+          ? found.mine
+            ? found.count === 1
+              ? m.reactions.filter((r) => r.emoji !== emoji)
+              : m.reactions.map((r) => (r.emoji === emoji ? { ...r, count: r.count - 1, mine: false } : r))
+            : m.reactions.map((r) => (r.emoji === emoji ? { ...r, count: r.count + 1, mine: true } : r))
+          : [...m.reactions, { emoji, count: 1, mine: true }];
+        return { ...m, reactions };
+      }),
+    );
+    toggleChatReaction(messageId, emoji).catch(() => setErrorMessage("리액션을 저장하지 못했습니다."));
+  }
+
+  // 검색은 이미 불러온 메시지만 훑는다. 방당 메시지가 수백 건 수준이라 서버로 내릴
+  // 이유가 없고, 이렇게 하면 타이핑마다 요청이 나가지도 않는다.
   const keyword = query.trim().toLowerCase();
   const visible = keyword
-    ? messages.filter((m) => !m.deleted && m.body.toLowerCase().includes(keyword))
+    ? messages.filter((m) => !m.deleted && toPlainText(m.body).toLowerCase().includes(keyword))
     : messages;
+
+  // '여기까지 읽음'은 이 방에 들어오기 전 기준보다 나중에 온 남의 첫 메시지 앞에 긋는다.
+  const markerId =
+    markerAt && !keyword
+      ? (messages.find((m) => m.createdAt > markerAt && m.author.id !== currentUserId)?.id ?? null)
+      : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -309,6 +344,7 @@ export function ChatPanel({
               : "불러온 대화에서 찾지 못했습니다. '이전 메시지 더 보기'로 과거를 더 불러와 보세요."}
           </p>
         )}
+
         {hasMore && (
           <div className="flex justify-center pb-2">
             <Button type="button" size="sm" variant="outline" onClick={loadOlder}>
@@ -327,12 +363,16 @@ export function ChatPanel({
         {visible.map((message, i) => {
           const prev = visible[i - 1];
           const showDay = !prev || dayKey(prev.createdAt) !== dayKey(message.createdAt);
+          const isMarker = message.id === markerId;
           const grouped =
             !showDay &&
+            !isMarker &&
             !!prev &&
             prev.author.id === message.author.id &&
             message.createdAt.getTime() - prev.createdAt.getTime() < GROUP_WINDOW_MS;
           const mine = message.author.id === currentUserId;
+          // 나 말고 몇 명이 더 읽었는지. 1:1이면 상대가 읽었는지만 알면 된다.
+          const unreadBy = Math.max(0, memberCount - 1 - message.readBy);
 
           return (
             <div key={message.id}>
@@ -341,6 +381,14 @@ export function ChatPanel({
                   {formatDay(message.createdAt)}
                 </div>
               )}
+              {isMarker && (
+                <div className="flex items-center gap-2 py-2">
+                  <span className="h-px flex-1 bg-destructive/40" />
+                  <span className="text-xs font-medium text-destructive">여기까지 읽음</span>
+                  <span className="h-px flex-1 bg-destructive/40" />
+                </div>
+              )}
+
               <div className={`flex gap-2 ${mine ? "flex-row-reverse" : ""} ${grouped ? "mt-0.5" : "mt-2"}`}>
                 {/* 묶인 메시지는 아바타 자리만 비워 말풍선 시작점을 맞춘다. */}
                 <div className="w-6 shrink-0">
@@ -350,6 +398,7 @@ export function ChatPanel({
                   {!grouped && !mine && (
                     <span className="text-xs text-muted-foreground">{message.author.name}</span>
                   )}
+
                   {editingId === message.id ? (
                     <EditRow
                       initial={message.body}
@@ -357,39 +406,78 @@ export function ChatPanel({
                       onSave={(text) => applyEdit(message.id, text)}
                     />
                   ) : (
-                    <div className={`flex items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
-                      <div
-                        className={`max-w-[15rem] rounded-2xl px-3 py-1.5 text-sm break-words whitespace-pre-wrap sm:max-w-md ${
-                          message.deleted
-                            ? "bg-muted text-muted-foreground italic"
-                            : mine
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted"
-                        }`}
-                      >
-                        {message.deleted ? (
-                        "삭제된 메시지입니다"
-                      ) : (
-                        <MessageBody
-                          text={message.body}
-                          partnerId={partner.id}
-                          currentUserId={currentUserId}
-                        />
-                      )}
+                    <>
+                      <div className={`flex items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                        <div
+                          className={`max-w-[15rem] rounded-2xl px-3 py-1.5 text-sm break-words whitespace-pre-wrap sm:max-w-md ${
+                            message.deleted
+                              ? "bg-muted text-muted-foreground italic"
+                              : mine
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted"
+                          }`}
+                        >
+                          {message.replyTo && !message.deleted && (
+                            <span className="mb-1 flex flex-col gap-0.5 rounded-lg bg-current/10 px-2 py-1 text-xs">
+                              <span className="font-medium opacity-80">{message.replyTo.authorName}</span>
+                              <span className="line-clamp-2 opacity-70">
+                                {message.replyTo.body ? toPlainText(message.replyTo.body) : "삭제된 메시지"}
+                              </span>
+                            </span>
+                          )}
+                          {message.deleted ? (
+                            "삭제된 메시지입니다"
+                          ) : (
+                            <MessageBody
+                              text={message.body}
+                              partnerId={room.partnerId}
+                              currentUserId={currentUserId}
+                            />
+                          )}
+                        </div>
+
+                        <span className="flex shrink-0 flex-col items-end text-xs whitespace-nowrap text-muted-foreground">
+                          {/* 읽은 사람 표시: 아직 안 읽은 사람 수를 보여준다(0이면 모두 읽음). */}
+                          {mine && !message.deleted && memberCount > 1 && (
+                            <span className={unreadBy === 0 ? "text-primary" : ""}>
+                              {unreadBy === 0 ? "모두 읽음" : `${unreadBy}명 안 읽음`}
+                            </span>
+                          )}
+                          <span>
+                            {formatTime(message.createdAt)}
+                            {message.editedAt && !message.deleted && " (수정됨)"}
+                          </span>
+                        </span>
+
+                        {!message.deleted && (
+                          <MessageActions
+                            canEdit={mine}
+                            onReply={() => setReplyTo(message)}
+                            onEdit={() => setEditingId(message.id)}
+                            onDelete={() => removeMessage(message.id)}
+                            onReact={(emoji) => react(message.id, emoji)}
+                          />
+                        )}
                       </div>
-                      <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-                        {formatTime(message.createdAt)}
-                        {message.editedAt && !message.deleted && " (수정됨)"}
-                      </span>
-                      {/* 수정·삭제는 본인이 쓴 메시지에만 연다. 파트너 관리자의 삭제 권한은
-                          서버에 열려 있지만 화면에는 아직 붙이지 않았다. */}
-                      {mine && !message.deleted && (
-                        <MessageActions
-                          onEdit={() => setEditingId(message.id)}
-                          onDelete={() => removeMessage(message.id)}
-                        />
+
+                      {message.reactions.length > 0 && (
+                        <div className={`flex flex-wrap gap-1 ${mine ? "justify-end" : ""}`}>
+                          {message.reactions.map((r) => (
+                            <button
+                              key={r.emoji}
+                              type="button"
+                              onClick={() => react(message.id, r.emoji)}
+                              aria-pressed={r.mine}
+                              className={`rounded-full border px-1.5 py-0.5 text-xs ${
+                                r.mine ? "border-primary bg-primary/10" : "border-foreground/10 bg-muted"
+                              }`}
+                            >
+                              {r.emoji} {r.count}
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -430,12 +518,31 @@ export function ChatPanel({
           </ul>
         )}
 
+        {replyTo && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted px-2 py-1.5">
+            <IconCornerUpLeft className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-xs">
+              <span className="font-medium">{replyTo.author.name}</span>
+              <span className="text-muted-foreground"> · {toPlainText(replyTo.body)}</span>
+            </span>
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              aria-label="답장 취소"
+              onClick={() => setReplyTo(null)}
+            >
+              <IconX />
+            </Button>
+          </div>
+        )}
+
         {/* 마커를 평문으로 저장하는 대가로 입력창에는 @[이름](id) 원문이 보인다.
             리치 에디터를 만드는 대신 보낼 모습을 한 줄로 미리 보여준다. */}
         {hasChatMarker(draft) && (
           <p className="pb-2 text-xs break-words text-muted-foreground">
             <span className="mr-1 opacity-70">미리보기</span>
-            <MessageBody text={draft} partnerId={partner.id} currentUserId={currentUserId} />
+            <MessageBody text={draft} partnerId={room.partnerId} currentUserId={currentUserId} />
           </p>
         )}
 
@@ -481,7 +588,7 @@ export function ChatPanel({
                 send();
               }
             }}
-            placeholder={`${partner.name}에 메시지 보내기 (@멤버, /프로젝트)`}
+            placeholder={`${room.name}에 메시지 보내기 (@멤버, /프로젝트)`}
             aria-label="메시지 입력"
             rows={1}
             className="max-h-32 min-h-9 flex-1 resize-none py-2"
@@ -542,7 +649,19 @@ function EditRow({
   );
 }
 
-function MessageActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function MessageActions({
+  canEdit,
+  onReply,
+  onEdit,
+  onDelete,
+  onReact,
+}: {
+  canEdit: boolean;
+  onReply: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onReact: (emoji: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -561,7 +680,7 @@ function MessageActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: ()
           </Button>
         }
       />
-      <PopoverContent className="w-40 gap-0.5 p-1.5" align="end">
+      <PopoverContent className="w-44 gap-0.5 p-1.5" align="end">
         {confirming ? (
           <>
             <p className="px-2 py-1 text-xs text-muted-foreground">삭제할까요?</p>
@@ -585,23 +704,56 @@ function MessageActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: ()
           </>
         ) : (
           <>
+            <div className="flex items-center gap-0.5 px-1 pb-1">
+              <IconMoodPlus className="size-3.5 shrink-0 text-muted-foreground" />
+              {QUICK_EMOJI.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  aria-label={`${emoji} 리액션`}
+                  onClick={() => {
+                    onReact(emoji);
+                    setOpen(false);
+                  }}
+                  className="rounded-md px-1 py-0.5 text-base hover:bg-muted"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <hr className="my-1 border-foreground/10" />
             <button
               type="button"
               onClick={() => {
-                onEdit();
+                onReply();
                 setOpen(false);
               }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
             >
-              수정
+              <IconCornerUpLeft className="size-4" />
+              답장
             </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(true)}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
-            >
-              삭제
-            </button>
+            {canEdit && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onEdit();
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+                >
+                  삭제
+                </button>
+              </>
+            )}
           </>
         )}
       </PopoverContent>

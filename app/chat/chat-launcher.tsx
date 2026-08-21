@@ -3,28 +3,32 @@
 import { useCallback, useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { fetchChatPartners, fetchUnreadChatCount } from "@/app/actions/chat";
-import type { ChatPartner } from "@/lib/chat";
+import { fetchChatRooms, fetchUnreadChatCount } from "@/app/actions/chat";
+import type { ChatRoomSummary } from "@/lib/chat";
 import { ChatPanel } from "./chat-panel";
-import { IconMessageCircle } from "@tabler/icons-react";
+import { ChatRoomList } from "./chat-room-list";
+import { NewRoomDialog } from "./new-room-dialog";
+import { RoomMembersDialog } from "./room-members-dialog";
+import { IconMessageCircle, IconChevronLeft, IconPlus, IconUsers } from "@tabler/icons-react";
 
-const LAST_PARTNER_KEY = "arpm.chat.lastPartnerId";
+export type UnreadChat = { total: number; byRoom: Record<string, number> };
 
-export type UnreadChat = { total: number; byPartner: Record<string, number> };
-
-// 파트너 목록은 패널을 처음 열 때만 읽는다. 버튼만 떠 있는 동안에는 요청이 나가지 않는다.
 export function ChatLauncher({
   currentUserId,
+  isSuperAdmin,
   initialUnread,
 }: {
   currentUserId: string;
+  isSuperAdmin: boolean;
   initialUnread: UnreadChat;
 }) {
   const [open, setOpen] = useState(false);
-  const [partners, setPartners] = useState<ChatPartner[] | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [rooms, setRooms] = useState<ChatRoomSummary[] | null>(null);
+  const [activeRoom, setActiveRoom] = useState<ChatRoomSummary | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [unread, setUnread] = useState<UnreadChat>(initialUnread);
+  const [newRoomOpen, setNewRoomOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
 
   const refreshUnread = useCallback(() => {
     fetchUnreadChatCount()
@@ -34,42 +38,55 @@ export function ChatLauncher({
       });
   }, []);
 
+  const loadRooms = useCallback(
+    (select?: string) =>
+      fetchChatRooms()
+        .then((list) => {
+          setRooms(list);
+          setErrorMessage(null);
+          if (select) {
+            const found = list.find((r) => r.id === select);
+            if (found) setActiveRoom(found);
+          }
+        })
+        .catch(() => setErrorMessage("채팅방 목록을 불러올 수 없습니다.")),
+    [],
+  );
+
   // 첫 값은 서버 렌더에서 받았으므로 타이머로 계속 확인하지 않는다. 사람이 실제로
-  // 뱃지를 볼 수 있게 되는 순간 — 탭으로 돌아왔을 때 — 에만 다시 읽는다. 호출 수가
-  // 시계가 아니라 사용에 비례하므로, 아무도 안 쓰는 동안에는 0이다.
+  // 뱃지를 볼 수 있게 되는 순간 — 탭으로 돌아왔을 때 — 에만 다시 읽는다.
   useEffect(() => {
     window.addEventListener("focus", refreshUnread);
     return () => window.removeEventListener("focus", refreshUnread);
   }, [refreshUnread]);
 
   useEffect(() => {
-    if (!open || partners) return;
-    fetchChatPartners()
-      .then((list) => {
-        setPartners(list);
-        const remembered = localStorage.getItem(LAST_PARTNER_KEY);
-        setSelectedId(list.find((p) => p.id === remembered)?.id ?? list[0]?.id ?? null);
-      })
-      .catch(() => setErrorMessage("파트너 목록을 불러올 수 없습니다."));
-  }, [open, partners]);
+    if (!open) return;
+    loadRooms();
+  }, [open, loadRooms]);
 
-  function selectPartner(id: string) {
-    setSelectedId(id);
-    localStorage.setItem(LAST_PARTNER_KEY, id);
-  }
-
-  // 패널이 그 파트너를 읽음 처리했을 때. 서버를 다시 부르지 않고 그만큼 뺀다.
-  const clearPartnerUnread = useCallback((partnerId: string) => {
+  // 방을 읽으면 뱃지에서 그만큼 뺀다(서버를 다시 부르지 않는다).
+  const clearRoomUnread = useCallback((roomId: string) => {
     setUnread((prev) => {
-      const count = prev.byPartner[partnerId] ?? 0;
+      const count = prev.byRoom[roomId] ?? 0;
       if (count === 0) return prev;
-      const byPartner = { ...prev.byPartner };
-      delete byPartner[partnerId];
-      return { total: Math.max(0, prev.total - count), byPartner };
+      const byRoom = { ...prev.byRoom };
+      delete byRoom[roomId];
+      return { total: Math.max(0, prev.total - count), byRoom };
     });
+    setRooms((prev) => prev?.map((r) => (r.id === roomId ? { ...r, unread: 0 } : r)) ?? prev);
   }, []);
 
-  const selected = partners?.find((p) => p.id === selectedId) ?? null;
+  function closeSheet(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      // 다음에 열 때 목록 화면부터 보이도록 되돌린다.
+      setActiveRoom(null);
+      refreshUnread();
+    }
+  }
+
+  const canManageRoom = activeRoom?.kind === "GROUP" && isSuperAdmin;
 
   return (
     <>
@@ -90,61 +107,89 @@ export function ChatLauncher({
         )}
       </Button>
 
-      <Sheet
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          // 닫을 때 한 번 맞춰준다 — 보는 동안 다른 파트너에 쌓인 것도 반영된다.
-          if (!next) refreshUnread();
-        }}
-      >
+      <Sheet open={open} onOpenChange={closeSheet}>
         <SheetContent
           side="bottom"
-          // 기본 max-h-[85vh] + 자체 스크롤 대신, 높이를 고정하고 메시지 영역만 스크롤시킨다.
+          // 기본 max-h-[85vh] + 자체 스크롤 대신, 높이를 고정하고 안쪽만 스크롤시킨다.
           // dvh를 쓰는 이유는 모바일에서 키보드가 올라올 때 100vh 기준이면 입력창이 가려지기 때문.
           className="data-[side=bottom]:flex data-[side=bottom]:h-[80dvh] data-[side=bottom]:max-h-none data-[side=bottom]:flex-col data-[side=bottom]:overflow-hidden sm:data-[side=bottom]:right-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:left-auto sm:data-[side=bottom]:h-[34rem] sm:data-[side=bottom]:w-96 sm:data-[side=bottom]:rounded-3xl"
         >
-          <div className="shrink-0 border-b border-foreground/10 px-4 pt-4 pr-14 pb-3">
-            <SheetTitle className="sr-only">채팅</SheetTitle>
-            {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
-            {!errorMessage && partners === null && (
-              <p className="text-sm text-muted-foreground">불러오는 중...</p>
-            )}
-            {partners?.length === 0 && (
-              <p className="text-sm text-muted-foreground">참여 중인 파트너가 없습니다.</p>
-            )}
-            {partners && partners.length > 0 && (
-              // 파트너 수가 많지 않고 목록 이상의 기능이 필요 없어 기본 select를 쓴다.
-              // 안읽음 수는 select 안에 뱃지를 넣을 수 없으므로 이름 뒤에 숫자로 붙인다.
-              <select
-                value={selectedId ?? ""}
-                onChange={(e) => selectPartner(e.target.value)}
-                aria-label="대화할 파트너"
-                className="w-full max-w-xs rounded-md border border-input bg-background px-2 py-1.5 text-sm font-medium"
-                style={{ color: selected?.color ?? undefined }}
-              >
-                {partners.map((p) => {
-                  const count = unread.byPartner[p.id] ?? 0;
-                  return (
-                    <option key={p.id} value={p.id}>
-                      {count > 0 ? `${p.name} (${count})` : p.name}
-                    </option>
-                  );
-                })}
-              </select>
+          <div className="flex shrink-0 items-center gap-1 border-b border-foreground/10 px-4 pt-4 pr-14 pb-3">
+            {activeRoom ? (
+              <>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="채팅방 목록으로"
+                  onClick={() => setActiveRoom(null)}
+                  className="-ml-2"
+                >
+                  <IconChevronLeft className="size-4" />
+                </Button>
+                <SheetTitle
+                  className="min-w-0 flex-1 truncate text-sm"
+                  style={{ color: activeRoom.color ?? undefined }}
+                >
+                  {activeRoom.name}
+                </SheetTitle>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="참여자 보기"
+                  onClick={() => setMembersOpen(true)}
+                >
+                  <IconUsers className="size-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <SheetTitle className="flex-1 text-sm">채팅</SheetTitle>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setNewRoomOpen(true)}>
+                  <IconPlus className="size-4" />
+                  새 대화
+                </Button>
+              </>
             )}
           </div>
 
-          {selected && (
+          {errorMessage && <p className="px-4 py-3 text-sm text-destructive">{errorMessage}</p>}
+
+          {activeRoom ? (
             <ChatPanel
-              key={selected.id}
-              partner={selected}
+              key={activeRoom.id}
+              room={activeRoom}
               currentUserId={currentUserId}
-              onRead={clearPartnerUnread}
+              onRead={clearRoomUnread}
             />
+          ) : rooms === null ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">불러오는 중...</p>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <ChatRoomList rooms={rooms} onOpen={setActiveRoom} />
+            </div>
           )}
         </SheetContent>
       </Sheet>
+
+      <NewRoomDialog
+        open={newRoomOpen}
+        onOpenChange={setNewRoomOpen}
+        currentUserId={currentUserId}
+        isSuperAdmin={isSuperAdmin}
+        onCreated={(roomId) => loadRooms(roomId)}
+      />
+
+      {activeRoom && (
+        <RoomMembersDialog
+          open={membersOpen}
+          onOpenChange={setMembersOpen}
+          roomId={activeRoom.id}
+          canManage={canManageRoom}
+          currentUserId={currentUserId}
+        />
+      )}
     </>
   );
 }

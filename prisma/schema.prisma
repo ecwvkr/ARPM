@@ -30,6 +30,10 @@ model User {
   pinnedProjects       ProjectPin[] // 개인별 프로젝트 카드 상단 고정
   chatMessages         ChatMessage[]
   chatReads            ChatRead[]
+  chatRoomMemberships  ChatRoomMember[]
+  createdChatRooms     ChatRoom[]         @relation("ChatRoomCreator")
+  chatReactions        ChatReaction[]
+  pushSubscriptions    PushSubscription[]
   masteredProjects     Project[]          @relation("ProjectMaster")
   projectParticipations ProjectParticipant[]
   priorities           ProjectPriority[]
@@ -61,8 +65,7 @@ model Partner {
   projects Project[]
   hiddenBy PartnerHide[] // 이 파트너를 숨긴 사용자들 (D2)
   pinnedBy PartnerPin[] // 이 파트너를 즐겨찾기 고정한 사용자들
-  chatMessages ChatMessage[]
-  chatReads    ChatRead[]
+  chatRoom     ChatRoom?
   joinRequests PartnerJoinRequest[]
 
   @@index([ownerId])
@@ -121,11 +124,48 @@ model PartnerPin {
   @@index([partnerId])
 }
 
-// 파트너 단위 채팅. 방을 따로 만들지 않고 파트너 하나당 대화방 하나로 고정한다 —
-// 파트너 멤버십이 이미 권한 모델이라 접근 제어·참여자 목록이 그대로 따라온다.
+// 채팅방. 파트너방은 파트너당 하나(멤버십을 PartnerMember에서 그대로 물려받는다),
+// 1:1과 단체방은 ChatRoomMember로 참여자를 직접 관리한다. 단체방 생성·초대·강퇴는
+// 무분별한 방 증식을 막기 위해 총관리자만 할 수 있다.
+model ChatRoom {
+  id          String       @id @default(cuid())
+  kind        ChatRoomKind
+  partnerId   String?      @unique // PARTNER 방 전용
+  name        String? // GROUP 방 전용
+  // 1:1 방 중복 생성 방지용 키. 두 사용자 id를 정렬해 이어붙인다.
+  directKey   String?      @unique
+  createdById String?
+  createdAt   DateTime     @default(now())
+
+  partner   Partner?         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdBy User?            @relation("ChatRoomCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members   ChatRoomMember[]
+  messages  ChatMessage[]
+  reads     ChatRead[]
+}
+
+enum ChatRoomKind {
+  PARTNER
+  DIRECT
+  GROUP
+}
+
+// DIRECT·GROUP 방의 참여자. PARTNER 방은 여기에 행을 만들지 않는다 —
+// 파트너 멤버가 바뀔 때마다 두 곳을 맞춰야 하는 문제를 만들지 않기 위해서다.
+model ChatRoomMember {
+  roomId   String
+  userId   String
+  joinedAt DateTime @default(now())
+  room     ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+  @@index([userId])
+}
+
 model ChatMessage {
   id        String    @id @default(cuid())
-  partnerId String
+  roomId    String
   authorId  String
   body      String
   createdAt DateTime  @default(now())
@@ -133,27 +173,54 @@ model ChatMessage {
   deletedAt DateTime? // 소프트 삭제 — 인용 답장이 가리키는 원본이 사라지지 않게 한다
   replyToId String?
 
-  partner Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  author  User          @relation(fields: [authorId], references: [id])
-  replyTo ChatMessage?  @relation("ChatReply", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies ChatMessage[] @relation("ChatReply")
+  room      ChatRoom       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  author    User           @relation(fields: [authorId], references: [id])
+  replyTo   ChatMessage?   @relation("ChatReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   ChatMessage[]  @relation("ChatReply")
+  reactions ChatReaction[]
 
-  // 목록은 항상 파트너로 좁힌 뒤 시간순으로 읽는다.
-  @@index([partnerId, createdAt])
+  // 목록은 항상 방으로 좁힌 뒤 시간순으로 읽는다.
+  @@index([roomId, createdAt])
   @@index([authorId])
 }
 
-// 안읽음 뱃지 기준. ProjectRead와 같은 모양이다.
+// 이모지 리액션. "확인했습니다" 한 줄을 대신해 알림 소음을 줄인다.
+model ChatReaction {
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime    @default(now())
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+// 안읽음 뱃지와 '여기까지 읽음' 마커, 읽은 사람 표시의 기준. ProjectRead와 같은 모양이다.
 model ChatRead {
-  partnerId  String
-  userId     String
+  roomId String
+  userId String
   // @updatedAt을 쓰지 않는다: Prisma의 upsert는 update가 비어 있으면 UPDATE 자체를
-  // 건너뛰어 @updatedAt이 갱신되지 않는다(실측 확인). 읽음 시각은 항상 명시적으로 넣는다.
+  // 건너뛰어 @updatedAt이 갱신되지 않는다. 읽음 시각은 항상 명시적으로 넣는다.
   lastReadAt DateTime
-  partner    Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  room       ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([partnerId, userId])
+  @@id([roomId, userId])
+  @@index([userId])
+}
+
+// 웹 푸시 구독. 사람마다 기기·브라우저별로 여러 개를 가질 수 있다.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 

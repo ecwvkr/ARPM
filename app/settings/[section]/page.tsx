@@ -5,6 +5,7 @@ import { WidthContainer } from "@/components/width-container";
 import { AccentColorForm } from "../accent-color-form";
 import { MyNameForm } from "../my-name-form";
 import { MyAvatarForm } from "../my-avatar-form";
+import { PushForm } from "../push-form";
 import { ChangePasswordForm } from "../change-password-form";
 import { UserManagement } from "../user-management";
 import { AppSettingsForm } from "../app-settings-form";
@@ -76,6 +77,10 @@ export default async function SettingsSectionPage({
             </div>
             <p className="text-xs text-muted-foreground">아이디: {session.user.email}</p>
             <ChangePasswordForm />
+            <div className="max-w-sm space-y-1 border-t border-foreground/10 pt-4">
+              <p className="text-xs text-muted-foreground">채팅 알림</p>
+              <PushForm publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+            </div>
           </div>
         )}
         {slug === "appearance" && <AccentColorForm currentColor={session.user.accentColor} />}

@@ -63,7 +63,9 @@ export function MessageBody({
   currentUserId,
 }: {
   text: string;
-  partnerId: string;
+  // 1:1·단체방은 파트너에 매이지 않는다. 이때 태그는 파트너를 특정할 수 없으므로
+  // 프로젝트 id만으로 링크를 만들 수 없어 칩만 그린다.
+  partnerId: string | null;
   currentUserId: string;
 }) {
   const segments = splitChatMarkup(text);
@@ -84,10 +86,19 @@ export function MessageBody({
           );
         }
         if (segment.kind === "tag") {
+          // 태그 마커가 파트너를 함께 담고 있으면 그걸 쓰고, 없으면 이 방의 파트너를 쓴다.
+          const target = segment.partnerId ?? partnerId;
+          if (!target) {
+            return (
+              <span key={i} className={CHIP_CLASS}>
+                /{segment.label}
+              </span>
+            );
+          }
           return (
             <Link
               key={i}
-              href={`/partners/${partnerId}?project=${segment.projectId}`}
+              href={`/partners/${target}?project=${segment.projectId}`}
               className={`${CHIP_CLASS} underline`}
             >
               /{segment.label}
