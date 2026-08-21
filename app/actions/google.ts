@@ -55,25 +55,48 @@ export async function listWritableCalendars(): Promise<
   }
 }
 
-export async function addCalendarEvent(_prevState: string | undefined, formData: FormData) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const calendarId = (formData.get("calendarId") as string | null)?.trim();
-  const title = (formData.get("title") as string | null)?.trim();
+// 시간 지정 여부와 시각을 폼에서 읽어 검증한다. 형식이 어긋나면 구글이 400을 주므로
+// 여기서 먼저 막는다.
+function readTiming(formData: FormData): { startDate: Date; endDate: Date; startTime: string | null; endTime: string | null } | string {
   const startRaw = formData.get("startDate") as string | null;
   const endRaw = formData.get("endDate") as string | null;
-
-  if (!calendarId) return "캘린더를 선택하세요.";
-  if (!title) return "일정 제목을 입력하세요.";
   if (!startRaw) return "시작일을 입력하세요.";
 
   const startDate = new Date(`${startRaw}T00:00:00`);
   const endDate = endRaw ? new Date(`${endRaw}T00:00:00`) : startDate;
   if (endDate < startDate) return "종료일은 시작일보다 빠를 수 없습니다.";
 
+  const timed = formData.get("timed") === "on";
+  if (!timed) return { startDate, endDate, startTime: null, endTime: null };
+
+  const startTime = (formData.get("startTime") as string | null)?.trim();
+  const endTime = (formData.get("endTime") as string | null)?.trim();
+  const valid = /^\d{2}:\d{2}$/;
+  if (!startTime || !valid.test(startTime)) return "시작 시간을 입력하세요.";
+  if (!endTime || !valid.test(endTime)) return "종료 시간을 입력하세요.";
+  // 같은 날이면 끝나는 시각이 시작보다 빠를 수 없다(여러 날에 걸치면 상관없다).
+  if (endDate.getTime() === startDate.getTime() && endTime <= startTime) {
+    return "종료 시간은 시작 시간보다 늦어야 합니다.";
+  }
+
+  return { startDate, endDate, startTime, endTime };
+}
+
+export async function addCalendarEvent(_prevState: string | undefined, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const calendarId = (formData.get("calendarId") as string | null)?.trim();
+  const title = (formData.get("title") as string | null)?.trim();
+
+  if (!calendarId) return "캘린더를 선택하세요.";
+  if (!title) return "일정 제목을 입력하세요.";
+
+  const timing = readTiming(formData);
+  if (typeof timing === "string") return timing;
+
   try {
-    await createGoogleCalendarEvent(calendarId, { title, startDate, endDate });
+    await createGoogleCalendarEvent(calendarId, { title, ...timing });
   } catch (e) {
     return calendarErrorMessage(e, "일정을 추가할 수 없습니다.");
   }
@@ -96,19 +119,15 @@ export async function updateCalendarEvent(_prevState: string | undefined, formDa
   const calendarId = (formData.get("calendarId") as string | null)?.trim();
   const eventId = (formData.get("eventId") as string | null)?.trim();
   const title = (formData.get("title") as string | null)?.trim();
-  const startRaw = formData.get("startDate") as string | null;
-  const endRaw = formData.get("endDate") as string | null;
 
   if (!calendarId || !eventId) return "잘못된 요청입니다.";
   if (!title) return "일정 제목을 입력하세요.";
-  if (!startRaw) return "시작일을 입력하세요.";
 
-  const startDate = new Date(`${startRaw}T00:00:00`);
-  const endDate = endRaw ? new Date(`${endRaw}T00:00:00`) : startDate;
-  if (endDate < startDate) return "종료일은 시작일보다 빠를 수 없습니다.";
+  const timing = readTiming(formData);
+  if (typeof timing === "string") return timing;
 
   try {
-    await updateGoogleCalendarEvent(calendarId, eventId, { title, startDate, endDate });
+    await updateGoogleCalendarEvent(calendarId, eventId, { title, ...timing });
   } catch (e) {
     return calendarErrorMessage(e, "일정을 수정할 수 없습니다.");
   }
@@ -116,12 +135,15 @@ export async function updateCalendarEvent(_prevState: string | undefined, formDa
   revalidatePath("/calendar");
 }
 
-// 월간뷰 드래그 이동 전용 — 제목은 그대로 두고 기간만 옮긴다.
+// 월간뷰 드래그 이동 전용 — 제목은 그대로 두고 날짜만 옮긴다. 시간 지정 일정이면
+// 원래 시각(startTime/endTime)을 그대로 다시 넘겨 시각이 유지되게 한다.
 export async function moveCalendarEvent(
   calendarId: string,
   eventId: string,
   startIso: string,
   endIso: string,
+  startTime?: string | null,
+  endTime?: string | null,
 ) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -129,6 +151,8 @@ export async function moveCalendarEvent(
   await moveGoogleCalendarEvent(calendarId, eventId, {
     startDate: new Date(`${startIso}T00:00:00`),
     endDate: new Date(`${endIso}T00:00:00`),
+    startTime,
+    endTime,
   });
   revalidatePath("/calendar");
 }
