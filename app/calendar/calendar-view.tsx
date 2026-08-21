@@ -73,9 +73,25 @@ export type CalendarGoogleEvent = {
   startDate: Date;
   endDate: Date;
   allDay: boolean;
+  startAt: Date | null;
+  endAt: Date | null;
   convertedProjectId: string | null;
   convertedPartnerId: string | null;
 };
+
+// 시간 지정 일정의 시각 표기. 하루 안에서 끝나면 "14:00~15:00", 여러 날에 걸치면
+// 시작 시각만 보여준다(칩이 좁아 둘 다 넣으면 제목이 밀린다).
+function eventTimeLabel(event: CalendarGoogleEvent): string | null {
+  if (!event.startAt) return null;
+  const hm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const sameDay = !!event.endAt && dateKey(event.startAt) === dateKey(event.endAt);
+  return sameDay && event.endAt ? `${hm(event.startAt)}~${hm(event.endAt)}` : hm(event.startAt);
+}
+
+// 서버 액션에 그대로 되돌려줄 "HH:MM". 드래그 이동에서 시각을 유지하는 데 쓴다.
+function hhmm(d: Date | null): string | null {
+  return d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : null;
+}
 
 // 월간뷰 칸·선택 패널은 프로젝트 마감일 칩과 구글 일정 칩을 같은 목록에 섞어서
 // 보여준다 — 2건 초과 시 접는 로직과 렌더링을 한 곳에서 함께 처리하기 위한 태그.
@@ -211,13 +227,17 @@ function GoogleEventChip({
   currentUserId?: string;
   onEdit?: (event: CalendarGoogleEvent) => void;
 }) {
+  const timeLabel = eventTimeLabel(event);
+
   return (
     <div
       style={{ borderLeftColor: event.calendarColor }}
       className="flex items-center gap-1.5 rounded-md border-l-2 bg-muted py-0.5 pr-1 pl-1.5 text-xs text-muted-foreground"
-      title={`${event.title} · ${event.calendarSummary}`}
+      title={`${timeLabel ? `${timeLabel} ` : ""}${event.title} · ${event.calendarSummary}`}
     >
       <IconBrandGoogle className="size-3 shrink-0" />
+      {/* 시간 지정 일정은 시각을 제목 앞에 붙인다. 종일 일정은 아무것도 붙지 않는다. */}
+      {timeLabel && <span className="shrink-0 font-medium tabular-nums">{timeLabel}</span>}
       {/* 태그 본문을 눌러 제목·기간 수정과 삭제 창을 연다. */}
       {onEdit ? (
         <button
@@ -297,6 +317,8 @@ function WeekBarItem({ item }: { item: WeekItem }) {
 
   const e = item.data;
   const converted = !!e.convertedProjectId;
+  // 월간뷰 바는 칸이 좁으므로 시작 시각만 붙인다.
+  const barTime = e.startAt ? eventTimeLabel(e)?.split("~")[0] : null;
   return (
     <div
       style={{
@@ -309,6 +331,7 @@ function WeekBarItem({ item }: { item: WeekItem }) {
       title={converted ? `${e.title} · ${e.calendarSummary} (업무로 전환됨)` : `${e.title} · ${e.calendarSummary}`}
     >
       {item.isActualStart && (converted ? <IconCheck className="size-3 shrink-0" /> : <IconBrandGoogle className="size-3 shrink-0" />)}
+      {item.isActualStart && barTime && <span className="shrink-0 tabular-nums">{barTime}</span>}
       <span className="truncate">{e.title}</span>
     </div>
   );
@@ -389,6 +412,15 @@ export function CalendarView({
         push(dateKey(d), { kind: "google", data: e });
       }
     }
+    // 하루 안에서는 종일 일정을 먼저, 시간 지정 일정을 시각순으로 둔다 — 구글 캘린더와 같은 순서.
+    for (const items of map.values()) {
+      items.sort((a, b) => {
+        if (a.kind !== "google" || b.kind !== "google") return 0;
+        const at = a.data.startAt?.getTime() ?? -1;
+        const bt = b.data.startAt?.getTime() ?? -1;
+        return at - bt;
+      });
+    }
     return map;
   }, [projects, googleEvents]);
 
@@ -436,7 +468,14 @@ export function CalendarView({
 
     startMove(async () => {
       try {
-        await moveCalendarEvent(drag.event.calendarId, drag.event.id, dateKey(nextStart), dateKey(nextEnd));
+        await moveCalendarEvent(
+          drag.event.calendarId,
+          drag.event.id,
+          dateKey(nextStart),
+          dateKey(nextEnd),
+          hhmm(drag.event.startAt),
+          hhmm(drag.event.endAt),
+        );
         router.refresh();
       } catch (e) {
         alert(e instanceof Error ? e.message : "일정을 옮길 수 없습니다.");

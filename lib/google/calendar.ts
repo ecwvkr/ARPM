@@ -54,6 +54,10 @@ export type NormalizedGoogleEvent = {
   startDate: Date; // 로컬 자정 기준 시작일
   endDate: Date; // 로컬 자정 기준 종료일(포함, exclusive 아님)
   allDay: boolean;
+  // 시간 지정 일정의 실제 시각. 종일 일정은 null이다. 표시는 브라우저 시간대로 하면
+  // 되므로 인스턴트만 넘긴다.
+  startAt: Date | null;
+  endAt: Date | null;
   // 이 일정을 이미 업무로 전환한 프로젝트가 있으면 채워진다(G5) — 있으면 원본 칩에
   // "전환됨" 표시를 하고 재전환을 막는다.
   convertedProjectId: string | null;
@@ -62,6 +66,24 @@ export type NormalizedGoogleEvent = {
 
 function dateOnly(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// 이 앱은 한국에서만 쓰이지만 서버는 UTC에서 돈다. 시간 지정 일정의 "무슨 날인가"를
+// 서버 시간대로 계산하면 새벽 일정이 하루 앞당겨진다(01:00 KST = 전날 16:00 UTC).
+// 항상 한국 벽시계 기준으로 연·월·일을 뽑고, 서버 시간대와 무관하게 같은 값이 나오도록
+// Date.UTC로 만든다.
+export const APP_TIME_ZONE = "Asia/Seoul";
+
+const ZONED_PARTS = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function zonedDateOnly(d: Date) {
+  const [year, month, day] = ZONED_PARTS.format(d).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 type RawGoogleEvent = {
@@ -99,14 +121,18 @@ function normalizeEvent(item: RawGoogleEvent, calendarId: string, meta: GoogleCa
 
   let startDate: Date;
   let endDate: Date;
+  let startAt: Date | null = null;
+  let endAt: Date | null = null;
   if (allDay && item.start.date && item.end.date) {
     startDate = new Date(`${item.start.date}T00:00:00`);
     // 구글 종일 일정의 종료일은 배타적(다음날 자정)이라 하루를 빼야 실제 마지막 날이 된다.
     const endExclusive = new Date(`${item.end.date}T00:00:00`);
     endDate = new Date(endExclusive.getTime() - 86_400_000);
   } else if (item.start.dateTime && item.end.dateTime) {
-    startDate = dateOnly(new Date(item.start.dateTime));
-    endDate = dateOnly(new Date(item.end.dateTime));
+    startAt = new Date(item.start.dateTime);
+    endAt = new Date(item.end.dateTime);
+    startDate = zonedDateOnly(startAt);
+    endDate = zonedDateOnly(endAt);
   } else {
     return null;
   }
@@ -120,6 +146,8 @@ function normalizeEvent(item: RawGoogleEvent, calendarId: string, meta: GoogleCa
     startDate,
     endDate,
     allDay,
+    startAt,
+    endAt,
     convertedProjectId: null,
     convertedPartnerId: null,
   };
@@ -223,7 +251,7 @@ async function deleteEvent(accessToken: string, calendarId: string, eventId: str
 // 종일 일정의 end.date는 배타적이라 마지막 날 +1일로 넣는다(조회 쪽 normalizeEvent와 짝).
 export async function createGoogleCalendarEvent(
   calendarId: string,
-  { title, startDate, endDate }: { title: string; startDate: Date; endDate: Date },
+  { title, ...timing }: EventTiming & { title: string },
 ): Promise<string> {
   const conn = await prisma.googleConnection.findFirst();
   if (!conn) throw new Error("연결된 구글 계정이 없습니다.");
@@ -234,7 +262,7 @@ export async function createGoogleCalendarEvent(
   const accessToken = await getValidAccessToken();
   if (!accessToken) throw new Error("연결된 구글 계정이 없습니다.");
 
-  return createEvent(accessToken, calendarId, { summary: title, ...allDayRange(startDate, endDate) });
+  return createEvent(accessToken, calendarId, { summary: title, ...rangeOf(timing) });
 }
 
 // 캘린더 뷰에서 손댈 수 있는 대상인지 확인하고 액세스 토큰을 돌려준다.
@@ -262,27 +290,51 @@ function allDayRange(startDate: Date, endDate: Date) {
   return { start: { date: toDateOnlyString(startDate) }, end: { date: toDateOnlyString(endExclusive) } };
 }
 
+// 시간 지정 일정. 서버 시간대에 휘둘리지 않도록 UTC로 환산하지 않고, 벽시계 문자열
+// ("2026-08-21T14:00:00")과 시간대 이름을 그대로 구글에 넘긴다.
+function timedRange(startDate: Date, endDate: Date, startTime: string, endTime: string) {
+  return {
+    start: { dateTime: `${toDateOnlyString(startDate)}T${startTime}:00`, timeZone: APP_TIME_ZONE },
+    end: { dateTime: `${toDateOnlyString(endDate)}T${endTime}:00`, timeZone: APP_TIME_ZONE },
+  };
+}
+
+export type EventTiming = {
+  startDate: Date;
+  endDate: Date;
+  // 둘 다 있으면 시간 지정 일정("HH:MM"), 없으면 종일 일정.
+  startTime?: string | null;
+  endTime?: string | null;
+};
+
+function rangeOf({ startDate, endDate, startTime, endTime }: EventTiming) {
+  return startTime && endTime
+    ? timedRange(startDate, endDate, startTime, endTime)
+    : allDayRange(startDate, endDate);
+}
+
 export async function updateGoogleCalendarEvent(
   calendarId: string,
   eventId: string,
-  { title, startDate, endDate }: { title: string; startDate: Date; endDate: Date },
+  { title, ...timing }: EventTiming & { title: string },
 ): Promise<void> {
   const accessToken = await requireEditableCalendar(calendarId);
   const ok = await updateEvent(accessToken, calendarId, eventId, {
     summary: title,
-    ...allDayRange(startDate, endDate),
+    ...rangeOf(timing),
   });
   if (!ok) throw new Error("일정을 수정할 수 없습니다. 구글에서 삭제되었거나 권한이 없습니다.");
 }
 
-// 드래그로 옮길 때는 제목을 건드리지 않는다 — 기간만 바꾼다.
+// 드래그로 옮길 때는 제목을 건드리지 않는다 — 날짜만 바꾸고, 시간 지정 일정이면
+// 시각은 그대로 둔다(오후 2시 회의를 옮겨도 오후 2시여야 한다).
 export async function moveGoogleCalendarEvent(
   calendarId: string,
   eventId: string,
-  { startDate, endDate }: { startDate: Date; endDate: Date },
+  timing: EventTiming,
 ): Promise<void> {
   const accessToken = await requireEditableCalendar(calendarId);
-  const ok = await updateEvent(accessToken, calendarId, eventId, allDayRange(startDate, endDate));
+  const ok = await updateEvent(accessToken, calendarId, eventId, rangeOf(timing));
   if (!ok) throw new Error("일정을 옮길 수 없습니다. 구글에서 삭제되었거나 권한이 없습니다.");
 }
 

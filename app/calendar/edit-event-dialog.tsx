@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { showToast } from "@/components/ui/global-toast";
+import { EventTimeFields } from "./event-time-fields";
 
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -20,7 +21,14 @@ export type EditableEvent = {
   title: string;
   startDate: Date;
   endDate: Date;
+  // 시간 지정 일정이면 실제 시각이 온다(종일이면 null).
+  startAt: Date | null;
+  endAt: Date | null;
 };
+
+function timeValue(d: Date) {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 // 하단 목록의 일정 태그를 눌러 여는 수정 창. 제목·기간을 고치거나 일정을 지운다.
 export function EditEventDialog({
@@ -80,22 +88,14 @@ export function EditEventDialog({
             <Label htmlFor="edit-title">제목</Label>
             <Input id="edit-title" name="title" defaultValue={event.title} required />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-start">시작일</Label>
-              <Input
-                id="edit-start"
-                name="startDate"
-                type="date"
-                defaultValue={dateKey(event.startDate)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-end">종료일</Label>
-              <Input id="edit-end" name="endDate" type="date" defaultValue={dateKey(event.endDate)} />
-            </div>
-          </div>
+          <EventTimeFields
+            idPrefix="edit"
+            defaultStartDate={dateKey(event.startDate)}
+            defaultEndDate={dateKey(event.endDate)}
+            defaultTimed={!!event.startAt}
+            defaultStartTime={event.startAt ? timeValue(event.startAt) : undefined}
+            defaultEndTime={event.endAt ? timeValue(event.endAt) : undefined}
+          />
           {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
           {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           <div className="flex items-center justify-between gap-2">

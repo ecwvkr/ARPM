@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { showToast } from "@/components/ui/global-toast";
 import { IconCalendarPlus } from "@tabler/icons-react";
+import { EventTimeFields } from "./event-time-fields";
 
-// 캘린더 뷰에서 바로 구글 캘린더에 종일 일정을 추가한다. 대상은 관리자가 '표시할 캘린더'로
+// 캘린더 뷰에서 바로 구글 캘린더에 일정을 추가한다(기본 종일, 시간 지정 가능). 대상은 관리자가 '표시할 캘린더'로
 // 고른 것들 중에서만 고를 수 있다(그 밖의 캘린더는 뷰에 안 보여 추가해도 확인이 안 된다).
 export function AddEventDialog({ defaultDate }: { defaultDate: string }) {
   const [open, setOpen] = useState(false);
@@ -85,16 +86,7 @@ export function AddEventDialog({ defaultDate }: { defaultDate: string }) {
               <Label htmlFor="event-title">제목</Label>
               <Input id="event-title" name="title" required />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="event-start">시작일</Label>
-                <Input id="event-start" name="startDate" type="date" defaultValue={defaultDate} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="event-end">종료일</Label>
-                <Input id="event-end" name="endDate" type="date" defaultValue={defaultDate} />
-              </div>
-            </div>
+            <EventTimeFields idPrefix="event" defaultStartDate={defaultDate} defaultEndDate={defaultDate} />
             {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
             <Button type="submit" disabled={isPending} className="w-full">
               {isPending ? "추가 중..." : "추가하기"}
