@@ -371,8 +371,17 @@ export function ChatPanel({
             prev.author.id === message.author.id &&
             message.createdAt.getTime() - prev.createdAt.getTime() < GROUP_WINDOW_MS;
           const mine = message.author.id === currentUserId;
-          // 나 말고 몇 명이 더 읽었는지. 1:1이면 상대가 읽었는지만 알면 된다.
+          // 나 말고 몇 명이 더 읽었는지. 1:1은 상대 한 명뿐이라 숫자가 의미 없어
+          // '읽음/읽지 않음'으로만 보여준다.
           const unreadBy = Math.max(0, memberCount - 1 - message.readBy);
+          const readLabel =
+            room.kind === "DIRECT"
+              ? unreadBy === 0
+                ? "읽음"
+                : "읽지 않음"
+              : unreadBy === 0
+                ? "모두 읽음"
+                : `${unreadBy}명 안 읽음`;
 
           return (
             <div key={message.id}>
@@ -439,9 +448,7 @@ export function ChatPanel({
                         <span className="flex shrink-0 flex-col items-end text-xs whitespace-nowrap text-muted-foreground">
                           {/* 읽은 사람 표시: 아직 안 읽은 사람 수를 보여준다(0이면 모두 읽음). */}
                           {mine && !message.deleted && memberCount > 1 && (
-                            <span className={unreadBy === 0 ? "text-primary" : ""}>
-                              {unreadBy === 0 ? "모두 읽음" : `${unreadBy}명 안 읽음`}
-                            </span>
+                            <span className={unreadBy === 0 ? "text-primary" : ""}>{readLabel}</span>
                           )}
                           <span>
                             {formatTime(message.createdAt)}
