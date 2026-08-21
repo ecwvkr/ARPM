@@ -4,6 +4,7 @@ import Script from "next/script";
 import { auth } from "@/auth";
 import { pickForeground } from "@/lib/color";
 import { BottomNav } from "@/components/bottom-nav";
+import { ChatLauncher } from "@/app/chat/chat-launcher";
 import { GlobalToastHost } from "@/components/ui/global-toast";
 import "./globals.css";
 import { Inter } from "next/font/google";
@@ -61,6 +62,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
         {children}
+        {session?.user?.id && <ChatLauncher currentUserId={session.user.id} />}
         {session && <BottomNav />}
         <GlobalToastHost />
       </body>
