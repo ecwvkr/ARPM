@@ -3,11 +3,19 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar-stack";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchChatMessages, markChatRead, sendChatMessage } from "@/app/actions/chat";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  deleteChatMessage,
+  editChatMessage,
+  fetchChatMessages,
+  markChatRead,
+  sendChatMessage,
+} from "@/app/actions/chat";
 import type { ChatMessageView, ChatPartner } from "@/lib/chat";
 import { MessageBody } from "./message-body";
-import { IconSend } from "@tabler/icons-react";
+import { IconSend, IconSearch, IconDotsVertical, IconX } from "@tabler/icons-react";
 
 // 패널이 열려 있는 동안에만 짧게 폴링한다. 닫혀 있으면 요청이 아예 나가지 않으므로
 // 아무도 대화를 보고 있지 않을 때의 비용이 0이다(무료 플랜의 병목은 호출 수와 CPU 시간).
@@ -45,9 +53,11 @@ function mergeById(prev: ChatMessageView[], incoming: ChatMessageView[]): ChatMe
 export function ChatPanel({
   partner,
   currentUserId,
+  onRead,
 }: {
   partner: ChatPartner;
   currentUserId: string;
+  onRead: (partnerId: string) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -55,6 +65,9 @@ export function ChatPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [isSending, startSend] = useTransition();
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const latestIdRef = useRef<string | null>(null);
@@ -77,6 +90,7 @@ export function ChatPanel({
         setHasMore(res.hasMore);
         latestIdRef.current = list.at(-1)?.id ?? null;
         setErrorMessage(null);
+        onRead(partner.id);
         return markChatRead(partner.id);
       })
       .catch((e) => {
@@ -89,7 +103,7 @@ export function ChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [partner.id]);
+  }, [partner.id, onRead]);
 
   // 첫 로드 뒤에는 맨 아래(최신)를 보여준다.
   useEffect(() => {
@@ -109,6 +123,7 @@ export function ChatPanel({
         latestIdRef.current = newest;
         setMessages((prev) => mergeById(prev, list));
         // 보고 있는 동안 온 메시지는 읽은 것으로 처리한다.
+        onRead(partner.id);
         await markChatRead(partner.id);
         scrollToBottom();
       } catch {
@@ -118,7 +133,7 @@ export function ChatPanel({
 
     const timer = setInterval(tick, POLL_MS);
     return () => clearInterval(timer);
-  }, [partner.id, scrollToBottom]);
+  }, [partner.id, scrollToBottom, onRead]);
 
   function loadOlder() {
     const oldest = messages[0];
@@ -149,9 +164,84 @@ export function ChatPanel({
     });
   }
 
+  function applyEdit(messageId: string, text: string) {
+    editChatMessage(messageId, text)
+      .then((updated) => {
+        setMessages((prev) => mergeById(prev, reviveDates([updated])));
+        setEditingId(null);
+        setErrorMessage(null);
+      })
+      .catch((e) => setErrorMessage(e instanceof Error ? e.message : "메시지를 수정할 수 없습니다."));
+  }
+
+  function removeMessage(messageId: string) {
+    deleteChatMessage(messageId)
+      .then(() =>
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, deleted: true, body: "" } : m)),
+        ),
+      )
+      .catch((e) => setErrorMessage(e instanceof Error ? e.message : "메시지를 삭제할 수 없습니다."));
+  }
+
+  // 검색은 이미 불러온 메시지만 훑는다. 파트너당 메시지가 수백 건 수준이라 서버로
+  // 내릴 이유가 없고, 이렇게 하면 타이핑마다 요청이 나가지도 않는다.
+  const keyword = query.trim().toLowerCase();
+  const visible = keyword
+    ? messages.filter((m) => !m.deleted && m.body.toLowerCase().includes(keyword))
+    : messages;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-2 px-4 pb-2">
+        {searchOpen ? (
+          <>
+            <div className="relative flex-1">
+              <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="이 대화에서 검색"
+                aria-label="대화 검색"
+                className="h-auto py-1.5 pl-8 text-sm"
+              />
+            </div>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="검색 닫기"
+              onClick={() => {
+                setSearchOpen(false);
+                setQuery("");
+              }}
+            >
+              <IconX className="size-4" />
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="ml-auto text-muted-foreground"
+            onClick={() => setSearchOpen(true)}
+          >
+            <IconSearch className="size-4" />
+            검색
+          </Button>
+        )}
+      </div>
+
       <div ref={scrollRef} className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
+        {keyword && (
+          <p className="pb-2 text-center text-xs text-muted-foreground">
+            {visible.length > 0
+              ? `불러온 대화에서 ${visible.length}건 찾았습니다`
+              : "불러온 대화에서 찾지 못했습니다. '이전 메시지 더 보기'로 과거를 더 불러와 보세요."}
+          </p>
+        )}
         {hasMore && (
           <div className="flex justify-center pb-2">
             <Button type="button" size="sm" variant="outline" onClick={loadOlder}>
@@ -167,8 +257,8 @@ export function ChatPanel({
           </p>
         )}
 
-        {messages.map((message, i) => {
-          const prev = messages[i - 1];
+        {visible.map((message, i) => {
+          const prev = visible[i - 1];
           const showDay = !prev || dayKey(prev.createdAt) !== dayKey(message.createdAt);
           const grouped =
             !showDay &&
@@ -193,23 +283,39 @@ export function ChatPanel({
                   {!grouped && !mine && (
                     <span className="text-xs text-muted-foreground">{message.author.name}</span>
                   )}
-                  <div className={`flex items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
-                    <div
-                      className={`max-w-[15rem] rounded-2xl px-3 py-1.5 text-sm break-words whitespace-pre-wrap sm:max-w-md ${
-                        message.deleted
-                          ? "bg-muted text-muted-foreground italic"
-                          : mine
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
-                      }`}
-                    >
-                      {message.deleted ? "삭제된 메시지입니다" : <MessageBody text={message.body} />}
+                  {editingId === message.id ? (
+                    <EditRow
+                      initial={message.body}
+                      onCancel={() => setEditingId(null)}
+                      onSave={(text) => applyEdit(message.id, text)}
+                    />
+                  ) : (
+                    <div className={`flex items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                      <div
+                        className={`max-w-[15rem] rounded-2xl px-3 py-1.5 text-sm break-words whitespace-pre-wrap sm:max-w-md ${
+                          message.deleted
+                            ? "bg-muted text-muted-foreground italic"
+                            : mine
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted"
+                        }`}
+                      >
+                        {message.deleted ? "삭제된 메시지입니다" : <MessageBody text={message.body} />}
+                      </div>
+                      <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
+                        {formatTime(message.createdAt)}
+                        {message.editedAt && !message.deleted && " (수정됨)"}
+                      </span>
+                      {/* 수정·삭제는 본인이 쓴 메시지에만 연다. 파트너 관리자의 삭제 권한은
+                          서버에 열려 있지만 화면에는 아직 붙이지 않았다. */}
+                      {mine && !message.deleted && (
+                        <MessageActions
+                          onEdit={() => setEditingId(message.id)}
+                          onDelete={() => removeMessage(message.id)}
+                        />
+                      )}
                     </div>
-                    <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-                      {formatTime(message.createdAt)}
-                      {message.editedAt && !message.deleted && " (수정됨)"}
-                    </span>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -248,5 +354,113 @@ export function ChatPanel({
         </div>
       </div>
     </div>
+  );
+}
+
+// 말풍선을 입력창으로 바꿔 그 자리에서 고친다.
+function EditRow({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  onSave: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(initial);
+
+  return (
+    <div className="flex w-full flex-col gap-1">
+      <Textarea
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            if (text.trim()) onSave(text.trim());
+          }
+        }}
+        aria-label="메시지 수정"
+        rows={2}
+        className="min-w-48 resize-none text-sm"
+      />
+      <div className="flex justify-end gap-1">
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          취소
+        </Button>
+        <Button type="button" size="sm" disabled={!text.trim()} onClick={() => onSave(text.trim())}>
+          저장
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function MessageActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setConfirming(false);
+      }}
+    >
+      <PopoverTrigger
+        render={
+          <Button size="icon-xs" variant="ghost" aria-label="메시지 작업" className="text-muted-foreground">
+            <IconDotsVertical />
+          </Button>
+        }
+      />
+      <PopoverContent className="w-40 gap-0.5 p-1.5" align="end">
+        {confirming ? (
+          <>
+            <p className="px-2 py-1 text-xs text-muted-foreground">삭제할까요?</p>
+            <button
+              type="button"
+              onClick={() => {
+                onDelete();
+                setOpen(false);
+              }}
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+            >
+              네, 삭제
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+            >
+              아니요
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                onEdit();
+                setOpen(false);
+              }}
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+            >
+              삭제
+            </button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

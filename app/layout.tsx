@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { pickForeground } from "@/lib/color";
 import { BottomNav } from "@/components/bottom-nav";
 import { ChatLauncher } from "@/app/chat/chat-launcher";
+import { countUnreadChat } from "@/lib/chat";
 import { GlobalToastHost } from "@/components/ui/global-toast";
 import "./globals.css";
 import { Inter } from "next/font/google";
@@ -42,6 +43,11 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = await auth();
   const accentColor = session?.user?.accentColor;
+  // 안읽음 수를 페이지 렌더에서 함께 읽어 첫 화면에 바로 보여준다 — 뱃지 하나 때문에
+  // 클라이언트가 서버 액션을 따로 부르지 않게 하기 위한 것(무료 플랜은 호출 수가 병목).
+  const unreadChat = session?.user?.id
+    ? await countUnreadChat(session.user.id, !!session.user.isSuperAdmin)
+    : null;
   const accentStyle = accentColor
     ? ({
         "--primary": accentColor,
@@ -62,7 +68,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
         {children}
-        {session?.user?.id && <ChatLauncher currentUserId={session.user.id} />}
+        {session?.user?.id && unreadChat && (
+          <ChatLauncher currentUserId={session.user.id} initialUnread={unreadChat} />
+        )}
         {session && <BottomNav />}
         <GlobalToastHost />
       </body>
