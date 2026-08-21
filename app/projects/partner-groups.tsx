@@ -59,6 +59,7 @@ export function ProjectPartnerGroupsView({
                 currentUserId={currentUserId}
                 links={project.links}
                 unread={isProjectUnread(project, currentUserId)}
+                pinned={project.pins.length > 0}
                 canJoin={canJoinProject(project, currentUserId, memberPartnerIds.has(project.partnerId))}
               />
             ))}

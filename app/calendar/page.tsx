@@ -50,6 +50,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     commentCount: t._count.comments,
     links: t.links,
     unread: isProjectUnread(t, userId),
+    pinned: t.pins.length > 0,
   }));
 
   return (

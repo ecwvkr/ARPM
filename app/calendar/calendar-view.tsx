@@ -35,14 +35,17 @@ export type CalendarProject = {
   commentCount: number;
   links: string[];
   unread: boolean;
+  pinned: boolean;
 };
 
 const PRIORITY_RANK: Record<string, number> = { URGENT: 3, NORMAL: 2, HOLD: 1 };
 
-// 하단 목록 정렬: 완료는 항상 맨 아래로 내리고, 그 안에서 마감일 임박순 →
-// 내 우선순위(긴급>보통>보류) → 가나다순.
+// 하단 목록 정렬: 개인 고정을 맨 위로, 완료는 항상 맨 아래로 내리고, 그 안에서
+// 마감일 임박순 → 내 우선순위(긴급>보통>보류) → 가나다순.
 function sortCalendarProjects(projects: CalendarProject[], currentUserId: string): CalendarProject[] {
   return [...projects].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+
     const aDone = a.status === "DONE";
     const bDone = b.status === "DONE";
     if (aDone !== bDone) return aDone ? 1 : -1;
@@ -580,6 +583,7 @@ export function CalendarView({
                     partnerColor={t.partnerColor}
                     links={t.links}
                     unread={t.unread}
+                    pinned={t.pinned}
                   />
                 ))}
               </div>
@@ -755,6 +759,7 @@ export function CalendarView({
                     partnerColor={t.partnerColor}
                     links={t.links}
                     unread={t.unread}
+                    pinned={t.pinned}
                   />
                 ))}
               </div>

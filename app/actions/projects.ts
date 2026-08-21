@@ -390,6 +390,25 @@ export async function removeParticipant(projectId: string, userId: string) {
   await revalidateProjectViews(project.partnerId);
 }
 
+// 파트너 고정(togglePartnerPin)과 같은 계정별 개인 설정 — 정렬과 무관하게 카드가
+// 항상 목록 맨 위로 온다. 완료된 프로젝트는 고정할 수 없다(완료 시 고정이 풀린다).
+export async function toggleProjectPin(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { project, canView } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!project || !canView) throw new Error("접근할 수 없는 프로젝트입니다.");
+  if (project.completedAt) throw new Error("완료된 프로젝트는 고정할 수 없습니다.");
+
+  const key = { userId_projectId: { userId: session.user.id, projectId } };
+  const existing = await prisma.projectPin.findUnique({ where: key });
+  if (existing) await prisma.projectPin.delete({ where: key });
+  else await prisma.projectPin.create({ data: { userId: session.user.id, projectId } });
+
+  // 고정은 활동이 아니므로 파트너 lastActivityAt은 건드리지 않는다.
+  await revalidateProjectViews(project.partnerId, { touch: false });
+}
+
 export async function updateProjectStatus(projectId: string, status: "TODO" | "IN_PROGRESS") {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -414,6 +433,8 @@ export async function completeProject(projectId: string) {
     where: { id: projectId },
     data: { status: "DONE", completedAt: new Date() },
   });
+  // 완료되면 카드에서 고정 버튼이 사라지므로, 남아 있는 개인 고정도 함께 푼다.
+  await prisma.projectPin.deleteMany({ where: { projectId } });
 
   let nextProjectId: string | undefined;
   if (project.recurrence === "WEEKLY") {

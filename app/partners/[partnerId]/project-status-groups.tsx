@@ -70,6 +70,7 @@ export function ProjectStatusGroupsView({
                     partnerColor={project.partnerColor}
                     links={project.links}
                     unread={isProjectUnread(project, currentUserId)}
+                    pinned={project.pins.length > 0}
                   />
                 ))}
               </div>

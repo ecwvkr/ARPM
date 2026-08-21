@@ -66,6 +66,7 @@ export function KanbanBoard({
                     commentCount={project._count.comments}
                     currentUserId={currentUserId}
                     unread={isProjectUnread(project, currentUserId)}
+                    pinned={project.pins.length > 0}
                   />
                 </div>
               ))}

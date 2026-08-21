@@ -201,6 +201,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
                     partnerColor={project.partnerColor}
                     links={project.links}
                     unread={isProjectUnread(project, session.user.id)}
+                    pinned={project.pins.length > 0}
                     canJoin={canJoinProject(project, session.user.id, memberPartnerIds.has(project.partnerId))}
                   />
                 ))}

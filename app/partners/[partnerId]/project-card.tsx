@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar } from "@/components/ui/avatar-stack";
 import { showToast } from "@/components/ui/global-toast";
-import { duplicateProject, setMyPriority, transferMaster } from "@/app/actions/projects";
+import { duplicateProject, setMyPriority, toggleProjectPin, transferMaster } from "@/app/actions/projects";
 import { listAllUsers } from "@/app/actions/users";
 import { PRIORITY_LABEL, type ParticipantChipData } from "@/lib/priority";
 import { ParticipantPriorityDot, PriorityDot } from "./project-priority-picker";
@@ -26,6 +26,8 @@ import {
   IconFlag3,
   IconUserCog,
   IconChevronRight,
+  IconPin,
+  IconPinFilled,
 } from "@tabler/icons-react";
 
 const PRIORITY_LEVELS = ["URGENT", "NORMAL", "HOLD"] as const;
@@ -51,6 +53,7 @@ export function ProjectCard({
   links = [],
   unread,
   canJoin = false,
+  pinned = false,
 }: {
   projectId: string;
   partnerId: string;
@@ -67,6 +70,7 @@ export function ProjectCard({
   links?: string[];
   unread?: boolean;
   canJoin?: boolean;
+  pinned?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -122,6 +126,8 @@ export function ProjectCard({
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 break-keep text-sm font-medium">{title}</h3>
             <div className="flex shrink-0 items-center gap-1">
+              {/* 완료된 프로젝트는 고정이 풀리므로(completeProject) 버튼 자체를 숨긴다. */}
+              {!done && <ProjectPinButton projectId={projectId} pinned={pinned} />}
               <Popover open={menuOpen} onOpenChange={handleMenuOpenChange}>
                 <PopoverTrigger
                   render={
@@ -288,6 +294,26 @@ export function ProjectCard({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// 파트너 카드의 고정 버튼과 같은 동작 — 누른 사람에게만 적용되는 개인 설정이다.
+function ProjectPinButton({ projectId, pinned }: { projectId: string; pinned: boolean }) {
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <Button
+      size="icon-xs"
+      variant="ghost"
+      disabled={isPending}
+      title={pinned ? "고정 해제" : "상단 고정"}
+      aria-label={pinned ? "고정 해제" : "상단 고정"}
+      aria-pressed={pinned}
+      onClick={() => startTransition(() => toggleProjectPin(projectId))}
+      className={`pointer-events-auto ${pinned ? "text-primary" : "text-muted-foreground"}`}
+    >
+      {pinned ? <IconPinFilled /> : <IconPin />}
+    </Button>
   );
 }
 

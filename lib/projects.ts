@@ -271,7 +271,15 @@ function projectListInclude(userId: string) {
     _count: { select: { comments: true } },
     comments: { orderBy: { createdAt: "desc" as const }, take: 1, select: { createdAt: true } },
     reads: { where: { userId }, select: { lastReadAt: true } },
+    pins: { where: { userId }, select: { userId: true } },
   };
+}
+
+// 개인 고정(ProjectPin)은 어떤 정렬을 골랐든 그 위에 얹는다 — 카드가 보이는 모든
+// 화면에서 고정된 프로젝트가 맨 위에 오도록 목록 함수의 마지막 단계에서 적용한다.
+// 완료된 프로젝트는 completeProject가 고정을 지우므로 여기서 따로 걸러낼 필요가 없다.
+export function pinnedFirst<T extends { pins: { userId: string }[] }>(projects: T[]): T[] {
+  return [...projects].sort((a, b) => Number(b.pins.length > 0) - Number(a.pins.length > 0));
 }
 
 // parentId는 항상 같은 파트너 내 프로젝트만 가리키므로(스키마 제약), 여러 파트너의
@@ -302,7 +310,7 @@ export async function listProjectsForPartner(partnerId: string, userId: string, 
     relationLoadStrategy: LIST_LOAD_STRATEGY,
   });
 
-  return sortProjects(filterVisibleProjects(allProjects, userId, isSuperAdmin));
+  return pinnedFirst(sortProjects(filterVisibleProjects(allProjects, userId, isSuperAdmin)));
 }
 
 // 캔버스는 노드를 그리는 데 필요한 스칼라 필드와, 가시성 판정에 필요한 participants,
@@ -411,7 +419,7 @@ export async function listProjectsForPartners(
     });
   }
 
-  return applySort(projects, filters.sort);
+  return pinnedFirst(applySort(projects, filters.sort));
 }
 
 // 설정 > 보관함(휴지통)에서 쓰는 목록. superAdmin은 전체, 그 외는 본인이 master이거나

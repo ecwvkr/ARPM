@@ -27,6 +27,7 @@ model User {
   partnerMemberships   PartnerMember[]
   hiddenPartners       PartnerHide[] // 개인별 대시보드 숨김 (D2)
   pinnedPartners       PartnerPin[] // 개인별 대시보드 즐겨찾기 고정
+  pinnedProjects       ProjectPin[] // 개인별 프로젝트 카드 상단 고정
   masteredProjects     Project[]          @relation("ProjectMaster")
   projectParticipations ProjectParticipant[]
   priorities           ProjectPriority[]
@@ -150,12 +151,26 @@ model Project {
   comments     Comment[]
   reads        ProjectRead[]
   tasks        TaskItem[]
+  pins         ProjectPin[]
 
   // 목록 조회는 항상 partnerId로 좁힌 뒤 createdAt으로 정렬하므로 복합 인덱스로 둘 다 태운다.
   @@index([partnerId, createdAt])
   @@index([parentId])
   @@index([masterId])
   @@index([sourceGoogleEventId])
+}
+
+// 프로젝트 카드 상단 고정. PartnerPin과 같이 계정별 개인 설정이라 별도 테이블.
+// 프로젝트가 완료되면 고정을 풀어야 하므로 completeProject에서 이 행들을 지운다.
+model ProjectPin {
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@index([projectId])
 }
 
 model ProjectParticipant {
