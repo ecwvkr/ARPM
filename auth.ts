@@ -57,10 +57,23 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       // 매 요청 PK 조회 1회로 존재·활성 여부를 확인하고, 아니면 세션을 무효화한다.
       // 권한(isSuperAdmin)도 함께 새로 읽어 부여·해제가 재로그인 없이 반영되게 한다.
       if (!token.id) return null;
-      const dbUser = await prisma.user.findUnique({
-        where: { id: token.id },
-        select: { isActive: true, isSuperAdmin: true },
-      });
+
+      // DB가 잠깐 끊긴 것과 "계정이 실제로 없어졌다"를 구분해야 한다. 조회가 예외로
+      // 실패했는데 세션을 무효화하면, DB 장애 몇 초 동안 전원이 로그아웃되고
+      // 로그인도 DB를 타므로 "다시 시도" 무한 루프에 빠진다(실제로 겪었다).
+      // 이 토큰은 발급 시점에 검증됐고 서명도 유효하므로, 조회 실패 때는 그대로 통과시킨다.
+      // 장애 중에는 어차피 다른 화면도 못 여니 권한이 잠시 남아도 노출되는 것이 없다.
+      let dbUser: { isActive: boolean; isSuperAdmin: boolean } | null;
+      try {
+        dbUser = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: { isActive: true, isSuperAdmin: true },
+        });
+      } catch {
+        return token;
+      }
+
+      // DB가 정상 응답했는데 없거나 비활성이면 그때만 세션을 끊는다.
       if (!dbUser || !dbUser.isActive) return null;
       token.isSuperAdmin = dbUser.isSuperAdmin;
 
