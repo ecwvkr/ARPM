@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/calendar/calendar-view.tsx"
+        ],
+        "createdAt": "2026-08-24T08:38:58.417Z",
+        "reason": "사용자 확인: 왼쪽 테두리 색은 구글 캘린더 구분용 데이터"
+      }
+    ]
+  }
+}
