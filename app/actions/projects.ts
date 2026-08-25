@@ -355,13 +355,15 @@ export async function joinProject(projectId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { project, canJoin } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  const { project, canJoin, grantedRole } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   if (!project || !canJoin) throw new Error("참여할 수 없습니다.");
 
   await prisma.projectParticipant.upsert({
     where: { projectId_userId: { projectId, userId: session.user.id } },
     update: {},
-    create: { projectId, userId: session.user.id },
+    // 상위 프로젝트에서 상속받은 role을 그대로 유지한다 — VIEWER로 초대된 사람이
+    // 스스로 참여해 MEMBER로 올라가지 않도록.
+    create: { projectId, userId: session.user.id, role: grantedRole ?? "MEMBER" },
   });
 
   await revalidateProjectViews(project.partnerId);

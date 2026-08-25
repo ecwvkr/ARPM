@@ -26,8 +26,10 @@ export function ProjectJoinButton({ projectId }: { projectId: string }) {
             await joinProject(projectId);
             setJoined(true);
             showToast("참여했습니다");
-          } catch (err) {
-            alert(err instanceof Error ? err.message : "참여할 수 없습니다.");
+          } catch {
+            // 프로덕션 빌드는 서버 액션이 던진 메시지를 감추고 React 내부 오류로 바꿔 넘긴다
+            // ("Minified React error #441"). err.message를 그대로 보여주면 그 문자열이 뜨므로 고정 안내를 쓴다.
+            alert("지금은 참여할 수 없습니다. 새로고침 후 다시 시도해 주세요.");
           }
         });
       }}

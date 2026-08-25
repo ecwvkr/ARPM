@@ -207,7 +207,11 @@ export async function getProjectAccess(projectId: string, userId: string, isSupe
   const locked = project.completedAt !== null;
   // 프로젝트 참여는 상위 파트너에 직접 참여 중인 사람만 할 수 있다 — 공개 파트너를 '볼 수만'
   // 있는 사람이 프로젝트로 바로 들어오는 경로를 막는다('업무 참여하기'로 파트너부터 합류).
-  const canJoin = canView && isPartnerMember && !isMaster && !grantedAccess && !locked;
+  // 기준은 grantedAccess가 아니라 ownGrant다: 상위 프로젝트에서 상속만 받은 사람은 이 하위
+  // 프로젝트의 참여자 칩에도 뜨지 않으므로 아직 '참여 전'이고, 목록의 canJoinProject도
+  // participants만 보고 '참여하기'를 띄운다. grantedAccess로 막으면 카드에는 버튼이 뜨는데
+  // 눌러도 서버가 거절하는 상태가 된다.
+  const canJoin = canView && isPartnerMember && !isMaster && !ownGrant && !locked;
   const canLeave = isParticipant && !isMaster && !locked;
 
   return {
@@ -215,6 +219,8 @@ export async function getProjectAccess(projectId: string, userId: string, isSupe
     isMaster,
     isParticipant,
     isViewer,
+    // 참여 시 그대로 물려줄 role(직접 grant > 조상 상속). 둘 다 없으면 undefined.
+    grantedRole,
     canView,
     canManage,
     canParticipantAct,
