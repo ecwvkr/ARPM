@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { updateProjectInfo, listMovableTargets, duplicateProject } from "@/app/actions/projects";
+import { updateProjectInfo, listMovableTargets, listMovablePartners, duplicateProject } from "@/app/actions/projects";
 import { useDetailSubmit } from "./use-detail-submit";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +58,7 @@ export function ProjectDetailHeader({
     return (
       <EditForm
         projectId={projectId}
+        partnerId={partnerId}
         project={project}
         errorMessage={errorMessage}
         isPending={isPending}
@@ -193,9 +194,10 @@ function DuplicateButton({ projectId, onDone }: { projectId: string; onDone: () 
   );
 }
 
-// 상위 프로젝트 변경은 별도 팝업 대신 이 수정 폼 안에서 함께 처리한다.
+// 소속 파트너·상위 프로젝트 변경은 별도 팝업 대신 이 수정 폼 안에서 함께 처리한다.
 function EditForm({
   projectId,
+  partnerId,
   project,
   errorMessage,
   isPending,
@@ -203,6 +205,7 @@ function EditForm({
   onCancel,
 }: {
   projectId: string;
+  partnerId: string;
   project: {
     title: string;
     memo: string | null;
@@ -215,9 +218,17 @@ function EditForm({
   onCancel: () => void;
 }) {
   const [targets, setTargets] = useState<{ id: string; title: string }[] | null>(null);
+  const [partners, setPartners] = useState<{ id: string; name: string }[] | null>(null);
+  const [selectedPartnerId, setSelectedPartnerId] = useState(partnerId);
+  const movingPartner = selectedPartnerId !== partnerId;
 
   useEffect(() => {
-    listMovableTargets(projectId).then(setTargets);
+    Promise.all([listMovableTargets(projectId), listMovablePartners(projectId)]).then(
+      ([nextTargets, nextPartners]) => {
+        setTargets(nextTargets);
+        setPartners(nextPartners);
+      },
+    );
   }, [projectId]);
 
   return (
@@ -237,18 +248,47 @@ function EditForm({
       <Textarea name="memo" defaultValue={project.memo ?? ""} placeholder="상세" rows={3} required />
       <LinkFields defaultLinks={project.links} />
       <div className="space-y-1.5">
-        <Label>상위 프로젝트</Label>
-        {targets === null ? (
+        <Label htmlFor={`partner-${projectId}`}>파트너</Label>
+        {/* 아직 안 불러왔으면 select 자체를 안 그린다 — partnerId가 폼에 안 실리면
+            서버는 지금 소속을 그대로 쓰므로, 뜨기 전에 저장해도 옮겨지지 않는다. */}
+        {partners === null ? (
           <p className="text-xs text-muted-foreground">불러오는 중...</p>
         ) : (
-          <ProjectParentPicker
-            name="parentId"
-            options={targets}
-            defaultId={project.parentId}
-            placeholder="상위 프로젝트 검색 (비우면 최상위)"
-          />
+          <select
+            id={`partner-${projectId}`}
+            name="partnerId"
+            value={selectedPartnerId}
+            onChange={(e) => setSelectedPartnerId(e.target.value)}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs"
+          >
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
+      {/* 상위 프로젝트 후보는 지금 파트너 안에서만 고를 수 있으므로, 옮기는 중이면 감춘다. */}
+      {movingPartner ? (
+        <p className="text-xs text-muted-foreground">
+          파트너를 옮기면 하위 프로젝트도 함께 옮겨지고, 상위 프로젝트 연결은 해제됩니다.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          <Label>상위 프로젝트</Label>
+          {targets === null ? (
+            <p className="text-xs text-muted-foreground">불러오는 중...</p>
+          ) : (
+            <ProjectParentPicker
+              name="parentId"
+              options={targets}
+              defaultId={project.parentId}
+              placeholder="상위 프로젝트 검색 (비우면 최상위)"
+            />
+          )}
+        </div>
+      )}
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
     </form>
   );

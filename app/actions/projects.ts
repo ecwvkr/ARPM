@@ -275,6 +275,30 @@ export async function listMovableTargets(projectId: string) {
     .map((t) => ({ id: t.id, title: t.title }));
 }
 
+// 프로젝트를 옮길 수 있는 파트너 목록. 고를 수 있는 범위는 생성과 같은 기준(직접 참여 중인
+// 파트너)이다 — 볼 수만 있는 공개 파트너로는 옮길 수 없다.
+export async function listMovablePartners(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const userId = session.user.id;
+  const isSuperAdmin = !!session.user.isSuperAdmin;
+  const { project, canManage } = await getProjectAccess(projectId, userId, isSuperAdmin);
+  if (!project || !canManage) return [];
+
+  const partners = await listVisiblePartners(userId, isSuperAdmin, false);
+  const options = partners
+    .filter((p) => isSuperAdmin || p.ownerId === userId || p.members.some((m) => m.userId === userId))
+    .map((p) => ({ id: p.id, name: p.name }));
+
+  // 지금 소속된 파트너는 거기 참여 중이 아니어도 항상 목록에 남긴다 — 빠지면 select가
+  // 엉뚱한 파트너를 고른 상태로 열려서 저장만 눌러도 프로젝트가 옮겨진다.
+  if (!options.some((p) => p.id === project.partnerId)) {
+    options.unshift({ id: project.partnerId, name: project.partner.name });
+  }
+  return options;
+}
+
 export async function getProjectSubtree(projectId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -578,11 +602,38 @@ export async function updateProjectInfo(
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
 
+  // 소속 파트너 변경도 이 폼에서 함께 처리한다. 옮길 때는 하위 트리 전체가 같이 움직인다 —
+  // parentId는 같은 파트너 안만 가리킬 수 있다는 전제로 트리를 파트너 단위로 조회하기
+  // 때문에(lib/projects.ts), 자식을 남겨두면 다른 파트너를 가리키는 parentId가 생긴다.
+  // 옮기는 프로젝트 자신의 상위는 옛 파트너에 남으므로 연결을 끊는다.
+  const partnerIdRaw = formData.get("partnerId") as string | null;
+  const newPartnerId = partnerIdRaw || project.partnerId;
+  const movingPartner = newPartnerId !== project.partnerId;
+  let newPartnerName = "";
+  let subtreeIds: string[] = [];
+  if (movingPartner) {
+    const { partner: target, isMember } = await getPartnerAccess(
+      newPartnerId,
+      session.user.id,
+      !!session.user.isSuperAdmin,
+    );
+    if (!target || !isMember) return "참여 중인 파트너로만 옮길 수 있습니다.";
+    newPartnerName = target.name;
+
+    // 보관함(deletedAt)에 있는 하위 프로젝트까지 함께 옮긴다 — 남겨두면 나중에 복구했을 때
+    // 다른 파트너의 프로젝트를 상위로 가리키게 된다.
+    const partnerProjects = await prisma.project.findMany({
+      where: { partnerId: project.partnerId },
+      select: { id: true, parentId: true },
+    });
+    subtreeIds = [projectId, ...collectDescendantIds(partnerProjects, projectId)];
+  }
+
   // 상위 프로젝트 변경도 이 폼에서 함께 처리한다(별도 '상위 프로젝트 변경' 팝업을 없앰).
   // 순환 참조를 만들지 않도록 moveProject와 같은 규칙으로 검증한다.
   const parentIdRaw = formData.get("parentId") as string | null;
-  const newParentId = parentIdRaw ? parentIdRaw : null;
-  if (newParentId !== project.parentId) {
+  const newParentId = movingPartner ? null : parentIdRaw ? parentIdRaw : null;
+  if (!movingPartner && newParentId !== project.parentId) {
     if (newParentId === projectId) return "자기 자신을 상위 프로젝트로 지정할 수 없습니다.";
     if (newParentId) {
       const partnerProjects = await listProjectsForPartner(
@@ -600,6 +651,9 @@ export async function updateProjectInfo(
   }
 
   await prisma.$transaction([
+    ...(movingPartner
+      ? [prisma.project.updateMany({ where: { id: { in: subtreeIds } }, data: { partnerId: newPartnerId } })]
+      : []),
     prisma.project.update({
       where: { id: projectId },
       data: { title, memo, links, parentId: newParentId },
@@ -610,12 +664,17 @@ export async function updateProjectInfo(
         action: "UPDATE_PROJECT_INFO",
         targetType: "PROJECT",
         targetId: projectId,
-        partnerId: project.partnerId,
-        message: `"${title}" 프로젝트 정보(제목/상세/링크)를 수정`,
+        partnerId: newPartnerId,
+        message: movingPartner
+          ? `"${title}" 프로젝트를 ${project.partner.name} → ${newPartnerName} 파트너로 이동` +
+            (subtreeIds.length > 1 ? ` (하위 ${subtreeIds.length - 1}개 포함)` : "")
+          : `"${title}" 프로젝트 정보(제목/상세/링크)를 수정`,
       },
     }),
   ]);
-  await revalidateProjectViews(project.partnerId, { syncProjectIds: [projectId] });
+  await revalidateProjectViews(newPartnerId, { syncProjectIds: [projectId] });
+  // 옮겼다면 떠난 파트너 화면에서도 카드가 사라져야 한다. 그쪽은 '활동'이 아니므로 touch 안 함.
+  if (movingPartner) await revalidateProjectViews(project.partnerId, { touch: false });
 }
 
 // 워크플로우 노드의 더블클릭 인라인 이름수정 전용 — updateProjectInfo는 memo·links까지
