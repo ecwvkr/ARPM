@@ -450,13 +450,32 @@ export async function updateProjectStatus(projectId: string, status: "TODO" | "I
   await revalidateProjectViews(project.partnerId);
 }
 
-export async function completeProject(projectId: string) {
+// 완료 확인 창에서 "남은 태스크도 같이 완료할까요?"를 물으려면 남은 목록이 필요하다.
+export async function listUnfinishedTasks(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { project, canParticipantAct } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
+  if (!project || !canParticipantAct) return [];
+  return project.tasks.filter((t) => !t.done).map((t) => ({ id: t.id, title: t.title }));
+}
+
+// completeTasks는 완료 확인 창의 선택값이다. 완료된 프로젝트는 수정이 막혀서 태스크를
+// 나중에 손댈 수 없으므로, 남은 태스크를 같이 닫을지 여기서 한 번에 정한다.
+export async function completeProject(projectId: string, completeTasks = false) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const { project, canParticipantAct } = await getProjectAccess(projectId, session.user.id, !!session.user.isSuperAdmin);
   if (!project || !canParticipantAct) throw new Error("권한이 없습니다.");
   if (project.completedAt) return;
+
+  if (completeTasks) {
+    await prisma.taskItem.updateMany({
+      where: { projectId, done: false },
+      data: { done: true, completedAt: new Date() },
+    });
+  }
 
   await prisma.project.update({
     where: { id: projectId },

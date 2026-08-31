@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import {
   updateProjectStatus,
-  completeProject,
   reopenProject,
   extendDueDate,
   updateCreatedDate,
@@ -15,8 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DeriveDialog } from "./project-derive-dialog";
+import { ProjectCompleteDialog } from "./project-complete-dialog";
 import { ProjectParentPicker } from "@/components/project-parent-picker";
 import { PriorityDot } from "./project-priority-picker";
 import { showToast } from "@/components/ui/global-toast";
@@ -79,7 +79,7 @@ export function ProjectDetailStatus({
               >
                 진행중
               </Button>
-              <CompleteConfirmDialog projectId={projectId} onDone={onDone} />
+              <CompleteButton projectId={projectId} onDone={onDone} />
             </>
           )}
           {locked && (canManage || isSuperAdmin) && (
@@ -283,38 +283,18 @@ function CreatedDateControl({
 }
 
 
-function CompleteConfirmDialog({ projectId, onDone }: { projectId: string; onDone: () => void }) {
+function CompleteButton({ projectId, onDone }: { projectId: string; onDone: () => void }) {
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline">완료</Button>} />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>프로젝트 완료</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">완료 시 수정이 불가능합니다. 완료하시겠습니까?</p>
-        <div className="flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
-            아니요
-          </Button>
-          <Button
-            size="sm"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                await completeProject(projectId);
-                setOpen(false);
-                showToast("'완료'로 변경되었습니다");
-                onDone();
-              })
-            }
-          >
-            네
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        완료
+      </Button>
+      {/* 열려 있을 때만 붙인다 — 그래야 열 때마다 남은 태스크를 새로 읽는다. */}
+      {open && (
+        <ProjectCompleteDialog projectId={projectId} onClose={() => setOpen(false)} onDone={onDone} />
+      )}
+    </>
   );
 }
