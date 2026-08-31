@@ -60,7 +60,16 @@ export function PartnerCard({
       {/* 카드는 2~4열 그리드라 어느 폭에서도 좁다. 제목과 버튼을 한 줄에 두면 제목이
           글자당 한 줄씩 세로로 접히므로, 버튼 줄은 항상 제목 아래로 내린다. */}
       <div className="pointer-events-none relative z-10 flex flex-col gap-1.5">
-        <h3 className="break-keep text-base font-bold">{partner.name}</h3>
+        {/* 긴 이름이 카드 밖으로 삐져나오지 않게 두 줄까지만 두고 넘치면 말줄임표.
+            break-keep은 한국어를 어절 단위로 끊어 주지만 끊을 곳 없는 긴 이름
+            (괄호 붙은 상호 등)은 그대로 밀고 나가므로, overflow-wrap으로 마지막
+            수단의 줄바꿈을 열어 준다. 전체 이름은 title로 확인할 수 있다. */}
+        <h3
+          title={partner.name}
+          className="line-clamp-2 break-keep text-base font-bold [overflow-wrap:anywhere]"
+        >
+          {partner.name}
+        </h3>
         {/* 이 행 자체는 pointer-events-none이라 버튼/태그 사이 빈 공간은 클릭이 아래 배경
             링크로 투과돼 카드 전체가 파트너 페이지로 넘어간다. pointer-events:none은
             자식에게 상속되므로, 클릭을 받아야 하는 요소(고정·설정 버튼)와 클릭을 막아야
