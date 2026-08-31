@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { pushConfigured } from "@/lib/push";
+import { pushConfigured, sendPushToUsers } from "@/lib/push";
 
 export async function getPushStatus() {
   const session = await auth();
@@ -38,4 +38,18 @@ export async function removePushSubscription(endpoint: string) {
   if (!session?.user?.id) redirect("/login");
   // 남의 구독을 지울 수 없도록 본인 것만 지운다.
   await prisma.pushSubscription.deleteMany({ where: { endpoint, userId: session.user.id } });
+}
+
+// 설정 화면에서 "이 기기에 잘 오는지" 바로 확인할 수 있게 한다. 기기·브라우저마다
+// 권한과 설치 상태가 달라서(특히 아이폰은 홈 화면에 추가해야 온다) 눌러 보는 것 말고는
+// 확인할 방법이 마땅치 않다. 본인에게만 보낸다.
+export async function sendTestPush() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await sendPushToUsers([session.user.id], {
+    title: "AR_PM",
+    body: "알림이 정상적으로 도착했습니다.",
+    url: "/",
+  });
 }

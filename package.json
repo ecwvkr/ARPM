@@ -8,12 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "generate:favicon": "node scripts/generate-favicon.mjs",
+    "generate:icons": "node scripts/generate-icons.mjs",
     "check:chat": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-chat.ts",
     "check:project-read": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-read.ts",
     "check:join": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-join.ts",
     "check:tree": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-tree.ts",
-    "check:notice": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notice.ts"
+    "check:notice": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notice.ts",
+    "check:notify": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notify.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

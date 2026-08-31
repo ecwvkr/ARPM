@@ -10,6 +10,7 @@ import { revalidateProjectViews } from "@/lib/revalidate";
 import { deleteGoogleEventsById } from "@/lib/google/calendar";
 import { getCommentVisibleCount } from "@/lib/settings";
 import { normalizeLinks } from "@/lib/normalize";
+import { pushNotifications } from "@/lib/notify";
 import { listVisiblePartners } from "@/lib/partners";
 import {
   getProjectAccess,
@@ -198,14 +199,14 @@ export async function deriveProject(
   });
 
   if (parent.masterId !== session.user.id) {
-    await prisma.notification.create({
-      data: {
-        userId: parent.masterId,
-        type: "SUBTASK_CREATED",
-        refId: parent.id,
-        message: `"${parent.title}"에 새 하위 프로젝트 "${title}"가 생성되었습니다.`,
-      },
-    });
+    const item = {
+      userId: parent.masterId,
+      type: "SUBTASK_CREATED",
+      refId: parent.id,
+      message: `"${parent.title}"에 새 하위 프로젝트 "${title}"가 생성되었습니다.`,
+    };
+    await prisma.notification.create({ data: item });
+    pushNotifications([item]);
   }
 
   await revalidateProjectViews(parent.partnerId, { syncProjectIds: [created.id] });
@@ -768,6 +769,14 @@ export async function transferMaster(projectId: string, formData: FormData) {
       },
     }),
   ]);
+  pushNotifications([
+    {
+      userId: newMasterId,
+      type: "MASTER_DELEGATED",
+      refId: project.id,
+      message: `"${project.title}" 프로젝트의 master로 위임되었습니다.`,
+    },
+  ]);
   await revalidateProjectViews(project.partnerId);
 }
 
@@ -858,6 +867,14 @@ export async function inviteToProject(
       }),
     ]),
   ]);
+  pushNotifications(
+    userIds.map((userId) => ({
+      userId,
+      type: "PROJECT_INVITED",
+      refId: project.id,
+      message: `"${project.title}" 프로젝트에 초대되었습니다.`,
+    })),
+  );
 
   await revalidateProjectViews(project.partnerId);
   revalidatePath("/");
@@ -882,14 +899,14 @@ export async function addComment(
   const notifyUserIds = formData.getAll("notify").filter((v): v is string => typeof v === "string" && v !== session.user.id);
   if (notifyUserIds.length > 0) {
     const snippet = body.length > 40 ? `${body.slice(0, 40)}...` : body;
-    await prisma.notification.createMany({
-      data: notifyUserIds.map((userId) => ({
-        userId,
-        type: "COMMENT_MENTION",
-        refId: projectId,
-        message: `${session.user.name}님이 "${project.title}" 프로젝트 코멘트에서 회원님을 언급했습니다: "${snippet}"`,
-      })),
-    });
+    const mentions = notifyUserIds.map((userId) => ({
+      userId,
+      type: "COMMENT_MENTION",
+      refId: projectId,
+      message: `${session.user.name}님이 "${project.title}" 프로젝트 코멘트에서 회원님을 언급했습니다: "${snippet}"`,
+    }));
+    await prisma.notification.createMany({ data: mentions });
+    pushNotifications(mentions);
   }
 
   await revalidateProjectViews(project.partnerId);
@@ -949,9 +966,11 @@ export async function archiveProject(
   const subtreeIds = [projectId, ...collectDescendantIds(siblings, projectId)];
 
   const admins = await prisma.user.findMany({ where: { isSuperAdmin: true }, select: { id: true } });
+  // 보관한 본인은 뺀다 — 방금 자기가 한 일을 알림으로 다시 받을 이유가 없고,
+  // 이제는 벨뿐 아니라 푸시까지 울린다.
   const notifyUserIds = Array.from(
     new Set([project.masterId, ...project.participants.map((p) => p.userId), ...admins.map((a) => a.id)]),
-  );
+  ).filter((id) => id !== session.user!.id);
 
   await prisma.$transaction([
     prisma.project.updateMany({ where: { id: { in: subtreeIds } }, data: { deletedAt: new Date() } }),
@@ -977,6 +996,14 @@ export async function archiveProject(
       },
     }),
   ]);
+  pushNotifications(
+    notifyUserIds.map((userId) => ({
+      userId,
+      type: "PROJECT_ARCHIVED",
+      refId: project.partnerId,
+      message: `"${project.title}" 프로젝트가 보관함으로 이동되었습니다.`,
+    })),
+  );
 
   // 보관된 프로젝트는 구글에 내보내지 않는다 — 하위 트리 전부에서 기존에 나가 있던
   // 이벤트를 지운다.

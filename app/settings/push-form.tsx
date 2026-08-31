@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/global-toast";
-import { getPushStatus, savePushSubscription, removePushSubscription } from "@/app/actions/push";
+import { getPushStatus, savePushSubscription, removePushSubscription, sendTestPush } from "@/app/actions/push";
 
 // base64url로 온 VAPID 공개키를 브라우저가 요구하는 바이트 배열로 바꾼다.
 function urlBase64ToUint8Array(base64: string) {
@@ -60,8 +60,9 @@ export function PushForm({ publicKey }: { publicKey: string | null }) {
           setState(permission === "denied" ? "denied" : "off");
           return;
         }
-        const reg = await navigator.serviceWorker.register("/sw.js");
-        await navigator.serviceWorker.ready;
+        // 워커는 앱을 열 때 이미 등록된다(components/service-worker.tsx). 여기서는
+        // 준비될 때까지만 기다린다 — 등록 직후에는 아직 활성 상태가 아닐 수 있다.
+        const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
@@ -127,9 +128,25 @@ export function PushForm({ publicKey }: { publicKey: string | null }) {
         <>
           <div className="flex items-center gap-2">
             {state === "on" ? (
-              <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={disable}>
-                이 기기 알림 끄기
-              </Button>
+              <>
+                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={disable}>
+                  이 기기 알림 끄기
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await sendTestPush();
+                      showToast("테스트 알림을 보냈습니다");
+                    })
+                  }
+                >
+                  테스트 알림
+                </Button>
+              </>
             ) : (
               <Button type="button" size="sm" disabled={isPending} onClick={enable}>
                 이 기기에서 알림 받기

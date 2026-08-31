@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { pushNotifications } from "@/lib/notify";
 import {
   CHAT_BODY_MAX,
   chatMessageInclude,
@@ -109,18 +110,20 @@ export async function sendChatMessage(
   // 서로 다른 값을 보여준다. 본인 멘션과 이 방 참여자가 아닌 대상은 걸러낸다.
   const mentionTargets = mentionedUserIds(text).filter((id) => id !== userId && memberIds.includes(id));
   if (mentionTargets.length > 0) {
-    await prisma.notification.createMany({
-      data: mentionTargets.map((id) => ({
-        userId: id,
-        type: "CHAT_MENTION",
-        refId: room!.partnerId,
-        message: `${userName}님이 ${roomLabel} 대화에서 회원님을 언급했습니다: "${preview}"`,
-      })),
-    });
+    const mentions = mentionTargets.map((id) => ({
+      userId: id,
+      type: "CHAT_MENTION",
+      refId: room!.partnerId,
+      message: `${userName}님이 ${roomLabel} 대화에서 회원님을 언급했습니다: "${preview}"`,
+    }));
+    await prisma.notification.createMany({ data: mentions });
+    pushNotifications(mentions);
   }
 
   // 푸시는 응답을 늦출 이유가 없으므로 응답을 보낸 뒤에 처리한다.
-  const pushTargets = memberIds.filter((id) => id !== userId);
+  // 언급된 사람은 위에서 이미 멘션 푸시를 받았다 — 여기서 또 보내면 메시지 하나에
+  // 알림이 두 번 뜬다. 멘션 쪽이 더 구체적이므로 그쪽을 남긴다.
+  const pushTargets = memberIds.filter((id) => id !== userId && !mentionTargets.includes(id));
   if (pushTargets.length > 0) {
     after(() => sendChatPush(pushTargets, `${userName} · ${roomLabel}`, preview));
   }

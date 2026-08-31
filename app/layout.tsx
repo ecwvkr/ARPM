@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { ChatLauncher } from "@/app/chat/chat-launcher";
 import { countUnreadChat } from "@/lib/chat";
 import { GlobalToastHost } from "@/components/ui/global-toast";
+import { ServiceWorkerRegistrar } from "@/components/service-worker";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         )}
         {session && <BottomNav />}
         <GlobalToastHost />
+        {/* 로그인한 사람에게만 등록한다 — 로그인 화면에서까지 워커를 띄울 이유가 없다. */}
+        {session && <ServiceWorkerRegistrar />}
       </body>
     </html>
   );

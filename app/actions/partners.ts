@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { pushNotifications } from "@/lib/notify";
 import { getPartnerAccess } from "@/lib/permissions";
 
 // 파트너 이름은 중복을 허용하지 않는다. 보관함(deletedAt)에 있는 것도 복구하면 되살아나므로
@@ -78,14 +79,14 @@ export async function createPartner(
   });
 
   if (memberIds.length > 0) {
-    await prisma.notification.createMany({
-      data: memberIds.map((userId) => ({
-        userId,
-        type: "PARTNER_INVITED",
-        refId: partner.id,
-        message: `"${partner.name}" 파트너에 초대되었습니다.`,
-      })),
-    });
+    const invites = memberIds.map((userId) => ({
+      userId,
+      type: "PARTNER_INVITED",
+      refId: partner.id,
+      message: `"${partner.name}" 파트너에 초대되었습니다.`,
+    }));
+    await prisma.notification.createMany({ data: invites });
+    pushNotifications(invites);
   }
 
   revalidatePath("/");
@@ -162,6 +163,14 @@ export async function inviteMember(
       }),
     ]),
   );
+  pushNotifications(
+    userIds.map((userId) => ({
+      userId,
+      type: "PARTNER_INVITED",
+      refId: partnerId,
+      message: `"${partner.name}" 파트너에 초대되었습니다.`,
+    })),
+  );
 
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
@@ -231,6 +240,14 @@ export async function transferPartnerOwner(partnerId: string, newOwnerId: string
       },
     }),
   ]);
+  pushNotifications([
+    {
+      userId: newOwnerId,
+      type: "PARTNER_OWNER_CHANGED",
+      refId: partnerId,
+      message: `"${partner.name}" 파트너의 관리자로 지정되었습니다.`,
+    },
+  ]);
 
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath("/");
@@ -268,6 +285,14 @@ export async function joinPartner(partnerId: string): Promise<{ joined: boolean 
         },
       }),
     ]);
+    pushNotifications([
+      {
+        userId: partner.ownerId,
+        type: "PARTNER_JOINED",
+        refId: partnerId,
+        message: `${session.user.name}님이 "${partner.name}" 파트너 업무에 참여했습니다.`,
+      },
+    ]);
 
     revalidatePath("/");
     revalidatePath("/projects");
@@ -290,6 +315,14 @@ export async function joinPartner(partnerId: string): Promise<{ joined: boolean 
         message: `${session.user.name}님이 "${partner.name}" 파트너 업무 참여를 신청했습니다.`,
       },
     }),
+  ]);
+  pushNotifications([
+    {
+      userId: partner.ownerId,
+      type: "PARTNER_JOIN_REQUESTED",
+      refId: partnerId,
+      message: `${session.user.name}님이 "${partner.name}" 파트너 업무 참여를 신청했습니다.`,
+    },
   ]);
 
   revalidatePath("/");
@@ -344,6 +377,16 @@ export async function respondToPartnerJoin(partnerId: string, userId: string, ac
           : `"${partner.name}" 파트너 업무 참여가 거부되었습니다.`,
       },
     }),
+  ]);
+  pushNotifications([
+    {
+      userId,
+      type: "PARTNER_INVITED",
+      refId: partnerId,
+      message: accept
+        ? `"${partner.name}" 파트너 업무 참여가 수락되었습니다.`
+        : `"${partner.name}" 파트너 업무 참여가 거부되었습니다.`,
+    },
   ]);
 
   revalidatePath("/");
