@@ -12,7 +12,8 @@
     "check:chat": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-chat.ts",
     "check:project-read": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-read.ts",
     "check:join": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-join.ts",
-    "check:tree": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-tree.ts"
+    "check:tree": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-tree.ts",
+    "check:notice": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notice.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

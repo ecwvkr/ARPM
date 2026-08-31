@@ -9,6 +9,8 @@ import { NotificationBell } from "@/app/notification-bell";
 import { PartnerSettingsDialog } from "./partner-settings-dialog";
 import { AdminControls } from "./admin-controls";
 import { listPartnerAuditLog } from "@/app/actions/audit";
+import { listNotices } from "@/lib/notices";
+import { NoticeSection } from "@/components/notice-section";
 import { ProjectList } from "./project-list";
 import { NewProjectDialog } from "./new-project-dialog";
 import { ProjectCanvas } from "./canvas-loader";
@@ -50,6 +52,8 @@ export default async function PartnerDetailPage({
   const hidden = partner.deletedAt !== null;
   const canViewAudit = isOwner || !!session.user.isSuperAdmin;
   const auditLog = canViewAudit ? await listPartnerAuditLog(partner.id) : [];
+  // 파트너 공지는 참여자만 보고 고칠 수 있다 — 미참여자에게는 섹션 자체를 안 그린다.
+  const notices = isMember ? await listNotices(partner.id) : [];
   const members = partner.members.map((m) => ({
     userId: m.userId,
     role: m.role,
@@ -105,6 +109,10 @@ export default async function PartnerDetailPage({
             </p>
           </section>
         ) : (
+        <>
+        {isMember && (
+          <NoticeSection heading="파트너 공지" partnerId={partner.id} notices={notices} canManage />
+        )}
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs">
             <Link href={`/partners/${partner.id}`} className={chipClass(!view)}>
@@ -140,6 +148,7 @@ export default async function PartnerDetailPage({
             />
           )}
         </section>
+        </>
         )}
 
         {canViewAudit && auditLog.length > 0 && (

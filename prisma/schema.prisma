@@ -45,6 +45,8 @@ model User {
   googleConnections     GoogleConnection[]
   createdTasks         TaskItem[]
   joinRequests         PartnerJoinRequest[]
+  createdNotices       Notice[]           @relation("NoticeAuthor")
+  editedNotices        Notice[]           @relation("NoticeEditor")
 }
 
 model Partner {
@@ -67,6 +69,7 @@ model Partner {
   pinnedBy PartnerPin[] // 이 파트너를 즐겨찾기 고정한 사용자들
   chatRoom     ChatRoom?
   joinRequests PartnerJoinRequest[]
+  notices      Notice[]
 
   @@index([ownerId])
 }
@@ -446,4 +449,29 @@ enum Priority {
   URGENT
   NORMAL
   HOLD
+}
+
+// 공지사항. partnerId가 없으면 전체공지(대시보드 상단, 모든 사용자에게 동일)이고,
+// 있으면 그 파트너 탭에서만 보이는 파트너 공지다. 두 화면이 같은 컴포넌트를 쓰므로
+// 테이블도 하나로 둔다 — 다른 건 "누가 보고 누가 고칠 수 있는가"뿐이다(lib/notices.ts).
+model Notice {
+  id        String  @id @default(cuid())
+  partnerId String? // null = 전체공지
+  title     String
+  body      String
+
+  // 로그는 "누가 처음 썼고, 누가 마지막으로 고쳤나"까지만 남긴다 — 전체 이력은 안 쌓는다.
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedById String? // 한 번도 수정 안 했으면 null
+  updatedAt   DateTime @updatedAt
+
+  partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("NoticeAuthor", fields: [createdById], references: [id])
+  updatedBy User?    @relation("NoticeEditor", fields: [updatedById], references: [id])
+
+  // 목록은 항상 (전체공지 | 특정 파트너)로 좁힌 뒤 최신순으로 읽는다.
+  @@index([partnerId, createdAt])
+  @@index([createdById])
+  @@index([updatedById])
 }

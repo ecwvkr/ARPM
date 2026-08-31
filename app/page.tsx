@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { listVisiblePartnersWithUnread, type PartnerSort } from "@/lib/partners";
 import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
+import { listNotices } from "@/lib/notices";
+import { NoticeSection } from "@/components/notice-section";
 import { isOverdue } from "@/lib/priority";
 import { LogoutButton } from "./logout-button";
 import { NewPartnerDialog } from "./new-partner-dialog";
@@ -32,11 +34,13 @@ export default async function DashboardPage({
 
   // ponytail: 서로 의존하지 않는 네 조회(알림 점검·파트너 목록·내 프로젝트·전체 프로젝트)를
   // 순차 대기 대신 한 번에 날려 왕복 시간을 줄인다.
-  const [, allPartners, myProjects, allProjects] = await Promise.all([
+  const [, allPartners, myProjects, allProjects, notices] = await Promise.all([
     ensureDeadlineNotifications(userId),
     listVisiblePartnersWithUnread(userId, isSuperAdmin, sort),
     listAllProjectsForUser(userId, isSuperAdmin, { assigneeIds: [userId] }),
     listAllProjectsForUser(userId, isSuperAdmin, {}),
+    // 전체공지는 누구에게나 같은 내용이라 권한 조회 없이 그대로 읽는다(lib/notices.ts).
+    listNotices(null),
   ]);
 
   // 개인별 숨김(D2)·즐겨찾기는 같은 조회 결과에서 갈라낸다 — 별도 쿼리 없이 한 번에 온
@@ -124,6 +128,8 @@ export default async function DashboardPage({
           <SummaryCard label="진행 중 프로젝트" value={activeProjects.length} href="/projects?f=1&status=TODO,IN_PROGRESS" active={false} />
           <SummaryCard label="참여 프로젝트" value={myActiveProjectCount} href="/projects?status=TODO,IN_PROGRESS" active={false} />
         </div>
+
+        <NoticeSection heading="공지사항" notices={notices} canManage />
 
         {dueSoon.length > 0 && (
           <section className="space-y-2">
