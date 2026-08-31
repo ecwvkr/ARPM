@@ -5,25 +5,11 @@ import { useRouter } from "next/navigation";
 import { updateMyAvatar } from "@/app/actions/account";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/global-toast";
+import { ImageCropDialog } from "@/components/image-crop-dialog";
 
+// 원본을 그대로 올리면 몇 MB짜리 사진이 DB에 들어간다. 자르기 창에서 고른 영역을
+// 128px JPEG로 다시 인코딩해 저장한다 — 결과는 보통 5KB 안팎.
 const SIZE = 128;
-
-// 원본을 그대로 올리면 몇 MB짜리 사진이 그대로 DB에 들어가므로, 브라우저에서
-// 가운데를 정사각형으로 잘라 128px JPEG로 다시 인코딩한다(원형 아바타라 가장자리는
-// 어차피 잘린다). 결과는 보통 5KB 안팎.
-async function compressToSquare(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = SIZE;
-  canvas.height = SIZE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("이미지를 처리할 수 없습니다.");
-
-  const side = Math.min(bitmap.width, bitmap.height);
-  ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, SIZE, SIZE);
-  bitmap.close();
-  return canvas.toDataURL("image/jpeg", 0.8);
-}
 
 export function MyAvatarForm({ userId, hasAvatar }: { userId: string; hasAvatar: boolean }) {
   const router = useRouter();
@@ -34,6 +20,8 @@ export function MyAvatarForm({ userId, hasAvatar }: { userId: string; hasAvatar:
   // 쿼리를 바꿔 이 화면의 미리보기만 새로 받아온다.
   const [version, setVersion] = useState(0);
   const [hasPhoto, setHasPhoto] = useState(hasAvatar);
+  // 파일을 고르면 바로 저장하지 않고 자르기 창을 먼저 띄운다.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   function save(dataUrl: string | null, message: string) {
     startTransition(async () => {
@@ -48,14 +36,6 @@ export function MyAvatarForm({ userId, hasAvatar }: { userId: string; hasAvatar:
       showToast(message);
       router.refresh();
     });
-  }
-
-  async function handleFile(file: File) {
-    try {
-      save(await compressToSquare(file), "프로필 사진이 저장되었습니다");
-    } catch {
-      setErrorMessage("이미지를 읽을 수 없습니다. 다른 파일을 선택해 주세요.");
-    }
   }
 
   return (
@@ -78,7 +58,7 @@ export function MyAvatarForm({ userId, hasAvatar }: { userId: string; hasAvatar:
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = "";
-              if (file) handleFile(file);
+              if (file) setPendingFile(file);
             }}
           />
           <Button type="button" size="sm" disabled={isPending} onClick={() => fileInput.current?.click()}>
@@ -98,9 +78,22 @@ export function MyAvatarForm({ userId, hasAvatar }: { userId: string; hasAvatar:
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        등록하지 않으면 이름 첫 글자가 표시됩니다. 올린 사진은 자동으로 정사각형 {SIZE}px로 줄여 저장합니다.
+        등록하지 않으면 이름 첫 글자가 표시됩니다. 사진을 고르면 자를 영역을 직접 맞출 수 있고,
+        고른 영역은 정사각형 {SIZE}px로 줄여 저장합니다.
       </p>
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+
+      {pendingFile && (
+        <ImageCropDialog
+          file={pendingFile}
+          size={SIZE}
+          onCancel={() => setPendingFile(null)}
+          onCropped={(dataUrl) => {
+            setPendingFile(null);
+            save(dataUrl, "프로필 사진이 저장되었습니다");
+          }}
+        />
+      )}
     </div>
   );
 }
