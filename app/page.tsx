@@ -99,9 +99,10 @@ export default async function DashboardPage({
       <header className="px-6 py-4 shadow-sm">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-              AR
-            </div>
+            {/* 홈 화면에 설치했을 때 보이는 것과 같은 아이콘을 쓴다
+                (app/icon.svg — npm run generate:icons가 앱 아이콘을 만드는 원본). */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- 고정 크기 정적 아이콘이라 최적화할 게 없다. */}
+            <img src="/icon.svg" alt="" aria-hidden className="size-11 shrink-0 rounded-full" />
             <div>
               <h1 className="text-base font-bold">AR_PM</h1>
               <p className="text-sm text-muted-foreground">{session?.user?.name}님</p>
