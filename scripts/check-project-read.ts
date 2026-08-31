@@ -39,12 +39,17 @@ async function main() {
     // 프로젝트가 수정된 상황을 흉내낸다(updatedAt이 읽은 시각보다 나중).
     const edited = {
       masterId: project.masterId,
+      status: "IN_PROGRESS",
       updatedAt: new Date(first.lastReadAt.getTime() + 1000),
       participants: project.participants.map((p) => ({ userId: p.userId })),
       reads: [{ lastReadAt: first.lastReadAt }],
       comments: [],
     };
     check("수정 후에는 미확인으로 뜬다", isProjectUnread(edited, userId));
+    // 완료 처리도 updatedAt을 밀어 올리므로, 완료된 프로젝트는 따로 빼 주지 않으면
+    // 완료시키는 순간 빨간 점이 켜진다.
+    check("완료된 프로젝트는 미확인으로 뜨지 않는다",
+      !isProjectUnread({ ...edited, status: "DONE" }, userId));
 
     await new Promise((r) => setTimeout(r, 1100));
     await markRead(project.id, userId);

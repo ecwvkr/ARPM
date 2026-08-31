@@ -39,6 +39,7 @@ export function isOverdue(dueDate: Date | null, status: string) {
 export function isProjectUnread(
   project: {
     masterId: string;
+    status: string;
     updatedAt: Date;
     participants: { userId: string }[];
     reads: { lastReadAt: Date }[];
@@ -46,6 +47,10 @@ export function isProjectUnread(
   },
   userId: string,
 ): boolean {
+  // 완료된 프로젝트는 더 확인할 것이 없으므로 빨간 점을 떼어 준다. 완료 처리 자체가
+  // updatedAt을 밀어 올려서, 이 줄이 없으면 완료시키는 순간 오히려 미확인으로 켜진다.
+  if (project.status === "DONE") return false;
+
   const isInvolved = project.masterId === userId || project.participants.some((p) => p.userId === userId);
   if (!isInvolved) return false;
 
