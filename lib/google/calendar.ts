@@ -81,6 +81,16 @@ const ZONED_PARTS = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+// 어떤 시각이 한국 기준 며칠인지를 "YYYY-MM-DD"로 준다.
+//
+// NormalizedGoogleEvent.startDate는 종일 일정과 시간 지정 일정이 서로 다른 방식으로
+// 만들어진다(종일은 서버 로컬 자정, 시간 지정은 zonedDateOnly가 만든 UTC 자정). 그래서
+// 두 Date를 timestamp로 바로 비교하면 서버 타임존에 따라 조용히 어긋난다. "같은 날인가"를
+// 따질 때는 반드시 이 키로 비교한다.
+export function seoulDateKey(d: Date) {
+  return ZONED_PARTS.format(d);
+}
+
 function zonedDateOnly(d: Date) {
   const [year, month, day] = ZONED_PARTS.format(d).split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));

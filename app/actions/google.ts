@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyCalendarEventAdded } from "@/lib/notifications";
 import { decryptToken, getValidAccessToken, revokeGoogleToken } from "@/lib/google/client";
 import { redirect } from "next/navigation";
 import {
@@ -95,10 +96,17 @@ export async function addCalendarEvent(_prevState: string | undefined, formData:
   const timing = readTiming(formData);
   if (typeof timing === "string") return timing;
 
+  let eventId: string | null = null;
   try {
-    await createGoogleCalendarEvent(calendarId, { title, ...timing });
+    eventId = await createGoogleCalendarEvent(calendarId, { title, ...timing });
   } catch (e) {
     return calendarErrorMessage(e, "일정을 추가할 수 없습니다.");
+  }
+
+  // 캘린더는 모두가 같은 화면을 보므로 일정이 생기면 전원에게 알린다(추가한 본인 제외).
+  // 알림이 실패해도 일정은 이미 만들어졌으므로 되돌리지 않는다.
+  if (eventId) {
+    await notifyCalendarEventAdded(eventId, title, timing.startDate, session.user.id).catch(() => {});
   }
 
   revalidatePath("/calendar");

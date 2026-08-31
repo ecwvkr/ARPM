@@ -14,7 +14,9 @@
     "check:join": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-join.ts",
     "check:tree": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-project-tree.ts",
     "check:notice": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notice.ts",
-    "check:notify": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notify.ts"
+    "check:notify": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notify.ts",
+    "check:deadline": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-deadline.ts",
+    "check:crop": "node node_modules/tsx/dist/cli.mjs scripts/check-crop.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

@@ -7,7 +7,7 @@
 //
 // 읽기만 한다 — 아무것도 만들거나 지우지 않는다.
 import { prisma } from "../lib/prisma";
-import { notificationHrefs, PARTNER_REF_TYPES } from "../lib/notify";
+import { notificationHrefs, PARTNER_REF_TYPES, CALENDAR_REF_TYPES } from "../lib/notify";
 
 let ok = 0, fail = 0;
 function check(label: string, cond: boolean, extra = "") {
@@ -27,6 +27,8 @@ const PROJECT_TYPES = [
 // 지금은 안 만들지만 옛 데이터로 남아 있는 종류. '업무 삭제'는 파트너/프로젝트 체계로
 // 넘어오면서 PROJECT_ARCHIVED로 대체됐다(73c9b4e).
 const LEGACY_TYPES = ["TASK_DELETED"];
+// 캘린더 일정은 우리 DB에 없다. refId(구글 일정 id)로 화면을 못 만드니 캘린더로 보낸다.
+const CALENDAR_TYPES = ["CALENDAR_EVENT_ADDED", "CALENDAR_DUE_SOON"];
 
 async function main() {
   const project = await prisma.project.findFirstOrThrow({
@@ -36,16 +38,19 @@ async function main() {
 
   // 파트너 알림은 partnerId를, 프로젝트 알림은 projectId를 refId로 받는다.
   const probes = [
-    ...PARTNER_TYPES.map((type) => ({ type, refId: project.partnerId, partner: true })),
-    ...PROJECT_TYPES.map((type) => ({ type, refId: project.id, partner: false })),
+    ...PARTNER_TYPES.map((type) => ({ type, refId: project.partnerId, want: `/partners/${project.partnerId}` })),
+    ...PROJECT_TYPES.map((type) => ({
+      type,
+      refId: project.id,
+      want: `/partners/${project.partnerId}?project=${project.id}`,
+    })),
+    // 구글 일정 id는 우리 DB에 없는 값이라도 캘린더 화면이 나와야 한다.
+    ...CALENDAR_TYPES.map((type) => ({ type, refId: "google-event-id-없는값", want: "/calendar" })),
   ];
   const hrefs = await notificationHrefs(probes);
 
   probes.forEach((probe, i) => {
-    const expected = probe.partner
-      ? `/partners/${project.partnerId}`
-      : `/partners/${project.partnerId}?project=${project.id}`;
-    check(`${probe.type} -> 주소`, hrefs[i] === expected, hrefs[i] ?? "(없음)");
+    check(`${probe.type} -> 주소`, hrefs[i] === probe.want, hrefs[i] ?? "(없음)");
   });
 
   // 저장된 알림도 같은 규칙으로 훑는다. 단, 가리키던 프로젝트가 영구 삭제된 옛 알림은
@@ -72,10 +77,12 @@ async function main() {
 
   // 목록에 없는 종류가 코드에 새로 생겼는지도 함께 본다.
   const unknown = [...new Set(saved.map((n) => n.type))]
-    .filter((t) => ![...PARTNER_TYPES, ...PROJECT_TYPES, ...LEGACY_TYPES].includes(t));
+    .filter((t) => ![...PARTNER_TYPES, ...PROJECT_TYPES, ...CALENDAR_TYPES, ...LEGACY_TYPES].includes(t));
   check("모르는 알림 종류 없음", unknown.length === 0, unknown.join(", "));
-  check("lib/notify.ts 목록이 이 스크립트와 일치",
+  check("lib/notify.ts 파트너 목록이 이 스크립트와 일치",
     PARTNER_TYPES.every((t) => PARTNER_REF_TYPES.has(t)) && PARTNER_REF_TYPES.size === PARTNER_TYPES.length);
+  check("lib/notify.ts 캘린더 목록이 이 스크립트와 일치",
+    CALENDAR_TYPES.every((t) => CALENDAR_REF_TYPES.has(t)) && CALENDAR_REF_TYPES.size === CALENDAR_TYPES.length);
 
   console.log(`\n${ok} OK, ${fail} FAIL`);
   if (fail > 0) process.exitCode = 1;
