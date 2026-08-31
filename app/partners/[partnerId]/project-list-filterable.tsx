@@ -35,7 +35,13 @@ export function ProjectListFilterable({
   }
 
   const visible = active.size === 0 ? projects : projects.filter((t) => active.has(t.status));
-  const sorted = [...visible].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+  // 고정(ProjectPin)이 진행 여부보다 먼저다 — 서버가 pinnedFirst로 맞춰 보낸 순서를
+  // 여기서 상태로만 다시 정렬하면 고정 카드가 자기 상태 그룹 안에 묻힌다.
+  const sorted = [...visible].sort(
+    (a, b) =>
+      Number(b.pins.length > 0) - Number(a.pins.length > 0) ||
+      STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
+  );
 
   return (
     <div className="space-y-3">
