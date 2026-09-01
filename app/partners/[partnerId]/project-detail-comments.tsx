@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { addComment, updateComment, deleteComment } from "@/app/actions/projects";
 import { useDetailSubmit } from "./use-detail-submit";
+import { linkifyWithMentions } from "@/components/linkify";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { IconPencil, IconTrash } from "@tabler/icons-react";
@@ -49,6 +50,8 @@ export function ProjectDetailComments({
             key={c.id}
             comment={c}
             canEdit={c.authorId === currentUserId || isSuperAdmin}
+            mentionCandidates={mentionCandidates}
+            myName={mentionCandidates.find((m) => m.userId === currentUserId)?.userName}
             onDone={onDone}
           />
         ))}
@@ -58,13 +61,21 @@ export function ProjectDetailComments({
   );
 }
 
+const MENTION_CHIP = "rounded-md bg-primary/10 px-1 font-medium text-primary";
+// 나를 부른 멘션은 더 진하게 — 코멘트를 훑을 때 내 차례를 먼저 찾게 한다.
+const MENTION_CHIP_ME = "rounded-md bg-primary/25 px-1 font-medium text-primary";
+
 function CommentItem({
   comment,
   canEdit,
+  mentionCandidates,
+  myName,
   onDone,
 }: {
   comment: { id: string; body: string; author: { name: string } };
   canEdit: boolean;
+  mentionCandidates: { userId: string; userName: string }[];
+  myName?: string;
   onDone: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -129,7 +140,16 @@ function CommentItem({
           </div>
         )}
       </div>
-      <p className="whitespace-pre-wrap">{comment.body}</p>
+      {/* 붙여넣은 주소처럼 끊을 곳 없는 긴 글이 코멘트 상자를 밀고 나가지 않게
+          강제로 줄바꿈한다(min-w-0은 위 flex 행이 같이 늘어나는 것을 막는다). */}
+      <p className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">
+        {linkifyWithMentions(comment.body, mentionCandidates.map((m) => m.userName), {
+          linkClassName: "text-primary underline underline-offset-2 [overflow-wrap:anywhere]",
+          chipClass: MENTION_CHIP,
+          meChipClass: MENTION_CHIP_ME,
+          myName,
+        })}
+      </p>
     </li>
   );
 }

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LinkFields } from "@/components/link-fields";
+import { Linkify } from "@/components/linkify";
 import { ProjectParentPicker } from "@/components/project-parent-picker";
 import { DeriveDialog } from "./project-derive-dialog";
 import { showToast } from "@/components/ui/global-toast";
@@ -116,7 +117,16 @@ export function ProjectDetailHeader({
           </div>
         )}
       </div>
-      {project.memo && <p className="text-sm whitespace-pre-wrap text-muted-foreground">{project.memo}</p>}
+      {project.memo && (
+        // 코멘트와 같은 처리 — 붙여넣은 주소가 상자를 밀고 나가지 않게 강제로 줄바꿈하고,
+        // 주소는 눌러서 열 수 있게 한다.
+        <p className="min-w-0 text-sm whitespace-pre-wrap text-muted-foreground [overflow-wrap:anywhere]">
+          <Linkify
+            text={project.memo}
+            linkClassName="text-primary underline underline-offset-2 [overflow-wrap:anywhere]"
+          />
+        </p>
+      )}
       {project.links.map((link) => (
         <a
           key={link}

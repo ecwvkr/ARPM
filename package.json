@@ -17,7 +17,8 @@
     "check:notify": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-notify.ts",
     "check:deadline": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-deadline.ts",
     "check:crop": "node node_modules/tsx/dist/cli.mjs scripts/check-crop.ts",
-    "check:avatar": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-avatar.ts"
+    "check:avatar": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-avatar.ts",
+    "check:linkify": "node node_modules/tsx/dist/cli.mjs scripts/check-linkify.tsx"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

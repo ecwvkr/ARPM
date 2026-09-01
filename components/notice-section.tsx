@@ -1,5 +1,6 @@
 import type { NoticeItem } from "@/lib/notices";
 import { NoticeFormDialog, NoticeDeleteButton } from "@/components/notice-form-dialog";
+import { Linkify } from "@/components/linkify";
 
 // 서버 컴포넌트로 둔다 — 시각을 서버에서 한 번만 찍어야 하이드레이션 때 서버(UTC)와
 // 브라우저(KST)의 표기가 어긋나지 않는다. 눌러야 동작하는 부분만 클라이언트다.
@@ -91,7 +92,12 @@ function NoticeCard({
         </span>
       </summary>
 
-      <p className="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{notice.body}</p>
+      <p className="mt-2 min-w-0 text-sm whitespace-pre-wrap text-muted-foreground [overflow-wrap:anywhere]">
+        <Linkify
+          text={notice.body}
+          linkClassName="text-primary underline underline-offset-2 [overflow-wrap:anywhere]"
+        />
+      </p>
 
       <div className="mt-3 flex items-end justify-between gap-2">
         <p className="min-w-0 text-xs text-muted-foreground">
