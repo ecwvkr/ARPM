@@ -67,13 +67,10 @@ async function main() {
   const broken = saved
     .map((n, i) => ({ ...n, href: savedHrefs[i] }))
     .filter((n) => n.refId && alive.has(n.refId) && !n.href);
-  // 이건 통과/실패로 세지 않고 알려만 준다. 옛 데이터에는 지금과 refId 의미가 다른 행이
-  // 섞여 있어서(파트너/프로젝트 체계 전환 이전) 실패로 잡으면 영영 빨간불이 된다.
-  // 규칙 자체의 회귀는 위의 종류별 검사가 잡는다.
-  console.log(
-    `  참고  저장된 알림 ${saved.length}건 중 눌러도 이동 못 하는 옛 행 ${broken.length}건` +
-      (broken.length ? ` (${broken.map((b) => b.type).join(", ")})` : ""),
-  );
+  // 이동 못 하는 옛 행은 한 번 정리했으므로(삭제된 프로젝트/없어진 종류) 이제는
+  // 0이어야 한다. 다시 생기면 refId 분류가 어긋났다는 뜻이다.
+  check(`저장된 알림 ${saved.length}건 모두 이동 가능`, broken.length === 0,
+    broken.length ? broken.map((b) => `${b.type}(${b.refId})`).join(", ") : "");
 
   // 목록에 없는 종류가 코드에 새로 생겼는지도 함께 본다.
   const unknown = [...new Set(saved.map((n) => n.type))]
