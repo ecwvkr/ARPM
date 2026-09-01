@@ -43,7 +43,14 @@ export function NotificationBellClient({ initial }: { initial: Notification[] })
           <Button variant="outline" size="icon" className="relative size-11" aria-label="알림">
             <IconBell className="size-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />
+              // 점만 있으면 몇 건인지 열어 봐야 안다. 두 자리를 넘으면 9+로 줄여
+              // 버튼 밖으로 번지지 않게 한다(알림 목록은 어차피 20건까지만 읽는다).
+              <span
+                aria-label={`읽지 않은 알림 ${unreadCount}건`}
+                className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-bold text-white tabular-nums"
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
             )}
           </Button>
         }
