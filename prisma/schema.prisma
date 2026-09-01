@@ -16,6 +16,9 @@ model User {
   email               String    @unique
   phone               String?
   avatarUrl           String?
+  // 프로필 사진이 바뀐 시각. 사진 주소(/api/avatar/<id>?v=)의 캐시 키로 쓴다 —
+  // 이게 없으면 다른 사람 브라우저가 캐시한 옛 사진(또는 사진 없음)이 오래 남는다.
+  avatarUpdatedAt     DateTime?
   passwordHash        String
   isSuperAdmin        Boolean   @default(false)
   isActive            Boolean   @default(true) // false = 비활성화(퇴사 등) — 로그인 불가, 참여자 선택 목록에서 제외

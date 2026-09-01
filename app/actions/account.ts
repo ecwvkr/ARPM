@@ -52,7 +52,11 @@ export async function updateMyAvatar(dataUrl: string | null) {
     if (dataUrl.length > AVATAR_MAX_LENGTH) return "이미지가 너무 큽니다.";
   }
 
-  await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl: dataUrl } });
+  // 버전 시각을 함께 밀어야 다른 사람 브라우저가 캐시한 옛 사진이 바로 교체된다.
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { avatarUrl: dataUrl, avatarUpdatedAt: dataUrl ? new Date() : null },
+  });
   // 아바타는 모든 화면의 참여자 칩에 나오므로 레이아웃 단위로 다시 그린다.
   revalidatePath("/", "layout");
 }

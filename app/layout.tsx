@@ -7,6 +7,8 @@ import { BottomNav } from "@/components/bottom-nav";
 import { ChatLauncher } from "@/app/chat/chat-launcher";
 import { countUnreadChat } from "@/lib/chat";
 import { GlobalToastHost } from "@/components/ui/global-toast";
+import { AvatarProvider } from "@/components/avatar-provider";
+import { listAvatarVersions } from "@/lib/avatars";
 import { ServiceWorkerRegistrar } from "@/components/service-worker";
 import "./globals.css";
 import { Inter } from "next/font/google";
@@ -46,9 +48,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const accentColor = session?.user?.accentColor;
   // 안읽음 수를 페이지 렌더에서 함께 읽어 첫 화면에 바로 보여준다 — 뱃지 하나 때문에
   // 클라이언트가 서버 액션을 따로 부르지 않게 하기 위한 것(무료 플랜은 호출 수가 병목).
-  const unreadChat = session?.user?.id
-    ? await countUnreadChat(session.user.id, !!session.user.isSuperAdmin)
-    : null;
+  // 참여자 칩이 쓰는 프로필 사진 목록. 화면마다 칩 데이터 모양이 달라 칩마다 실어
+  // 나르기 어려우므로 여기서 한 번만 읽어 컨텍스트로 내려 준다.
+  const [unreadChat, avatarVersions] = session?.user?.id
+    ? await Promise.all([
+        countUnreadChat(session.user.id, !!session.user.isSuperAdmin),
+        listAvatarVersions(),
+      ])
+    : [null, {}];
   const accentStyle = accentColor
     ? ({
         "--primary": accentColor,
@@ -68,14 +75,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
-        {children}
-        {session?.user?.id && unreadChat && (
-          <ChatLauncher
-            currentUserId={session.user.id}
-            isSuperAdmin={!!session.user.isSuperAdmin}
-            initialUnread={unreadChat}
-          />
-        )}
+        {/* 채팅 창에도 참여자 칩이 나오므로 화면과 함께 감싼다. */}
+        <AvatarProvider versions={avatarVersions}>
+          {children}
+          {session?.user?.id && unreadChat && (
+            <ChatLauncher
+              currentUserId={session.user.id}
+              isSuperAdmin={!!session.user.isSuperAdmin}
+              initialUnread={unreadChat}
+            />
+          )}
+        </AvatarProvider>
         {session && <BottomNav />}
         <GlobalToastHost />
         {/* 로그인한 사람에게만 등록한다 — 로그인 화면에서까지 워커를 띄울 이유가 없다. */}
