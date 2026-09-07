@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { parseDateInput } from "@/lib/date-input";
 import { notifyCalendarEventAdded } from "@/lib/notifications";
 import { decryptToken, getValidAccessToken, revokeGoogleToken } from "@/lib/google/client";
 import { redirect } from "next/navigation";
@@ -63,6 +64,11 @@ function readTiming(formData: FormData): { startDate: Date; endDate: Date; start
   const endRaw = formData.get("endDate") as string | null;
   if (!startRaw) return "시작일을 입력하세요.";
 
+  // 날짜 칸은 연도에 6자리가 들어갈 수 있어(lib/date-input.ts) 형식과 범위를 확인한다.
+  if (!parseDateInput(startRaw)) return "올바른 시작일을 입력하세요. (예: 2026-09-04)";
+  if (endRaw && !parseDateInput(endRaw)) return "올바른 종료일을 입력하세요. (예: 2026-09-04)";
+
+  // 구글에 보내는 값은 서버 시간대 기준 자정이어야 해서 여기서 다시 만든다.
   const startDate = new Date(`${startRaw}T00:00:00`);
   const endDate = endRaw ? new Date(`${endRaw}T00:00:00`) : startDate;
   if (endDate < startDate) return "종료일은 시작일보다 빠를 수 없습니다.";

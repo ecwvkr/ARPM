@@ -10,6 +10,7 @@ import { revalidateProjectViews } from "@/lib/revalidate";
 import { deleteGoogleEventsById } from "@/lib/google/calendar";
 import { getCommentVisibleCount } from "@/lib/settings";
 import { normalizeLinks } from "@/lib/normalize";
+import { parseDateInput } from "@/lib/date-input";
 import { pushNotifications } from "@/lib/notify";
 import { listVisiblePartners } from "@/lib/partners";
 import {
@@ -112,7 +113,10 @@ export async function createProject(
   if (!memo) return "상세를 입력하세요.";
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
+  // 날짜 칸은 연도에 6자리가 들어갈 수 있어(lib/date-input.ts) 여기서 다시 확인한다.
   const dueDateRaw = formData.get("dueDate") as string | null;
+  const dueDate = parseDateInput(dueDateRaw);
+  if (dueDateRaw && !dueDate) return "올바른 기한을 입력하세요. (예: 2026-09-04)";
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   const recurrence = formData.get("recurrence") === "WEEKLY" ? "WEEKLY" : null;
   // startDate/sourceGoogleEventId는 구글 일정을 업무로 전환할 때만 채워진다(G5) —
@@ -150,7 +154,7 @@ export async function createProject(
       title,
       memo,
       links,
-      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      dueDate,
       startDate: startDateRaw ? new Date(startDateRaw) : null,
       sourceGoogleEventId,
       visibility,
@@ -182,6 +186,8 @@ export async function deriveProject(
   const links = normalizeLinks(formData.getAll("link"));
   if (links === undefined) return "올바른 링크를 입력하세요. (예: https://example.com)";
   const dueDateRaw = formData.get("dueDate") as string | null;
+  const dueDate = parseDateInput(dueDateRaw);
+  if (dueDateRaw && !dueDate) return "올바른 기한을 입력하세요. (예: 2026-09-04)";
   const visibility = formData.get("visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
 
   const created = await prisma.project.create({
@@ -191,7 +197,7 @@ export async function deriveProject(
       title,
       memo,
       links,
-      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      dueDate,
       visibility,
       masterId: session.user.id,
       participants: { create: { userId: session.user.id } },
@@ -568,9 +574,11 @@ export async function extendDueDate(
 
   const dueDateRaw = formData.get("dueDate") as string | null;
   if (!dueDateRaw) return "날짜를 입력하세요.";
+  const dueDate = parseDateInput(dueDateRaw);
+  if (!dueDate) return "올바른 날짜를 입력하세요. (예: 2026-09-04)";
 
   await prisma.$transaction([
-    prisma.project.update({ where: { id: projectId }, data: { dueDate: new Date(dueDateRaw) } }),
+    prisma.project.update({ where: { id: projectId }, data: { dueDate } }),
     prisma.auditLog.create({
       data: {
         actorId: session.user.id,
@@ -578,7 +586,7 @@ export async function extendDueDate(
         targetType: "PROJECT",
         targetId: projectId,
         partnerId: project.partnerId,
-        message: `마감일을 ${new Date(dueDateRaw).toLocaleDateString("ko-KR")}(으)로 변경`,
+        message: `마감일을 ${dueDate.toLocaleDateString("ko-KR")}(으)로 변경`,
       },
     }),
   ]);
@@ -598,8 +606,10 @@ export async function updateCreatedDate(
 
   const createdAtRaw = formData.get("createdAt") as string | null;
   if (!createdAtRaw) return "날짜를 입력하세요.";
+  const createdAt = parseDateInput(createdAtRaw);
+  if (!createdAt) return "올바른 날짜를 입력하세요. (예: 2026-09-04)";
 
-  await prisma.project.update({ where: { id: projectId }, data: { createdAt: new Date(createdAtRaw) } });
+  await prisma.project.update({ where: { id: projectId }, data: { createdAt } });
   await revalidateProjectViews(project.partnerId);
 }
 
