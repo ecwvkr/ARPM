@@ -50,6 +50,7 @@ model User {
   joinRequests         PartnerJoinRequest[]
   createdNotices       Notice[]           @relation("NoticeAuthor")
   editedNotices        Notice[]           @relation("NoticeEditor")
+  createdPartnerLinks  PartnerLink[]
 }
 
 model Partner {
@@ -73,6 +74,7 @@ model Partner {
   chatRoom     ChatRoom?
   joinRequests PartnerJoinRequest[]
   notices      Notice[]
+  links        PartnerLink[]
 
   @@index([ownerId])
 }
@@ -477,4 +479,25 @@ model Notice {
   @@index([partnerId, createdAt])
   @@index([createdById])
   @@index([updatedById])
+}
+
+// 파트너 공지 아래에 두는 링크 카드. 자주 쓰는 문서·시트로 바로 넘어가는 바로가기다.
+// 공지와 같은 자리에 있고 권한 규칙도 같아서(그 파트너 참여자만) lib/notices.ts의
+// getNoticeAccess를 그대로 쓴다.
+model PartnerLink {
+  id        String @id @default(cuid())
+  partnerId String
+  title     String
+  url       String // normalizeLink를 통과한 http(s) 주소만 저장한다
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  // 한 파트너의 카드를 만든 순서대로 읽는다.
+  @@index([partnerId, createdAt])
+  @@index([createdById])
 }

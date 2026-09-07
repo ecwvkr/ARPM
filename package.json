@@ -19,7 +19,8 @@
     "check:crop": "node node_modules/tsx/dist/cli.mjs scripts/check-crop.ts",
     "check:avatar": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-avatar.ts",
     "check:linkify": "node node_modules/tsx/dist/cli.mjs scripts/check-linkify.tsx",
-    "check:date-input": "node node_modules/tsx/dist/cli.mjs scripts/check-date-input.ts"
+    "check:date-input": "node node_modules/tsx/dist/cli.mjs scripts/check-date-input.ts",
+    "check:partner-link": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-partner-link.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
