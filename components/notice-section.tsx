@@ -1,18 +1,15 @@
 import type { NoticeItem } from "@/lib/notices";
 import { NoticeFormDialog, NoticeDeleteButton } from "@/components/notice-form-dialog";
 import { Linkify } from "@/components/linkify";
+import { koreanStamp } from "@/lib/ui";
 
 // 서버 컴포넌트로 둔다 — 시각을 서버에서 한 번만 찍어야 하이드레이션 때 서버(UTC)와
 // 브라우저(KST)의 표기가 어긋나지 않는다. 눌러야 동작하는 부분만 클라이언트다.
 const TIME_ZONE = "Asia/Seoul";
 
-function stamp(date: Date) {
-  return new Date(date).toLocaleString("ko-KR", {
-    timeZone: TIME_ZONE,
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+// 시각 표기는 koreanStamp를 쓴다 — toLocaleString은 오전/오후를 그 환경의 로케일
+// 자료에서 가져와서, 개발기와 운영기에서 "오후"와 "PM"으로 갈린다.
+const stamp = koreanStamp;
 
 function day(date: Date) {
   return new Date(date).toLocaleDateString("ko-KR", { timeZone: TIME_ZONE });

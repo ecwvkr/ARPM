@@ -5,6 +5,7 @@ import { listVisiblePartnersWithUnread, type PartnerSort } from "@/lib/partners"
 import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
 import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { listNotices } from "@/lib/notices";
+import { countCommentSummary } from "@/lib/comments";
 import { NoticeSection } from "@/components/notice-section";
 import { isOverdue } from "@/lib/priority";
 import { LogoutButton } from "./logout-button";
@@ -66,6 +67,10 @@ export default async function DashboardPage({
     (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),
   ).length;
 
+  // 코멘트 요약 카드 2종. 이미 읽어 온 프로젝트 목록을 그대로 넘겨 같은 조회를
+  // 반복하지 않는다(무료 플랜의 병목은 호출 수다).
+  const commentSummary = await countCommentSummary(allProjects, userId, session.user.name ?? "");
+
   const byFilter = (p: (typeof allPartners)[number]) => {
     if (filter === "joined") return isJoined(p);
     return true;
@@ -117,7 +122,9 @@ export default async function DashboardPage({
         </div>
       </header>
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {/* 카드가 여섯 장이라 세 칸씩 두 줄로 떨어진다. 네 칸으로 두면 4+2로 남아
+            아래 줄이 비어 보인다. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <SummaryCard label="전체 파트너" value={visibleAll.length} href={widgetHref("all")} active={filter === "all"} />
           <SummaryCard
             label="참여 파트너"
@@ -128,6 +135,9 @@ export default async function DashboardPage({
           {/* 프로젝트 태그 둘은 파트너 필터가 아니라 전체 프로젝트 화면으로 넘겨주는 버튼이다. */}
           <SummaryCard label="진행 중 프로젝트" value={activeProjects.length} href="/projects?f=1&status=TODO,IN_PROGRESS" active={false} />
           <SummaryCard label="참여 프로젝트" value={myActiveProjectCount} href="/projects?status=TODO,IN_PROGRESS" active={false} />
+          {/* 코멘트 모아보기 — 프로젝트를 하나씩 열지 않아도 오간 이야기를 훑는다. */}
+          <SummaryCard label="전체 코멘트" value={commentSummary.all} href="/comments" active={false} />
+          <SummaryCard label="멘션된 코멘트" value={commentSummary.mentions} href="/comments?view=mention" active={false} />
         </div>
 
         <NoticeSection heading="공지사항" notices={notices} canManage />
