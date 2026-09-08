@@ -137,7 +137,7 @@ export default async function DashboardPage({
           <SummaryCard label="참여 프로젝트" value={myActiveProjectCount} href="/projects?status=TODO,IN_PROGRESS" active={false} />
           {/* 코멘트 모아보기 — 프로젝트를 하나씩 열지 않아도 오간 이야기를 훑는다. */}
           <SummaryCard label="전체 코멘트" value={commentSummary.all} href="/comments" active={false} />
-          <SummaryCard label="멘션된 코멘트" value={commentSummary.mentions} href="/comments?view=mention" active={false} />
+          <SummaryCard label="멘션된 코멘트" value={commentSummary.mentions} href="/comments?filter=mention" active={false} />
         </div>
 
         <NoticeSection heading="공지사항" notices={notices} canManage />

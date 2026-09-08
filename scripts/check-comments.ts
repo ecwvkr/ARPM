@@ -47,28 +47,30 @@ async function main() {
     const visible = await listAllProjectsForUser(user.id, user.isSuperAdmin, {});
     const visibleIds = new Set(visible.map((p) => p.id));
 
-    // 필터 없이 = 볼 수 있는 모든 프로젝트의 코멘트.
-    const feed = await listCommentFeed(user.id, user.isSuperAdmin, {});
+    // '전체' = 볼 수 있는 모든 프로젝트의 코멘트.
+    const feed = await listCommentFeed(user.id, user.isSuperAdmin, "all", user.name);
     const leaked = feed.filter((c) => !visibleIds.has(c.projectId));
     check(`${user.name}: 볼 수 없는 프로젝트의 코멘트가 안 섞인다`, leaked.length === 0,
       `${feed.length}건`);
     check(`${user.name}: 최신순`, feed.every((c, i) => i === 0 || feed[i - 1].createdAt >= c.createdAt));
 
-    // 기본 필터(진행 전·진행 중 + 내 프로젝트)
-    const scoped = await listCommentFeed(user.id, user.isSuperAdmin, {
-      statuses: ["TODO", "IN_PROGRESS"],
-      mineOnly: true,
-    });
-    const wrongStatus = scoped.filter((c) => c.projectStatus === "DONE");
-    check(`${user.name}: 기본 필터에 완료 프로젝트가 없다`, wrongStatus.length === 0, `${scoped.length}건`);
-    const notMine = scoped.filter((c) => {
+    // '내 프로젝트' 필터
+    const involved = await listCommentFeed(user.id, user.isSuperAdmin, "involved", user.name);
+    const notMine = involved.filter((c) => {
       const p = visible.find((x) => x.id === c.projectId)!;
       return p.masterId !== user.id && !p.participants.some((x) => x.userId === user.id);
     });
-    check(`${user.name}: 기본 필터가 내 프로젝트만 남긴다`, notMine.length === 0);
+    check(`${user.name}: '내 프로젝트'가 관여하는 것만 남긴다`, notMine.length === 0, `${involved.length}건`);
+
+    // '내가 작성한 코멘트' 필터
+    const authored = await listCommentFeed(user.id, user.isSuperAdmin, "authored", user.name);
+    check(`${user.name}: '내가 작성' 이 전부 내 글`,
+      authored.every((c) => c.authorId === user.id), `${authored.length}건`);
+    check(`${user.name}: '내가 작성' 이 빠짐없이 잡힌다`,
+      authored.length === feed.filter((c) => c.authorId === user.id).length);
 
     // 멘션 목록
-    const mentions = await listCommentFeed(user.id, user.isSuperAdmin, { mentionName: user.name });
+    const mentions = await listCommentFeed(user.id, user.isSuperAdmin, "mention", user.name);
     check(`${user.name}: 멘션 목록이 전부 실제 멘션`,
       mentions.every((c) => mentionsName(c.body, user.name)), `${mentions.length}건`);
     // 묶음: 같은 프로젝트가 한 장으로 모이고, 묶음 순서는 그 안의 최신 코멘트 기준.
@@ -77,23 +79,21 @@ async function main() {
       new Set(groups.map((g) => g.projectId)).size === groups.length, `${groups.length}묶음`);
     check(`${user.name}: 묶음에 코멘트가 빠짐없이 들어간다`,
       groups.reduce((n, g) => n + g.comments.length, 0) === feed.length);
-    check(`${user.name}: 묶음 안이 최신순`,
-      groups.every((g) => g.comments.every((c, i) => i === 0 || g.comments[i - 1].createdAt >= c.createdAt)));
-    check(`${user.name}: 묶음끼리도 최신순`,
+    // 묶음 안은 오래된 것이 위 — 프로젝트 상세의 코멘트 순서와 같아야 한다.
+    check(`${user.name}: 묶음 안은 오래된 순`,
+      groups.every((g) => g.comments.every((c, i) => i === 0 || g.comments[i - 1].createdAt <= c.createdAt)));
+    // 묶음끼리는 최신 코멘트가 있는 프로젝트가 위.
+    check(`${user.name}: 묶음끼리는 최신순`,
       groups.every((g, i) => i === 0 || groups[i - 1].latestAt >= g.latestAt));
+    check(`${user.name}: 묶음의 latestAt이 그 안의 마지막 코멘트`,
+      groups.every((g) => g.latestAt.getTime() === g.comments.at(-1)!.createdAt.getTime()));
     check(`${user.name}: 한 묶음은 한 프로젝트의 코멘트만`,
       groups.every((g) => g.comments.every((c) => c.projectId === g.projectId)));
 
-    // 멘션 목록은 완료된 프로젝트 묶음을 아래로 내린다.
-    const mentionGroups = groupByProject(mentions, true);
-    const firstDone = mentionGroups.findIndex((g) => g.projectDone);
-    check(`${user.name}: 완료 프로젝트 묶음이 아래로`,
-      firstDone === -1 || mentionGroups.slice(firstDone).every((g) => g.projectDone));
-
     // 카드 숫자와 화면 개수가 같아야 한다.
     const summary = await countCommentSummary(visible, user.id, user.name);
-    check(`${user.name}: '전체 코멘트' 카드 숫자 = 기본 필터 개수`,
-      summary.all === scoped.length, `${summary.all} vs ${scoped.length}`);
+    check(`${user.name}: '전체 코멘트' 카드 숫자 = '전체' 개수`,
+      summary.all === feed.length, `${summary.all} vs ${feed.length}`);
     check(`${user.name}: '멘션된 코멘트' 카드 숫자 = 멘션 개수`,
       summary.mentions === mentions.length, `${summary.mentions} vs ${mentions.length}`);
   }
