@@ -3,8 +3,7 @@ import { auth } from "@/auth";
 import { listVisiblePartners } from "@/lib/partners";
 import { listProjectsForPartners, isProjectUnread, type DueBucket, type ProjectSort } from "@/lib/projects";
 import { isOverdue, buildParticipantChips, canJoinProject } from "@/lib/priority";
-import { NotificationBell } from "@/app/notification-bell";
-import { LogoutButton } from "@/app/logout-button";
+
 import { ProjectCard } from "@/app/partners/[partnerId]/project-card";
 import { NewProjectDialog } from "@/app/partners/[partnerId]/new-project-dialog";
 import { ProjectStatusGroupsView } from "@/app/partners/[partnerId]/project-status-groups";
@@ -14,6 +13,8 @@ import { listSavedFilters } from "@/app/actions/filters";
 import { listAllUsers } from "@/app/actions/users";
 import { ProjectFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
+import { AppHeader } from "@/components/app-header";
+import { CreateButton } from "@/components/create-button";
 import { chipClass, toArray } from "@/lib/ui";
 
 const VIEWS = [
@@ -93,45 +94,43 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-base font-bold">
-              {(isCanvas ? activePartner : singleSelectedPartner)
-                ? `${(isCanvas ? activePartner : singleSelectedPartner)!.name} 프로젝트`
-                : "전체 프로젝트"}
-            </h1>
-            {(isCanvas ? activePartner : singleSelectedPartner) && (
-              <Link
-                href={viewHref({ ...params, partnerId: undefined, partners: undefined }, view)}
-                className="block text-xs text-muted-foreground underline underline-offset-2"
-              >
-                ← 전체 프로젝트 보기
-              </Link>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <NewProjectDialog
-              partners={partners.map((p) => ({ id: p.id, name: p.name }))}
-              currentUserId={session.user.id}
-            />
-            <NotificationBell />
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        title={
+          (isCanvas ? activePartner : singleSelectedPartner)
+            ? `${(isCanvas ? activePartner : singleSelectedPartner)!.name} 프로젝트`
+            : "전체 프로젝트"
+        }
+        subtitle={
+          (isCanvas ? activePartner : singleSelectedPartner) ? (
+            <Link
+              href={viewHref({ ...params, partnerId: undefined, partners: undefined }, view)}
+              className="block text-xs text-muted-foreground underline underline-offset-2"
+            >
+              ← 전체 프로젝트 보기
+            </Link>
+          ) : undefined
+        }
+      />
 
       <WidthContainer mainClassName="space-y-4 px-6 py-6">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {VIEWS.map((v) => (
-            <Link
-              key={v.label}
-              href={viewHref(params, v.key)}
-              className={chipClass(view === v.key)}
-            >
-              {v.label}
-            </Link>
-          ))}
+        {/* 만들기 버튼은 만들 대상이 놓인 목록 바로 위에 둔다. */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {VIEWS.map((v) => (
+              <Link
+                key={v.label}
+                href={viewHref(params, v.key)}
+                className={chipClass(view === v.key)}
+              >
+                {v.label}
+              </Link>
+            ))}
+          </div>
+          <NewProjectDialog
+            partners={partners.map((p) => ({ id: p.id, name: p.name }))}
+            currentUserId={session.user.id}
+            trigger={<CreateButton label="새 프로젝트" />}
+          />
         </div>
 
         {isCanvas ? (

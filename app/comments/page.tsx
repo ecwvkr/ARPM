@@ -3,9 +3,8 @@ import { auth } from "@/auth";
 import { listCommentFeed, groupByProject } from "@/lib/comments";
 import { toCommentFilter, COMMENT_FILTERS } from "@/lib/comment-filters";
 import { listAllUsers } from "@/app/actions/users";
-import { NotificationBell } from "@/app/notification-bell";
-import { LogoutButton } from "@/app/logout-button";
 import { WidthContainer } from "@/components/width-container";
+import { AppHeader } from "@/components/app-header";
 import { ProjectDeepLink } from "@/app/partners/[partnerId]/project-deep-link";
 import { CommentList } from "./comment-list";
 import { CommentFilters } from "./filters";
@@ -32,15 +31,7 @@ export default async function CommentsPage({ searchParams }: PageProps<"/comment
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <h1 className="text-base font-bold">{heading}</h1>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader title={heading} />
 
       <WidthContainer mainClassName="space-y-4 px-6 py-6">
         <CommentFilters filter={filter} layout={layout} />

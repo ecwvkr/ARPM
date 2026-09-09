@@ -1,10 +1,38 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProjectAccess } from "@/lib/projects";
 import { revalidateProjectViews } from "@/lib/revalidate";
+
+// 태스크 탭의 '태스크 추가' 창에서 쓴다. 거기서는 프로젝트를 폼에서 고르고, 실패
+// 이유를 창 안에 보여 줘야 하므로 예외를 던지는 대신 문구를 돌려준다.
+export async function createTaskFromPicker(_prevState: string | undefined, formData: FormData) {
+  const projectId = (formData.get("projectId") as string | null)?.trim();
+  if (!projectId) return "프로젝트를 선택하세요.";
+
+  const title = (formData.get("title") as string | null)?.trim();
+  if (!title) return "태스크 내용을 입력하세요.";
+
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { project, canParticipantAct } = await getProjectAccess(
+    projectId,
+    session.user.id,
+    !!session.user.isSuperAdmin,
+  );
+  if (!project || !canParticipantAct) return "이 프로젝트에 태스크를 추가할 권한이 없습니다.";
+  if (project.completedAt) return "완료된 프로젝트에는 태스크를 추가할 수 없습니다.";
+
+  await prisma.taskItem.create({
+    data: { projectId, title, createdById: session.user.id },
+  });
+  await revalidateProjectViews(project.partnerId);
+  revalidatePath("/tasks");
+}
 
 export async function createTask(projectId: string, formData: FormData) {
   const session = await auth();

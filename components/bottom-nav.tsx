@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { IconLayoutGrid, IconChecklist, IconListCheck, IconBuilding, IconCalendar, IconSettings } from "@tabler/icons-react";
+import { IconLayoutGrid, IconChecklist, IconListCheck, IconBuilding, IconCalendar, IconMessage } from "@tabler/icons-react";
 import { getRecentPartner, subscribeRecentPartner } from "@/lib/recent-partner";
 import { useSavedToast } from "@/components/ui/saved-toast";
 
@@ -11,7 +11,7 @@ function getServerSnapshot() {
   return null;
 }
 
-// 6탭은 라벨 폭이 빡빡하므로 파트너명이 길면 줄인다.
+// 탭이 여섯이라 라벨 폭이 빡빡하므로 파트너명이 길면 줄인다.
 function abbreviatePartnerName(name: string, max = 3) {
   return name.length > max ? `${name.slice(0, max)}···` : name;
 }
@@ -53,7 +53,9 @@ export function BottomNav() {
           <NavLink label="전체 프로젝트" href="/projects" Icon={IconChecklist} active={pathname.startsWith("/projects")} />
           <NavLink label="태스크" href="/tasks" Icon={IconListCheck} active={pathname.startsWith("/tasks")} />
           <NavLink label="캘린더" href="/calendar" Icon={IconCalendar} active={pathname.startsWith("/calendar")} />
-          <NavLink label="설정" href="/settings" Icon={IconSettings} active={pathname.startsWith("/settings")} />
+          {/* 설정은 상단 로고 메뉴로 옮겼다(components/app-logo-menu.tsx) — 자주 쓰지
+              않는데 탭 하나를 차지하고 있었다. 그 자리에 코멘트를 둔다. */}
+          <NavLink label="코멘트" href="/comments" Icon={IconMessage} active={pathname.startsWith("/comments")} />
         </ul>
       </nav>
       {toast}

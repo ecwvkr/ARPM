@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { WidthContainer } from "@/components/width-container";
+import { AppHeader } from "@/components/app-header";
 import { AccentColorForm } from "../accent-color-form";
 import { MyNameForm } from "../my-name-form";
 import { MyAvatarForm } from "../my-avatar-form";
@@ -42,18 +43,20 @@ export default async function SettingsSectionPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-2">
-          <Link
-            href="/settings"
-            aria-label="설정으로 돌아가기"
-            className="-ml-2 rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <IconChevronLeft className="size-5" />
-          </Link>
-          <h1 className="text-base font-bold">{section.title}</h1>
-        </div>
-      </header>
+      <AppHeader
+        title={
+          <span className="flex items-center gap-1">
+            <Link
+              href="/settings"
+              aria-label="설정으로 돌아가기"
+              className="-ml-1 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <IconChevronLeft className="size-5" />
+            </Link>
+            {section.title}
+          </span>
+        }
+      />
 
       <WidthContainer mainClassName="space-y-3 px-6 py-6">
         <p className="text-sm text-muted-foreground">{section.description}</p>

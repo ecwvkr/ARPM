@@ -31,7 +31,7 @@ export function TaskBoardView({ partners }: { partners: GroupedTaskPartner[] }) 
                 </summary>
                 <div className="mt-1 divide-y divide-foreground/5">
                   {project.tasks.map((task) => (
-                    <TaskRow key={task.id} projectId={project.id} partnerId={partner.id} task={task} />
+                    <TaskRow key={task.id} projectId={project.id} partnerId={partner.id} task={task} showOwner />
                   ))}
                 </div>
               </details>

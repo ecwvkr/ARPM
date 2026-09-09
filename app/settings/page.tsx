@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { LogoutButton } from "@/app/logout-button";
 import { WidthContainer } from "@/components/width-container";
+import { AppHeader } from "@/components/app-header";
 import { SETTINGS_SECTIONS } from "./sections";
 import { IconChevronRight } from "@tabler/icons-react";
 
@@ -15,12 +15,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <h1 className="text-base font-bold">설정</h1>
-          <LogoutButton />
-        </div>
-      </header>
+      <AppHeader title="설정" />
 
       <WidthContainer mainClassName="space-y-2 px-6 py-6">
         {sections.map((section) => (

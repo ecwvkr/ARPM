@@ -8,9 +8,9 @@ import { listNotices } from "@/lib/notices";
 import { countCommentSummary } from "@/lib/comments";
 import { NoticeSection } from "@/components/notice-section";
 import { isOverdue } from "@/lib/priority";
-import { LogoutButton } from "./logout-button";
 import { NewPartnerDialog } from "./new-partner-dialog";
-import { NotificationBell } from "./notification-bell";
+import { AppHeader } from "@/components/app-header";
+import { CreateButton } from "@/components/create-button";
 import { PartnerCard } from "./partner-card";
 import { WidthContainer } from "@/components/width-container";
 import { PartnerSortSelect } from "./partner-sort-select";
@@ -101,26 +101,7 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* 홈 화면에 설치했을 때 보이는 것과 같은 아이콘을 쓴다
-                (app/icon.svg — npm run generate:icons가 앱 아이콘을 만드는 원본). */}
-            {/* eslint-disable-next-line @next/next/no-img-element -- 고정 크기 정적 아이콘이라 최적화할 게 없다. */}
-            <img src="/icon.svg" alt="" aria-hidden className="size-11 shrink-0 rounded-full" />
-            <div>
-              <h1 className="text-base font-bold">AR_PM</h1>
-              <p className="text-sm text-muted-foreground">{session?.user?.name}님</p>
-            </div>
-          </div>
-          {/* 다른 화면들처럼 생성 버튼은 최상단 바에 둔다. */}
-          <div className="flex items-center gap-3">
-            <NewPartnerDialog currentUserId={userId} />
-            <NotificationBell />
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader title="AR_PM" subtitle={<p className="text-sm text-muted-foreground">{session?.user?.name}님</p>} />
       <WidthContainer mainClassName="space-y-6 px-6 py-6">
         {/* 카드가 여섯 장이라 세 칸씩 두 줄로 떨어진다. 네 칸으로 두면 4+2로 남아
             아래 줄이 비어 보인다. */}
@@ -170,7 +151,12 @@ export default async function DashboardPage({
 
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-foreground">파트너</h2>
-          <PartnerSortSelect />
+          {/* 만들기 버튼은 만들 대상이 놓인 목록 바로 위에 둔다 — 상단 바에 있으면
+              지금 화면에서 무엇이 만들어지는지 헷갈린다. */}
+          <div className="flex items-center gap-2">
+            <NewPartnerDialog currentUserId={userId} trigger={<CreateButton label="새 파트너" />} />
+            <PartnerSortSelect />
+          </div>
         </div>
 
         {partners.length === 0 ? (

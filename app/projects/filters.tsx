@@ -4,12 +4,12 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { ProjectSortSelect } from "./project-sort-select";
 import { chipClass, toArray } from "@/lib/ui";
 import { saveFilter, deleteSavedFilter } from "@/app/actions/filters";
-import { IconSearch, IconBookmark, IconUser } from "@tabler/icons-react";
+import { IconSearch, IconFilter, IconX, IconUser } from "@tabler/icons-react";
 
 const STATUS_OPTIONS = [
   { value: "TODO", label: "진행전" },
@@ -24,6 +24,12 @@ const DUE_OPTIONS = [
   { value: "NONE", label: "마감일 없음" },
 ];
 
+// 검색·파트너·상태·담당자·마감일·내 프로젝트·정렬·즐겨찾기를 한 줄에 늘어놓았더니
+// 좁은 화면에서 세 줄을 차지하고, 정작 목록은 화면 밖으로 밀렸다.
+//
+// 늘 보이는 것은 검색창과 '필터' 버튼 둘뿐이다. 나머지는 필터 창 안으로 넣고, 켜져
+// 있는 조건만 아래에 알약으로 되돌려 보여 준다 — 무엇이 걸려 있는지는 보이되, 안
+// 쓸 때는 자리를 차지하지 않는다.
 export function ProjectFilters({
   partners,
   assignees,
@@ -39,11 +45,12 @@ export function ProjectFilters({
   const searchParams = useSearchParams();
   const [queryInput, setQueryInput] = useState(searchParams.get("q") ?? "");
   const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     // f=1: 필터를 한 번이라도 직접 건드렸다는 표시. 이게 있어야 담당자 필터를
-    // 전부 해제해 빈 배열이 됐을 때도(요청 13의 기본값과 URL이 똑같이 "없음"이라
+    // 전부 해제해 빈 배열이 됐을 때도(요청 13의 기본값과 URL이 똑같이 "없음"이라)
     // 서버가 다시 기본값(내 프로젝트)을 되살리지 않는다.
     params.set("f", "1");
     if (value) params.set(key, value);
@@ -82,6 +89,7 @@ export function ProjectFilters({
   const touched = searchParams.get("f") !== null;
   const selectedAssignees = rawAssignee !== null ? toArray(rawAssignee) : touched ? [] : [currentUserId];
   const selectedDue = toArray(searchParams.get("due"));
+  const sort = searchParams.get("sort") ?? "";
   const mine = selectedAssignees.includes(currentUserId);
 
   function toggleMine() {
@@ -111,96 +119,182 @@ export function ProjectFilters({
     });
   }
 
+  const labelOf = (options: { value: string; label: string }[], value: string) =>
+    options.find((o) => o.value === value)?.label ?? value;
+
+  // 켜져 있는 조건을 하나씩 알약으로 되돌려 보여 준다. 필터 창을 열지 않아도 지금
+  // 무엇이 걸려 있는지 알 수 있어야 결과를 오해하지 않는다.
+  const activeChips: { key: string; label: string; remove: () => void }[] = [
+    ...selectedPartners.map((v) => ({
+      key: `partner-${v}`,
+      label: labelOf(partnerOptions, v),
+      remove: () => setArrayParam("partners", selectedPartners.filter((x) => x !== v)),
+    })),
+    ...selectedStatuses.map((v) => ({
+      key: `status-${v}`,
+      label: labelOf(STATUS_OPTIONS, v),
+      remove: () => setArrayParam("status", selectedStatuses.filter((x) => x !== v)),
+    })),
+    ...selectedAssignees.map((v) => ({
+      key: `assignee-${v}`,
+      label: labelOf(assigneeOptions, v),
+      remove: () => setArrayParam("assignee", selectedAssignees.filter((x) => x !== v)),
+    })),
+    ...selectedDue.map((v) => ({
+      key: `due-${v}`,
+      label: labelOf(DUE_OPTIONS, v),
+      remove: () => setArrayParam("due", selectedDue.filter((x) => x !== v)),
+    })),
+  ];
+  const activeCount = activeChips.length + (sort ? 1 : 0);
+
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
             placeholder="프로젝트명·담당자 검색"
             aria-label="프로젝트명·담당자 검색"
-            className="h-auto w-48 py-1.5 pl-8 text-sm"
+            className="h-auto w-full py-1.5 pl-8 text-sm"
           />
         </div>
 
-        <MultiSelectFilter
-          label="파트너"
-          options={partnerOptions}
-          selected={selectedPartners}
-          onChange={(v) => setArrayParam("partners", v)}
-        />
-        <MultiSelectFilter
-          label="상태"
-          options={STATUS_OPTIONS}
-          selected={selectedStatuses}
-          onChange={(v) => setArrayParam("status", v)}
-        />
-        <MultiSelectFilter
-          label="담당자"
-          options={assigneeOptions}
-          selected={selectedAssignees}
-          onChange={(v) => setArrayParam("assignee", v)}
-        />
-        <MultiSelectFilter
-          label="마감일"
-          options={DUE_OPTIONS}
-          selected={selectedDue}
-          onChange={(v) => setArrayParam("due", v)}
-        />
-
-        <button type="button" onClick={toggleMine} aria-pressed={mine} className={chipClass(mine, "flex items-center gap-1")}>
-          <IconUser className="size-3.5" />내 프로젝트
-        </button>
-
-        <ProjectSortSelect />
-
-        <Popover>
-          <PopoverTrigger
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger
             render={
-              <Button type="button" size="sm" variant="outline">
-                <IconBookmark className="size-3.5" />
+              <Button type="button" size="sm" variant={activeCount > 0 ? "default" : "outline"} className="shrink-0">
+                <IconFilter className="size-3.5" />
                 필터
+                {activeCount > 0 && <span className="tabular-nums">{activeCount}</span>}
               </Button>
             }
           />
-          <PopoverContent className="w-64 gap-2 p-2" align="start">
-            <Button type="button" size="sm" variant="ghost" onClick={handleSave} disabled={isPending} className="justify-start">
-              + 현재 필터 저장
-            </Button>
-            {savedFilters.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-muted-foreground">저장된 필터가 없습니다.</p>
-            ) : (
-              <ul className="space-y-0.5">
-                {savedFilters.map((f) => (
-                  <li key={f.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const params = new URLSearchParams(f.query);
-                        params.set("f", "1");
-                        router.push(`/projects?${params.toString()}`);
-                      }}
-                      className="truncate text-left text-sm"
-                    >
-                      {f.name}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`${f.name} 삭제`}
-                      onClick={() => startTransition(async () => { await deleteSavedFilter(f.id); })}
-                      className="shrink-0 text-muted-foreground/60 hover:text-destructive"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </PopoverContent>
-        </Popover>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>필터</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <MultiSelectFilter
+                  label="파트너"
+                  options={partnerOptions}
+                  selected={selectedPartners}
+                  onChange={(v) => setArrayParam("partners", v)}
+                />
+                <MultiSelectFilter
+                  label="상태"
+                  options={STATUS_OPTIONS}
+                  selected={selectedStatuses}
+                  onChange={(v) => setArrayParam("status", v)}
+                />
+                <MultiSelectFilter
+                  label="담당자"
+                  options={assigneeOptions}
+                  selected={selectedAssignees}
+                  onChange={(v) => setArrayParam("assignee", v)}
+                />
+                <MultiSelectFilter
+                  label="마감일"
+                  options={DUE_OPTIONS}
+                  selected={selectedDue}
+                  onChange={(v) => setArrayParam("due", v)}
+                />
+                <button
+                  type="button"
+                  onClick={toggleMine}
+                  aria-pressed={mine}
+                  className={chipClass(mine, "flex items-center gap-1")}
+                >
+                  <IconUser className="size-3.5" />내 프로젝트
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 border-t border-foreground/10 pt-3">
+                <span className="text-xs text-muted-foreground">정렬</span>
+                <ProjectSortSelect />
+              </div>
+
+              <div className="space-y-1.5 border-t border-foreground/10 pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">즐겨찾기</span>
+                  <Button type="button" size="sm" variant="ghost" onClick={handleSave} disabled={isPending}>
+                    + 현재 필터 저장
+                  </Button>
+                </div>
+                {savedFilters.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">저장된 필터가 없습니다.</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {savedFilters.map((f) => (
+                      <li key={f.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const params = new URLSearchParams(f.query);
+                            params.set("f", "1");
+                            router.push(`/projects?${params.toString()}`);
+                            setOpen(false);
+                          }}
+                          className="min-w-0 flex-1 truncate text-left text-sm"
+                        >
+                          {f.name}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`${f.name} 삭제`}
+                          onClick={() => startTransition(async () => { await deleteSavedFilter(f.id); })}
+                          className="shrink-0 text-muted-foreground/60 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {(activeChips.length > 0 || sort) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {activeChips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.remove}
+              aria-label={`${chip.label} 필터 해제`}
+              className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/70"
+            >
+              {chip.label}
+              <IconX className="size-3" />
+            </button>
+          ))}
+          {sort && (
+            <button
+              type="button"
+              onClick={() => setParam("sort", "")}
+              aria-label="정렬 해제"
+              className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/70"
+            >
+              정렬
+              <IconX className="size-3" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => router.push("/projects?f=1")}
+            className="px-1 text-xs text-muted-foreground underline underline-offset-2"
+          >
+            초기화
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,12 +3,12 @@ import { auth } from "@/auth";
 import { listVisiblePartners } from "@/lib/partners";
 import { listGroupedTasksForUser, flattenGroupedTasks } from "@/lib/tasks";
 import { listAllUsers } from "@/app/actions/users";
-import { NotificationBell } from "@/app/notification-bell";
-import { LogoutButton } from "@/app/logout-button";
 import { WidthContainer } from "@/components/width-container";
+import { AppHeader } from "@/components/app-header";
 import { TaskFilters } from "./filters";
 import { TaskListView } from "./task-list-view";
 import { TaskBoardView } from "./task-board-view";
+import { NewTaskDialog } from "./new-task-dialog";
 import { chipClass, toArray } from "@/lib/ui";
 
 function viewHref(params: Record<string, string | string[] | undefined>, view?: string) {
@@ -28,7 +28,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const params = await searchParams;
   const selectedPartnerIds = toArray(typeof params.partners === "string" ? params.partners : undefined);
   const q = typeof params.q === "string" ? params.q : undefined;
-  const view = typeof params.view === "string" ? params.view : undefined;
+  // 기본은 보드 뷰. 태스크는 어느 프로젝트 것인지가 중요해서 묶어 보는 편이 훑기 쉽다.
+  const view = params.view === "list" ? "list" : "board";
   // author 파라미터가 없으면(순수 진입) 기본값은 "내 태스크"(=본인이 등록한 것만).
   // "all"이면 전체, 그 외에는 지정한 사용자가 등록한 것만.
   const rawAuthor = typeof params.author === "string" ? params.author : undefined;
@@ -48,24 +49,19 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <h1 className="text-base font-bold">태스크</h1>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+      <AppHeader title="태스크" />
 
       <WidthContainer mainClassName="space-y-4 px-6 py-6">
-        <div className="flex items-center gap-2 text-xs">
-          <Link href={viewHref(params, undefined)} className={chipClass(!view)}>
-            리스트 뷰
-          </Link>
-          <Link href={viewHref(params, "board")} className={chipClass(view === "board")}>
-            보드 뷰
-          </Link>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs">
+            <Link href={viewHref(params, undefined)} className={chipClass(view === "board")}>
+              보드 뷰
+            </Link>
+            <Link href={viewHref(params, "list")} className={chipClass(view === "list")}>
+              리스트 뷰
+            </Link>
+          </div>
+          <NewTaskDialog partners={partners.map((p) => ({ id: p.id, name: p.name }))} />
         </div>
 
         <TaskFilters
@@ -77,10 +73,10 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
 
         {grouped.length === 0 ? (
           <p className="text-sm text-muted-foreground">조건에 맞는 태스크가 없습니다.</p>
-        ) : view === "board" ? (
-          <TaskBoardView partners={grouped} />
-        ) : (
+        ) : view === "list" ? (
           <TaskListView rows={flattenGroupedTasks(grouped)} />
+        ) : (
+          <TaskBoardView partners={grouped} />
         )}
       </WidthContainer>
     </div>

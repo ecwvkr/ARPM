@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { getPartnerAccess } from "@/lib/permissions";
 import { PartnerJoinButton } from "@/components/partner-join-button";
 import { Badge } from "@/components/ui/badge";
-import { NotificationBell } from "@/app/notification-bell";
 import { PartnerSettingsDialog } from "./partner-settings-dialog";
 import { AdminControls } from "./admin-controls";
 import { listPartnerAuditLog } from "@/app/actions/audit";
@@ -21,6 +20,8 @@ import { ProjectKanban } from "./project-kanban";
 import { ProjectDeepLink } from "./project-deep-link";
 import { RecentPartnerTracker } from "./recent-partner-tracker";
 import { WidthContainer } from "@/components/width-container";
+import { AppHeader } from "@/components/app-header";
+import { CreateButton } from "@/components/create-button";
 import { chipClass } from "@/lib/ui";
 
 export default async function PartnerDetailPage({
@@ -67,9 +68,9 @@ export default async function PartnerDetailPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="px-6 py-4 shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+      <AppHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2">
             {partner.color && (
               <span
                 aria-hidden
@@ -77,31 +78,28 @@ export default async function PartnerDetailPage({
                 style={{ backgroundColor: partner.color }}
               />
             )}
-            <h1 className="text-base font-bold">{partner.name}</h1>
+            {partner.name}
             <Badge variant={partner.visibility === "PUBLIC" ? "secondary" : "outline"}>
               {partner.visibility === "PUBLIC" ? "공개" : "비공개"}
             </Badge>
             {hidden && <Badge variant="destructive">보관됨</Badge>}
-          </div>
-          <div className="flex items-center gap-2">
-            {!isMember && (
-              <PartnerJoinButton
-                partnerId={partner.id}
-                isPublic={partner.visibility === "PUBLIC"}
-                requested={pendingRequest?.status === "PENDING"}
-              />
-            )}
-            {isMember && <NewProjectDialog partnerId={partner.id} currentUserId={session.user.id} />}
-            <PartnerSettingsDialog
-              partner={{ ...partner, members }}
-              isOwner={isOwner}
-              canDelete={(isOwner || !!session.user.isSuperAdmin) && !hidden}
-            />
-            {hidden && (isOwner || session.user.isSuperAdmin) && <AdminControls partnerId={partner.id} />}
-            <NotificationBell />
-          </div>
-        </div>
-      </header>
+          </span>
+        }
+      >
+        {!isMember && (
+          <PartnerJoinButton
+            partnerId={partner.id}
+            isPublic={partner.visibility === "PUBLIC"}
+            requested={pendingRequest?.status === "PENDING"}
+          />
+        )}
+        <PartnerSettingsDialog
+          partner={{ ...partner, members }}
+          isOwner={isOwner}
+          canDelete={(isOwner || !!session.user.isSuperAdmin) && !hidden}
+        />
+        {hidden && (isOwner || session.user.isSuperAdmin) && <AdminControls partnerId={partner.id} />}
+      </AppHeader>
 
       <WidthContainer mainClassName="space-y-8 px-6 py-6">
         {!canView ? (
@@ -120,16 +118,26 @@ export default async function PartnerDetailPage({
         )}
         {isMember && <PartnerLinkCards partnerId={partner.id} links={partnerLinks} canManage />}
         <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <Link href={`/partners/${partner.id}`} className={chipClass(!view)}>
-              리스트 뷰
-            </Link>
-            <Link href={`/partners/${partner.id}?view=status`} className={chipClass(view === "status")}>
-              보드 뷰
-            </Link>
-            <Link href={`/partners/${partner.id}?view=canvas`} className={chipClass(view === "canvas")}>
-              워크플로우
-            </Link>
+          {/* 만들기 버튼은 만들 대상이 놓인 목록 바로 위에 둔다. */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Link href={`/partners/${partner.id}`} className={chipClass(!view)}>
+                리스트 뷰
+              </Link>
+              <Link href={`/partners/${partner.id}?view=status`} className={chipClass(view === "status")}>
+                보드 뷰
+              </Link>
+              <Link href={`/partners/${partner.id}?view=canvas`} className={chipClass(view === "canvas")}>
+                워크플로우
+              </Link>
+            </div>
+            {isMember && (
+              <NewProjectDialog
+                partnerId={partner.id}
+                currentUserId={session.user.id}
+                trigger={<CreateButton label="새 프로젝트" />}
+              />
+            )}
           </div>
           {view === "status" ? (
             <ProjectStatusGroups

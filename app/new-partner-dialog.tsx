@@ -16,7 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function NewPartnerDialog({ currentUserId }: { currentUserId: string }) {
+export function NewPartnerDialog({
+  currentUserId,
+  trigger,
+}: {
+  currentUserId: string;
+  trigger?: React.ReactElement;
+}) {
   const [open, setOpen] = useState(false);
   const [errorMessage, formAction, isPending] = useActionState(
     createPartner,
@@ -34,9 +40,11 @@ export function NewPartnerDialog({ currentUserId }: { currentUserId: string }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="icon-sm" variant="outline" title="새 파트너" aria-label="새 파트너">
-            <IconPlus />
-          </Button>
+          trigger ?? (
+            <Button size="icon-sm" variant="outline" title="새 파트너" aria-label="새 파트너">
+              <IconPlus />
+            </Button>
+          )
         }
       />
       <DialogContent>
