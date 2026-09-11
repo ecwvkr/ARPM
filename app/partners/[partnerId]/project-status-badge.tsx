@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { updateProjectStatus, reopenProject } from "@/app/actions/projects";
 import { ProjectCompleteDialog } from "./project-complete-dialog";
-import { STATUS_LABEL } from "@/lib/priority";
+import { STATUS_LABEL, STATUS_BADGE_CLASS } from "@/lib/priority";
 
 type Status = "TODO" | "IN_PROGRESS" | "DONE";
 const STATUSES: Status[] = ["TODO", "IN_PROGRESS", "DONE"];
@@ -42,7 +42,7 @@ export function ProjectStatusBadge({ projectId, status }: { projectId: string; s
         <PopoverTrigger
           render={
             <button type="button" disabled={isPending} className="pointer-events-auto">
-              <Badge variant={status === "DONE" ? "secondary" : "default"} className="cursor-pointer">
+              <Badge variant="outline" className={`cursor-pointer ${STATUS_BADGE_CLASS[status]}`}>
                 {STATUS_LABEL[status]}
               </Badge>
             </button>

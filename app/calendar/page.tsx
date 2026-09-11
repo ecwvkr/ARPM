@@ -5,6 +5,8 @@ import { buildParticipantChips } from "@/lib/priority";
 import { getSyncedGoogleEvents } from "@/lib/google/calendar";
 import { WidthContainer } from "@/components/width-container";
 import { AppHeader } from "@/components/app-header";
+import { RememberView } from "@/components/remember-view";
+import { withRememberedView } from "@/lib/view-prefs";
 import { CalendarView } from "./calendar-view";
 
 export default async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
@@ -12,13 +14,16 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   if (!session?.user?.id) return null;
 
   const userId = session.user.id;
-  const params = await searchParams;
+  // 주소에 뷰가 안 적혀 있으면 이 계정이 마지막에 보던 설정으로 되살린다.
+  const params = await withRememberedView(userId, "calendar", await searchParams);
   const today = new Date();
   const initialDate =
     typeof params.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.d)
       ? params.d
       : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const initialView = params.v === "day" ? "day" : "month";
+  // done=0이면 완료 숨김이 켜진 상태로 들어온다(주소에 없으면 모두 보여 준다).
+  const initialHideDone = params.done === "0";
 
   // ponytail: 매 이동마다 다시 조회하는 완전한 실시간 대신, 초기 진입일 기준 앞뒤로
   // 넉넉한 창을 한 번에 읽어온다 — prev/next 몇 번 누르는 일반적인 탐색은 이걸로 충분하고,
@@ -60,12 +65,14 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
         <CalendarView
           initialDate={initialDate}
           initialView={initialView}
+          initialHideDone={initialHideDone}
           projects={calendarProjects}
           googleEvents={googleEvents}
           currentUserId={userId}
           partners={partners.map((p) => ({ id: p.id, name: p.name }))}
         />
       </WidthContainer>
+      <RememberView section="calendar" />
     </div>
   );
 }

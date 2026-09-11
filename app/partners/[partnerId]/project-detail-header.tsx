@@ -14,7 +14,7 @@ import { Linkify } from "@/components/linkify";
 import { ProjectParentPicker } from "@/components/project-parent-picker";
 import { DeriveDialog } from "./project-derive-dialog";
 import { showToast } from "@/components/ui/global-toast";
-import { STATUS_LABEL, isOverdue } from "@/lib/priority";
+import { STATUS_LABEL, STATUS_BADGE_CLASS, isOverdue } from "@/lib/priority";
 import { IconPencil, IconCheck, IconX, IconLink, IconPlus, IconCopy } from "@tabler/icons-react";
 
 export function ProjectDetailHeader({
@@ -82,7 +82,7 @@ export function ProjectDetailHeader({
           {isNew && <Badge variant="destructive">신규</Badge>}
           {isEdited && <Badge variant="outline">수정됨</Badge>}
           <h2 className="text-lg font-bold">{project.title}</h2>
-          <Badge variant={project.status === "DONE" ? "secondary" : "default"}>
+          <Badge variant="outline" className={STATUS_BADGE_CLASS[project.status]}>
             {STATUS_LABEL[project.status]}
           </Badge>
           {overdue && <Badge variant="destructive">지연</Badge>}

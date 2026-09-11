@@ -83,6 +83,13 @@ export default async function PartnerDetailPage({
               {partner.visibility === "PUBLIC" ? "공개" : "비공개"}
             </Badge>
             {hidden && <Badge variant="destructive">보관됨</Badge>}
+            {/* 설정(⋮)은 어느 파트너의 설정인지 바로 보이도록 이름 옆에 붙인다. */}
+            <PartnerSettingsDialog
+              partner={{ ...partner, members }}
+              isOwner={isOwner}
+              canDelete={(isOwner || !!session.user.isSuperAdmin) && !hidden}
+            />
+            {hidden && (isOwner || session.user.isSuperAdmin) && <AdminControls partnerId={partner.id} />}
           </span>
         }
       >
@@ -93,12 +100,6 @@ export default async function PartnerDetailPage({
             requested={pendingRequest?.status === "PENDING"}
           />
         )}
-        <PartnerSettingsDialog
-          partner={{ ...partner, members }}
-          isOwner={isOwner}
-          canDelete={(isOwner || !!session.user.isSuperAdmin) && !hidden}
-        />
-        {hidden && (isOwner || session.user.isSuperAdmin) && <AdminControls partnerId={partner.id} />}
       </AppHeader>
 
       <WidthContainer mainClassName="space-y-8 px-6 py-6">

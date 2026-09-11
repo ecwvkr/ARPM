@@ -51,6 +51,7 @@ model User {
   createdNotices       Notice[]           @relation("NoticeAuthor")
   editedNotices        Notice[]           @relation("NoticeEditor")
   createdPartnerLinks  PartnerLink[]
+  viewPreferences      ViewPreference[]
 }
 
 model Partner {
@@ -500,4 +501,22 @@ model PartnerLink {
   // 한 파트너의 카드를 만든 순서대로 읽는다.
   @@index([partnerId, createdAt])
   @@index([createdById])
+}
+
+// 화면마다 마지막에 고른 보기 설정. 탭을 다시 열면 지난번 그대로 나오게 한다.
+// 브라우저가 아니라 계정에 붙는다 — 한 기기를 여럿이 쓰거나 기기를 옮겨도 따라간다.
+//
+// value에는 그 화면에서 기억할 주소 조각만 담는다(예: "view=status"). 검색어나
+// 보고 있던 날짜처럼 매번 달라지는 것은 담지 않는다 — lib/view-prefs.ts가 화면별로
+// 기억할 항목을 정한다.
+model ViewPreference {
+  userId String
+  // 화면 이름: projects | tasks | comments | calendar
+  key    String
+  value  String
+
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, key])
 }

@@ -361,13 +361,16 @@ function AccordionSection({
 export function CalendarView({
   initialDate,
   initialView,
-  projects,
+  initialHideDone = false,
+  projects: allProjects,
   googleEvents,
   currentUserId,
   partners,
 }: {
   initialDate: string;
   initialView: CalendarView;
+  /** 완료된 프로젝트를 숨긴 채로 들어올지 — 마지막에 고른 설정을 서버가 넘겨 준다. */
+  initialHideDone?: boolean;
   projects: CalendarProject[];
   googleEvents: CalendarGoogleEvent[];
   currentUserId: string;
@@ -375,6 +378,9 @@ export function CalendarView({
 }) {
   const router = useRouter();
   const [view, setView] = useState<CalendarView>(initialView);
+  // 끝난 일까지 달력에 남아 있으면 지금 할 일이 묻힌다. 껐다 켰다 할 수 있게 둔다.
+  // 구글 일정에는 '완료'가 없으므로 프로젝트에만 적용된다.
+  const [hideDone, setHideDone] = useState(initialHideDone);
   const [cursor, setCursor] = useState(() => new Date(`${initialDate}T00:00:00`));
   const [selectedKey, setSelectedKey] = useState(initialDate);
   const [hover, setHover] = useState<HoverInfo>(null);
@@ -385,10 +391,16 @@ export function CalendarView({
   const [isMoving, startMove] = useTransition();
 
   const cursorKey = dateKey(cursor);
+  const projects = useMemo(
+    () => (hideDone ? allProjects.filter((p) => p.status !== "DONE") : allProjects),
+    [allProjects, hideDone],
+  );
 
+  // 지금 보고 있는 설정을 주소에 적어 둔다. 새로고침·뒤로가기에서 그대로 돌아오고,
+  // 다음 진입 때 이 화면의 마지막 설정으로 되살릴 근거가 된다(components/remember-view).
   useEffect(() => {
-    router.replace(`/calendar?v=${view}&d=${cursorKey}`, { scroll: false });
-  }, [view, cursorKey, router]);
+    router.replace(`/calendar?v=${view}&d=${cursorKey}&done=${hideDone ? "0" : "1"}`, { scroll: false });
+  }, [view, cursorKey, hideDone, router]);
 
   const itemsByDate = useMemo(() => {
     const map = new Map<string, DayItem[]>();
@@ -518,6 +530,18 @@ export function CalendarView({
             {v.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setHideDone((v) => !v)}
+          aria-pressed={hideDone}
+          className={
+            hideDone
+              ? "rounded-full bg-foreground px-3 py-1 font-medium text-background"
+              : "rounded-full bg-muted px-3 py-1 text-muted-foreground"
+          }
+        >
+          완료 숨김
+        </button>
         <button
           type="button"
           onClick={goToday}

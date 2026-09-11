@@ -5,6 +5,8 @@ import { toCommentFilter, COMMENT_FILTERS } from "@/lib/comment-filters";
 import { listAllUsers } from "@/app/actions/users";
 import { WidthContainer } from "@/components/width-container";
 import { AppHeader } from "@/components/app-header";
+import { RememberView } from "@/components/remember-view";
+import { withRememberedView } from "@/lib/view-prefs";
 import { ProjectDeepLink } from "@/app/partners/[partnerId]/project-deep-link";
 import { CommentList } from "./comment-list";
 import { CommentFilters } from "./filters";
@@ -16,7 +18,8 @@ export default async function CommentsPage({ searchParams }: PageProps<"/comment
   const userId = session.user.id;
   const myName = session.user.name ?? "";
   const isSuperAdmin = !!session.user.isSuperAdmin;
-  const params = await searchParams;
+  // 주소에 필터·보기가 안 적혀 있으면 이 계정이 마지막에 보던 설정으로 되살린다.
+  const params = await withRememberedView(userId, "comments", await searchParams);
 
   const filter = toCommentFilter(typeof params.filter === "string" ? params.filter : undefined);
   // 기본은 묶어보기 — 한 프로젝트의 이야기가 목록 곳곳에 흩어지지 않는 쪽이 훑기 좋다.
@@ -48,6 +51,7 @@ export default async function CommentsPage({ searchParams }: PageProps<"/comment
 
       {/* 코멘트를 누르면 ?project= 가 붙고 여기서 상세 창을 연다(프로젝트 카드와 같은 창). */}
       <ProjectDeepLink />
+      <RememberView section="comments" />
     </div>
   );
 }

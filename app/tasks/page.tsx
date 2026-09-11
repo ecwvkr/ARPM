@@ -5,6 +5,8 @@ import { listGroupedTasksForUser, flattenGroupedTasks } from "@/lib/tasks";
 import { listAllUsers } from "@/app/actions/users";
 import { WidthContainer } from "@/components/width-container";
 import { AppHeader } from "@/components/app-header";
+import { RememberView } from "@/components/remember-view";
+import { withRememberedView } from "@/lib/view-prefs";
 import { TaskFilters } from "./filters";
 import { TaskListView } from "./task-list-view";
 import { TaskBoardView } from "./task-board-view";
@@ -25,7 +27,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const params = await searchParams;
+  // 주소에 뷰가 안 적혀 있으면 이 계정이 마지막에 보던 뷰로 되살린다.
+  const params = await withRememberedView(session.user.id, "tasks", await searchParams);
   const selectedPartnerIds = toArray(typeof params.partners === "string" ? params.partners : undefined);
   const q = typeof params.q === "string" ? params.q : undefined;
   // 기본은 보드 뷰. 태스크는 어느 프로젝트 것인지가 중요해서 묶어 보는 편이 훑기 쉽다.
@@ -79,6 +82,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/tasks">) {
           <TaskBoardView partners={grouped} />
         )}
       </WidthContainer>
+      <RememberView section="tasks" />
     </div>
   );
 }

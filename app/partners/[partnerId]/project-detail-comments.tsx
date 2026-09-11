@@ -214,7 +214,14 @@ function CommentForm({
           name="body"
           value={body}
           onChange={handleChange}
-          placeholder="코멘트를 입력하세요 (@로 멘션)"
+          onKeyDown={(e) => {
+            // 코멘트는 여러 줄로 쓰는 일이 많아 엔터는 줄바꿈으로 둔다. 대신
+            // Ctrl(맥은 Cmd)+엔터로 바로 등록할 수 있게 한다.
+            if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+            e.preventDefault();
+            e.currentTarget.form?.requestSubmit();
+          }}
+          placeholder="코멘트를 입력하세요 (@로 멘션, Ctrl+Enter로 등록)"
           rows={2}
           required
         />

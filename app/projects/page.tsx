@@ -14,6 +14,8 @@ import { listAllUsers } from "@/app/actions/users";
 import { ProjectFilters } from "./filters";
 import { WidthContainer } from "@/components/width-container";
 import { AppHeader } from "@/components/app-header";
+import { RememberView } from "@/components/remember-view";
+import { withRememberedView } from "@/lib/view-prefs";
 import { CreateButton } from "@/components/create-button";
 import { chipClass, toArray } from "@/lib/ui";
 
@@ -39,7 +41,8 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const params = await searchParams;
+  // 주소에 뷰가 안 적혀 있으면 이 계정이 마지막에 보던 뷰로 되살린다.
+  const params = await withRememberedView(session.user.id, "projects", await searchParams);
   // partnerId(단수)는 워크플로우 뷰의 파트너 전환 전용. 리스트·보드 뷰의 파트너 필터는
   // 다중 선택이라 별도 파라미터(partners, comma-join)를 쓴다.
   const partnerId = typeof params.partnerId === "string" ? params.partnerId : undefined;
@@ -209,6 +212,7 @@ export default async function AllProjectsPage({ searchParams }: PageProps<"/proj
           </>
         )}
       </WidthContainer>
+      <RememberView section="projects" />
     </div>
   );
 }

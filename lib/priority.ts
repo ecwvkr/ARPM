@@ -16,6 +16,18 @@ export const STATUS_LABEL: Record<string, string> = {
   DONE: "완료",
 };
 
+// 상태마다 색을 달리한다. 예전에는 진행전과 진행중이 같은 색이라 배지만 봐서는
+// 어느 쪽인지 구분이 안 됐다.
+//   진행전  테두리만 — 아직 손대지 않은 것
+//   진행중  가장 진하게 — 지금 도는 일이 먼저 눈에 띄어야 한다
+//   완료    초록 — 끝난 것은 색으로 바로 구분되고, 진한 색과 헷갈리지 않는다
+// Badge의 outline을 바탕으로 덮어쓴다(비어 있으면 outline 그대로).
+export const STATUS_BADGE_CLASS: Record<string, string> = {
+  TODO: "",
+  IN_PROGRESS: "border-transparent bg-primary text-primary-foreground",
+  DONE: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+};
+
 // 대시보드 프로젝트 목록의 기본 노출 순서: 진행중 -> 진행전 -> 완료
 export const STATUS_ORDER: Record<string, number> = {
   IN_PROGRESS: 0,

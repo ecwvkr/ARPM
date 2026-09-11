@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { IconLayoutGrid, IconChecklist, IconListCheck, IconBuilding, IconCalendar, IconMessage } from "@tabler/icons-react";
 import { getRecentPartner, subscribeRecentPartner } from "@/lib/recent-partner";
 import { useSavedToast } from "@/components/ui/saved-toast";
@@ -21,11 +21,43 @@ const NAV_ITEM_CLASS =
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const recentPartner = useSyncExternalStore(subscribeRecentPartner, getRecentPartner, getServerSnapshot);
   const { toast, trigger: showNoPartnerToast } = useSavedToast("대시보드에서 파트너를 먼저 선택해 주세요");
 
   const partnerActive = pathname.startsWith("/partners/");
   const partnerLabel = recentPartner ? `파트너(${abbreviatePartnerName(recentPartner.name)})` : "파트너";
+
+  // 탭 순서대로 좌우 화살표로 옮겨 다닌다. 키보드를 쓰는 동안 손을 떼지 않아도 된다.
+  const order = useMemo(
+    () => ["/", recentPartner ? `/partners/${recentPartner.id}` : null, "/projects", "/tasks", "/comments", "/calendar"],
+    [recentPartner],
+  );
+  const currentIndex = order.findIndex((href) =>
+    href === "/" ? pathname === "/" : !!href && pathname.startsWith(href.split("?")[0]),
+  );
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      // 글을 쓰는 중이거나 조합키를 누른 상태면 화살표는 그쪽 몫이다. 이걸 안 보면
+      // 코멘트를 쓰다가 커서를 옮기는 순간 다른 탭으로 튄다.
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      // 창이 떠 있으면(상세·설정 등) 그 안에서 쓰는 화살표일 수 있다.
+      if (document.querySelector('[data-slot="dialog-content"], [role="dialog"]')) return;
+
+      if (currentIndex < 0) return;
+      const next = order[currentIndex + (e.key === "ArrowRight" ? 1 : -1)];
+      if (!next) return;
+      e.preventDefault();
+      router.push(next);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentIndex, order, router]);
 
   return (
     <>
@@ -52,10 +84,10 @@ export function BottomNav() {
 
           <NavLink label="전체 프로젝트" href="/projects" Icon={IconChecklist} active={pathname.startsWith("/projects")} />
           <NavLink label="태스크" href="/tasks" Icon={IconListCheck} active={pathname.startsWith("/tasks")} />
-          <NavLink label="캘린더" href="/calendar" Icon={IconCalendar} active={pathname.startsWith("/calendar")} />
           {/* 설정은 상단 로고 메뉴로 옮겼다(components/app-logo-menu.tsx) — 자주 쓰지
               않는데 탭 하나를 차지하고 있었다. 그 자리에 코멘트를 둔다. */}
           <NavLink label="코멘트" href="/comments" Icon={IconMessage} active={pathname.startsWith("/comments")} />
+          <NavLink label="캘린더" href="/calendar" Icon={IconCalendar} active={pathname.startsWith("/calendar")} />
         </ul>
       </nav>
       {toast}
