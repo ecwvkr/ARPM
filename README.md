@@ -114,12 +114,16 @@ npx next build
 | `npm run check:crop` | 없음 | 프로필 사진 자르기 계산 |
 | `npm run check:linkify` | 없음 | 주소 자동 링크·멘션 칩 |
 | `npm run check:date-input` | 없음 | 날짜 입력 범위·없는 날짜 거부, 날짜 칸이 공용 Input을 쓰는지 |
+| `npm run check:login` | 없음 | 로그인 잠금: 5번째 실패에 잠금, 잠긴 동안 맞는 비밀번호 거절, 15분 뒤 해제, 성공 시 초기화 |
+| `npm run check:trash` | 없음 | 보관함 자동 삭제일과 화면의 남은 날짜가 일치, 기능 시작 전 보관분 유예 |
+
+DB가 "없음"인 검사와 타입·린트·빌드는 **GitHub Actions CI**(`.github/workflows/ci.yml`)가 푸시마다 돌립니다. DB 검사는 운영 DB라 CI에 넣지 않았습니다.
 
 ## 배포
 
 - `master`에 푸시하면 Vercel이 자동 배포합니다.
 - 함수 리전은 `vercel.json`에서 **서울(`icn1`)로 고정**합니다. DB가 서울이라 다른 리전이면 왕복마다 약 200ms가 붙습니다(대시보드 5.9초 → 0.16초의 원인이었음).
-- 크론: `vercel.json`의 `/api/cron/deadlines`, 매일 02:00 UTC(= 11:00 KST). Hobby 플랜은 크론 2개까지, 하루 1회까지입니다.
+- 크론: `vercel.json`의 `/api/cron/deadlines`, 매일 02:00 UTC(= 11:00 KST). 기한·캘린더 알림, 오래된 알림 정리, **보관함 30일 자동 삭제**를 한 번에 합니다. Hobby 플랜은 크론 2개까지, 하루 1회까지입니다.
 - 앱 아이콘을 바꾸면 `npm run generate:icons`로 192/512 PNG를 다시 만듭니다.
 
 ## 폴더 구조

@@ -1,8 +1,14 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/normalize";
+import { isLoginLocked, lockAfterFailure } from "@/lib/login-throttle";
+
+// 잠긴 계정. 로그인 화면이 code로 일반 실패와 구분해 안내한다(app/login/actions.ts).
+class LoginLocked extends CredentialsSignin {
+  code = "locked";
+}
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   session: { strategy: "jwt" },
@@ -24,8 +30,35 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.isActive) return null;
 
+        // 잠금은 비밀번호를 비교하기 전에 본다. 잠긴 동안 맞는 비밀번호를 받아 주면
+        // 대입하는 쪽이 "잠김"과 "통과"로 정답을 알아챌 수 있다.
+        const now = Date.now();
+        if (isLoginLocked(user.loginLockedUntil, now)) throw new LoginLocked();
+
         const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          const { failedLoginCount } = await prisma.user.update({
+            where: { id: user.id },
+            data: { failedLoginCount: { increment: 1 } },
+            select: { failedLoginCount: true },
+          });
+          const lockUntil = lockAfterFailure(failedLoginCount, now);
+          if (lockUntil) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { failedLoginCount: 0, loginLockedUntil: lockUntil },
+            });
+            throw new LoginLocked();
+          }
+          return null;
+        }
+
+        if (user.failedLoginCount > 0 || user.loginLockedUntil) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { failedLoginCount: 0, loginLockedUntil: null },
+          });
+        }
 
         return {
           id: user.id,

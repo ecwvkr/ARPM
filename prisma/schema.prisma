@@ -24,7 +24,9 @@ model User {
   isActive            Boolean   @default(true) // false = 비활성화(퇴사 등) — 로그인 불가, 참여자 선택 목록에서 제외
   accentColor         String?
   createdAt           DateTime  @default(now())
-  lastDeadlineCheckAt DateTime? // 마감 임박/지연 알림 점검을 마지막으로 실행한 시각(대시보드 로드마다 재점검하지 않기 위한 쓰로틀)
+  lastDeadlineCheckAt DateTime? // 더 이상 쓰지 않음(2026-10-14, 대시보드 기한 점검 제거). 운영 코드가 바뀐 뒤 다음 마이그레이션 때 삭제
+  failedLoginCount    Int       @default(0) // 연속 로그인 실패 횟수. 성공하거나 잠기면 0으로(lib/login-throttle.ts)
+  loginLockedUntil    DateTime? // 이 시각 전까지는 맞는 비밀번호로도 로그인할 수 없다
 
   ownedPartners        Partner[]          @relation("PartnerOwner")
   partnerMemberships   PartnerMember[]

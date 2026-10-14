@@ -74,7 +74,12 @@ export async function resetUserPassword(userId: string, _prevState: string | und
   if (newPassword.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  // 로그인 잠금도 함께 푼다 — 잠긴 사람이 관리자에게 초기화를 요청하는 것이 잠금
+  // 안내문이 알려 주는 해결 방법이다(lib/login-throttle.ts).
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, failedLoginCount: 0, loginLockedUntil: null },
+  });
 }
 
 export async function toggleUserSuperAdmin(userId: string) {

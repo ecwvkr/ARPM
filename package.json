@@ -21,7 +21,9 @@
     "check:linkify": "node node_modules/tsx/dist/cli.mjs scripts/check-linkify.tsx",
     "check:date-input": "node node_modules/tsx/dist/cli.mjs scripts/check-date-input.ts",
     "check:partner-link": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-partner-link.ts",
-    "check:comments": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-comments.ts"
+    "check:comments": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/check-comments.ts",
+    "check:login": "node node_modules/tsx/dist/cli.mjs scripts/check-login-throttle.ts",
+    "check:trash": "node node_modules/tsx/dist/cli.mjs scripts/check-trash.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

@@ -106,7 +106,9 @@ async function TrashPanel({ userId, isSuperAdmin }: { userId: string; isSuperAdm
     listTrashedPartners(userId, isSuperAdmin),
     listTrashedProjects(userId, isSuperAdmin),
   ]);
-  return <TrashSection partners={partners} projects={projects} />;
+  // 남은 날짜를 셀 기준 시각을 서버에서 한 번 정해 넘긴다. 브라우저에서 따로 재면 서버
+  // 렌더와 값이 갈릴 수 있다(하이드레이션 불일치).
+  return <TrashSection partners={partners} projects={projects} now={new Date().getTime()} />;
 }
 
 async function UserPanel() {

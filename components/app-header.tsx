@@ -1,12 +1,13 @@
 import { AppLogoMenu } from "@/components/app-logo-menu";
 import { NotificationBell } from "@/app/notification-bell";
+import { GlobalSearch } from "@/components/global-search";
 
 // 모든 화면이 쓰는 상단 바. 예전에는 화면마다 헤더를 따로 짜서 알림 종의 위치와
 // 곁에 붙는 버튼이 제각각이었다.
 //
 // 자리를 고정한다.
 //   왼쪽  앱 아이콘(설정·로그아웃 메뉴) + 제목
-//   오른쪽 화면별 동작(children) + 알림 종
+//   오른쪽 화면별 동작(children) + 전체 검색 + 알림 종
 //
 // 만들기 버튼(새 파트너·새 프로젝트)은 여기 두지 않는다 — 만들 대상이 놓인 목록
 // 바로 위에 있어야 무엇이 만들어지는지 헷갈리지 않는다.
@@ -32,6 +33,7 @@ export function AppHeader({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {children}
+          <GlobalSearch />
           <NotificationBell />
         </div>
       </div>

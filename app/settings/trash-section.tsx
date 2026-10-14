@@ -5,6 +5,7 @@ import { restorePartner, hardDeletePartner } from "@/app/actions/partners";
 import { restoreProject, hardDeleteProject } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TRASH_RETENTION_DAYS, trashDaysLeft } from "@/lib/trash";
 
 type TrashedPartner = { id: string; name: string; color: string | null; deletedAt: Date | null };
 type TrashedProject = {
@@ -48,6 +49,7 @@ function TrashRow({
   title,
   subtitle,
   deletedAt,
+  now,
   onRestore,
   onHardDelete,
 }: {
@@ -55,6 +57,7 @@ function TrashRow({
   title: string;
   subtitle?: string;
   deletedAt: Date | null;
+  now: number;
   onRestore: () => void;
   onHardDelete: (formData: FormData) => void;
 }) {
@@ -69,6 +72,7 @@ function TrashRow({
           <p className="text-xs text-muted-foreground">
             {subtitle && `${subtitle} · `}
             {deletedAt && new Date(deletedAt).toLocaleDateString("ko-KR")} 보관
+            {deletedAt && <DaysLeft deletedAt={new Date(deletedAt)} now={now} />}
           </p>
         </div>
       </div>
@@ -88,12 +92,27 @@ function TrashRow({
   );
 }
 
+// 크론이 영구 삭제하는 날까지 남은 날짜. 규칙은 크론과 같은 lib/trash.ts를 쓴다 —
+// 화면의 날짜와 실제로 지워지는 날이 어긋나면 안 된다. 일주일 안으로 들어오면 붉게 둔다.
+function DaysLeft({ deletedAt, now }: { deletedAt: Date; now: number }) {
+  const days = trashDaysLeft(deletedAt, now);
+  return (
+    <span className={days <= 7 ? "text-destructive" : undefined}>
+      {" · "}
+      {days === 0 ? "오늘 자동 삭제" : `${days}일 후 자동 삭제`}
+    </span>
+  );
+}
+
 export function TrashSection({
   partners,
   projects,
+  now,
 }: {
   partners: TrashedPartner[];
   projects: TrashedProject[];
+  /** 남은 날짜를 셀 기준 시각(서버에서 정해 넘긴다) */
+  now: number;
 }) {
   if (partners.length === 0 && projects.length === 0) {
     return <p className="text-sm text-muted-foreground">보관함이 비어 있습니다.</p>;
@@ -101,6 +120,9 @@ export function TrashSection({
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        보관한 지 {TRASH_RETENTION_DAYS}일이 지나면 매일 오전 11시에 자동으로 영구 삭제됩니다. 필요한 것은 그 전에 복구하세요.
+      </p>
       {partners.length > 0 && (
         <div className="space-y-1.5">
           <h3 className="text-xs font-medium text-muted-foreground">보관된 파트너 ({partners.length})</h3>
@@ -111,6 +133,7 @@ export function TrashSection({
                 color={p.color}
                 title={p.name}
                 deletedAt={p.deletedAt}
+                now={now}
                 onRestore={() => restorePartner(p.id)}
                 onHardDelete={(formData) => hardDeletePartner(p.id, undefined, formData)}
               />
@@ -129,6 +152,7 @@ export function TrashSection({
                 title={t.title}
                 subtitle={t.partner.name}
                 deletedAt={t.deletedAt}
+                now={now}
                 onRestore={() => restoreProject(t.id)}
                 onHardDelete={(formData) => hardDeleteProject(t.id, undefined, formData)}
               />

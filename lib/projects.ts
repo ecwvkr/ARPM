@@ -361,6 +361,20 @@ export type ProjectListFilters = {
   sort?: ProjectSort;
 };
 
+// 프로젝트 검색어 판정: 이름, 담당자·참여자 이름. 전체 프로젝트 화면의 검색창과 상단 바의
+// 전체 검색(app/actions/search.ts)이 같이 쓴다 — 두 곳의 결과가 달라지면 안 된다.
+export function projectMatchesQuery(
+  t: { title: string; master: { name: string }; participants: { user: { name: string } }[] },
+  query: string,
+) {
+  const q = query.toLowerCase();
+  return (
+    t.title.toLowerCase().includes(q) ||
+    t.master.name.toLowerCase().includes(q) ||
+    t.participants.some((p) => p.user.name.toLowerCase().includes(q))
+  );
+}
+
 export async function listAllProjectsForUser(
   userId: string,
   isSuperAdmin: boolean,
@@ -403,13 +417,8 @@ export async function listProjectsForPartners(
     projects = projects.filter((t) => filters.statuses!.includes(t.status));
   }
   if (filters.q) {
-    const q = filters.q.toLowerCase();
-    projects = projects.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.master.name.toLowerCase().includes(q) ||
-        t.participants.some((p) => p.user.name.toLowerCase().includes(q)),
-    );
+    const q = filters.q;
+    projects = projects.filter((t) => projectMatchesQuery(t, q));
   }
   if (filters.assigneeIds?.length) {
     projects = projects.filter(

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { listVisiblePartnersWithUnread, type PartnerSort } from "@/lib/partners";
 import { listAllProjectsForUser, isProjectUnread } from "@/lib/projects";
-import { ensureDeadlineNotifications } from "@/lib/notifications";
 import { listNotices } from "@/lib/notices";
 import { countCommentSummary } from "@/lib/comments";
 import { NoticeSection } from "@/components/notice-section";
@@ -33,16 +32,24 @@ export default async function DashboardPage({
     params.sort === "name" || params.sort === "created" ? params.sort : "activity";
   const filter: PartnerFilter = params.filter === "joined" ? "joined" : "all";
 
-  // ponytail: 서로 의존하지 않는 네 조회(알림 점검·파트너 목록·내 프로젝트·전체 프로젝트)를
-  // 순차 대기 대신 한 번에 날려 왕복 시간을 줄인다.
-  const [, allPartners, myProjects, allProjects, notices] = await Promise.all([
-    ensureDeadlineNotifications(userId),
+  // 서로 의존하지 않는 조회(파트너 목록·전체 프로젝트·공지)를 한 번에 날린다.
+  //
+  // 기한 알림 점검은 여기서 하지 않는다 — 매일 11시 크론(app/api/cron/deadlines)이 전원을
+  // 훑는다. 대시보드 자체가 '오늘/이번주 마감'을 보여 주므로 화면을 연 사람에게 벨까지
+  // 다시 만들어 줄 이유가 없었고, 그 점검이 대시보드를 열 때마다 조회를 더하고 있었다.
+  const [allPartners, allProjects, notices] = await Promise.all([
     listVisiblePartnersWithUnread(userId, isSuperAdmin, sort),
-    listAllProjectsForUser(userId, isSuperAdmin, { assigneeIds: [userId] }),
     listAllProjectsForUser(userId, isSuperAdmin, {}),
     // 전체공지는 누구에게나 같은 내용이라 권한 조회 없이 그대로 읽는다(lib/notices.ts).
     listNotices(null),
   ]);
+
+  // 내 프로젝트(담당자이거나 참여 중)는 전체 목록에서 갈라낸다. 예전에는 담당자 필터를 건
+  // 같은 조회를 한 번 더 돌렸는데, 그 필터도 결국 조회 뒤 메모리에서 거르는 것이라
+  // (lib/projects.ts의 assigneeIds) 결과가 같고 DB 왕복만 두 배였다.
+  const isMine = (t: (typeof allProjects)[number]) =>
+    t.masterId === userId || t.participants.some((p) => p.userId === userId);
+  const myProjects = allProjects.filter(isMine);
 
   // 개인별 숨김(D2)·즐겨찾기는 같은 조회 결과에서 갈라낸다 — 별도 쿼리 없이 한 번에 온
   // 목록을 화면에서 두 묶음(안 숨김/숨김)으로 나누고, 각 묶음 안에서는 즐겨찾기를 맨 위로.
@@ -63,9 +70,7 @@ export default async function DashboardPage({
   const activeProjects = allProjects.filter(
     (t) => joinedPartnerIds.has(t.partnerId) && t.status !== "DONE",
   );
-  const myActiveProjectCount = activeProjects.filter(
-    (t) => t.masterId === userId || t.participants.some((p) => p.userId === userId),
-  ).length;
+  const myActiveProjectCount = activeProjects.filter(isMine).length;
 
   // 코멘트 요약 카드 2종. 이미 읽어 온 프로젝트 목록을 그대로 넘겨 같은 조회를
   // 반복하지 않는다(무료 플랜의 병목은 호출 수다).

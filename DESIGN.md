@@ -161,7 +161,7 @@ Effectively monochrome at rest: one neutral ramp from white to near-black carrie
 
 - **Fixed max width.** Content, header and bottom nav all cap at `max-w-5xl` (1024px), centered. The old 넓게/패드/폰 width toggle was removed on 2026-08-07 at the user's request.
 - **Card grids:** two columns even on phones (project and partner cards), three to four on wider screens. Titles in narrow cards use `break-keep` + `[overflow-wrap:anywhere]` + `line-clamp-2` so long Korean names neither break per character nor overflow.
-- **Top bar (`AppHeader`)** on every authenticated screen: left = app-icon logo menu (설정 · 로그아웃) + page title; right = page actions + notification bell, always in the same spot.
+- **Top bar (`AppHeader`)** on every authenticated screen: left = app-icon logo menu (설정 · 로그아웃) + page title; right = page actions + search (opens with Ctrl/Cmd+K) + notification bell, always in the same spot. Search and bell are the same 44px outline icon buttons.
 - **Create buttons (`CreateButton`)** sit directly above the list they add to, never in the top bar — "새 파트너" beside the 파트너 heading, "새 프로젝트" above project lists, "태스크 추가" above the task list.
 - **Bottom navigation**, six tabs in this order: 홈 · 파트너 · 전체 프로젝트 · 태스크 · 코멘트 · 캘린더. ←/→ arrow keys move between tabs (not while typing, holding a modifier, or with a dialog open).
 - **Chat** is a floating round button above the bottom nav, bottom-right.

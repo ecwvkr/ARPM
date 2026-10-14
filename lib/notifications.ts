@@ -3,7 +3,6 @@ import { KST_DUE_DAY_END_OFFSET_MS } from "@/lib/priority";
 import { pushNotifications, type NotifyItem } from "@/lib/notify";
 import { getSyncedGoogleEvents, seoulDateKey } from "@/lib/google/calendar";
 
-const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1시간에 한 번만 점검
 const NOTIFICATION_RETENTION_DAYS = 30;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -23,7 +22,7 @@ export function classifyDeadline(
 }
 
 // 한 사람 몫의 기한 임박(D-1)·지연 점검. 아직 없는 알림만 만들고, 새로 만든 것을
-// 돌려준다 — 푸시를 보낼지는 부르는 쪽이 정한다. 같은 타입+프로젝트당 한 번만 만든다.
+// 돌려준다 — 크론이 그것만 푸시로 보낸다. 같은 타입+프로젝트당 한 번만 만든다.
 async function scanDeadlines(userId: string, now: number): Promise<NotifyItem[]> {
   const projects = await prisma.project.findMany({
     where: {
@@ -66,40 +65,14 @@ async function scanDeadlines(userId: string, now: number): Promise<NotifyItem[]>
   return created;
 }
 
-// 대시보드를 열 때 도는 lazy 점검. 크론(sweepDeadlineNotifications)이 하루 한 번 도는
-// 것과 별개로, 크론이 못 돌거나 그 사이에 기한이 넘어간 경우를 위한 안전망이다.
-// 여기서는 푸시를 보내지 않는다 — 이 사람은 지금 화면을 보고 있어서 벨로 충분하다.
-// 매 로드마다 다시 훑지 않도록 User.lastDeadlineCheckAt으로 쓰로틀하고, 같은 주기에
-// 읽은 지 오래된 알림도 함께 정리한다.
-export async function ensureDeadlineNotifications(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { lastDeadlineCheckAt: true },
-  });
-  const now = Date.now();
-  if (user?.lastDeadlineCheckAt && now - user.lastDeadlineCheckAt.getTime() < CHECK_INTERVAL_MS) {
-    return;
-  }
-
-  await scanDeadlines(userId, now);
-
-  const retentionCutoff = new Date(now - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  await prisma.notification.deleteMany({
-    where: { userId, isRead: true, createdAt: { lt: retentionCutoff } },
-  });
-
-  // update가 아니라 updateMany를 쓴다. 세션은 살아있는데 계정이 삭제된 경우
-  // update는 레코드를 못 찾아 예외를 던지고, 그 예외가 대시보드 전체를 500으로
-  // 무너뜨렸다. 알림 점검 시각 기록은 실패해도 무방한 부수 작업이므로 조용히 넘어간다.
-  await prisma.user.updateMany({ where: { id: userId }, data: { lastDeadlineCheckAt: new Date(now) } });
-}
-
 // 크론(매일 한국시간 오전 11시)에서 도는 전체 점검. 대시보드를 열지 않아도 기한 알림이 가야
-// 하므로 여기서는 푸시까지 보낸다 — 앱을 열어야만 오는 알림은 마감 알림으로서
-// 쓸모가 없다.
+// 하므로 푸시까지 보낸다 — 앱을 열어야만 오는 알림은 마감 알림으로서 쓸모가 없다.
 //
-// 대시보드 lazy 점검이 이미 만든 알림은 여기서 다시 만들지 않으므로 푸시도 가지
-// 않는다. 화면에서 이미 본 것을 다시 울릴 이유가 없으니 그대로 둔다.
+// 예전에는 대시보드를 열 때도 같은 점검을 돌렸다(크론이 못 돌 때의 안전망). 크론이 매일
+// 정시에 도는 것을 알림 기록으로 확인한 뒤 없앴다 — 대시보드가 '오늘/이번주 마감'을
+// 이미 보여 주므로 그 점검은 화면을 연 사람에게 같은 내용을 벨로 한 번 더 줄 뿐이었고,
+// 대시보드를 열 때마다 조회가 붙었다. 크론이 멈추면 기한 알림도 멈춘다는 뜻이니,
+// CRON_SECRET을 바꿀 때는 Vercel 쪽 값도 함께 바꾼다.
 export async function sweepDeadlineNotifications() {
   const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true } });
   const now = Date.now();
@@ -117,7 +90,13 @@ export async function sweepDeadlineNotifications() {
   const calendarItems = await scanCalendarEvents(now);
   if (calendarItems.length > 0) pushNotifications(calendarItems);
 
-  return { users: users.length, created, calendar: calendarItems.length };
+  // 읽은 지 오래된 알림 정리. 예전에는 각자 대시보드를 열 때만 지워져서, 대시보드를 안
+  // 여는 사람의 알림은 계속 쌓였다. 읽지 않은 알림은 기간과 상관없이 남긴다.
+  const { count: purged } = await prisma.notification.deleteMany({
+    where: { isRead: true, createdAt: { lt: new Date(now - NOTIFICATION_RETENTION_DAYS * DAY_MS) } },
+  });
+
+  return { users: users.length, created, calendar: calendarItems.length, purged };
 }
 
 // 캘린더 일정 알림 ---------------------------------------------------------
