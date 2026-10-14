@@ -75,8 +75,8 @@
     {
       "name": "Status Badges",
       "kind": "chip",
-      "refersTo": "badge-status-open",
-      "description": "The Two-State Signal Rule, now in black instead of blue: open/closed are the only status colors; overdue is a separate, always-additional red badge.",
+      "refersTo": "badge-status-in-progress",
+      "description": "The Three-State Status Rule (since 2026-09-11): 진행전 outline, 진행중 filled black, 완료 soft green; overdue is a separate, always-additional red badge.",
       "html": "<div class=\"ds-badge-row\"><span class=\"ds-badge ds-badge-open\">진행중</span><span class=\"ds-badge ds-badge-closed\">종료</span><span class=\"ds-badge ds-badge-overdue\">지연</span></div>",
       "css": ".ds-badge-row { display: flex; gap: 6px; align-items: center; } .ds-badge { display: inline-flex; align-items: center; justify-content: center; height: 20px; padding: 2px 8px; border-radius: 22px; font-size: 12px; font-weight: 500; white-space: nowrap; } .ds-badge-open { background: #171717; color: #ffffff; } .ds-badge-closed { background: #f5f5f5; color: #171717; } .ds-badge-overdue { background: #e7000b; color: #ffffff; }"
     },
@@ -99,7 +99,7 @@
     {
       "name": "Bottom Navigation",
       "kind": "nav",
-      "refersTo": "badge-status-open",
+      "refersTo": "badge-status-in-progress",
       "description": "Unchanged layout, now with Tabler iconography app-wide (Lucide fully removed). Not-yet-built tabs render dimmed and inert rather than hidden.",
       "html": "<nav class=\"ds-bottom-nav\"><ul class=\"ds-bottom-nav-list\"><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-active\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"4\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"14\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"4\" y=\"14\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" rx=\"1\"/></svg>대시보드</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z\"/></svg>프로젝트</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"6\" cy=\"17\" r=\"2\"/><circle cx=\"12\" cy=\"7\" r=\"2\"/><circle cx=\"18\" cy=\"17\" r=\"2\"/><path d=\"M12 9v4M8 15.5 10.5 11M16 15.5 13.5 11\"/></svg>캔버스</a></li><li class=\"ds-bottom-nav-item\"><a href=\"#\" class=\"ds-bottom-nav-link ds-disabled\"><svg class=\"ds-bottom-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z\"/></svg>설정</a></li></ul></nav>",
       "css": ".ds-bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; border-top: 0.5px solid #e5e5e5; background: #ffffff; } .ds-bottom-nav-list { display: flex; align-items: stretch; justify-content: space-between; max-width: 768px; margin: 0 auto; list-style: none; padding: 0; } .ds-bottom-nav-item { flex: 1; } .ds-bottom-nav-link { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; font-size: 12px; color: #737373; text-decoration: none; } .ds-bottom-nav-link.ds-active { color: #0a0a0a; font-weight: 500; } .ds-bottom-nav-link.ds-disabled { color: rgba(115,115,115,0.4); cursor: not-allowed; } .ds-bottom-nav-icon { width: 20px; height: 20px; }"
@@ -107,7 +107,7 @@
   ],
   "narrative": {
     "northStar": "The Command Board",
-    "overview": "AR_PM reads less like a quiet ledger now and more like a control surface a team actually commands from: bold, tactile, confident. There is no colored brand hue anywhere in the system — the \"accent\" is simply the darkest point of one continuous black-to-white neutral ramp, so buttons, active status badges, and the logo mark are pure near-black rather than a tinted brand color. Containers — cards, dialogs, popovers, the task-detail sheet — now genuinely float: they carry real, soft shadows and generous rounding (22-26px), a deliberate move away from the earlier flat/hairline treatment. Controls — buttons, inputs, badges, checkboxes — stay flat and filled rather than shadowed, so the floating/flat distinction still tracks which components are \"surfaces\" versus \"instruments\" within them. Red is still the one true hue reserved exclusively for urgency; individual users can opt into a personal accent hue via Settings on top of the monochrome default.",
+    "overview": "AR_PM reads less like a quiet ledger now and more like a control surface a team actually commands from: bold, tactile, confident. There is no colored brand hue anywhere in the system — the \"accent\" is simply the darkest point of one continuous black-to-white neutral ramp, so buttons and the in-progress status badge are pure near-black rather than a tinted brand color. Containers — cards, dialogs, popovers, the task-detail sheet — now genuinely float: they carry real, soft shadows and generous rounding (22-26px), a deliberate move away from the earlier flat/hairline treatment. Controls — buttons, inputs, badges, checkboxes — stay flat and filled rather than shadowed, so the floating/flat distinction still tracks which components are \"surfaces\" versus \"instruments\" within them. Red is still the one true hue reserved exclusively for urgency; individual users can opt into a personal accent hue via Settings on top of the monochrome default.",
     "keyCharacteristics": [
       "No brand hue at rest — the primary \"accent\" is the black end of the neutral scale, not a separate color.",
       "Containers float (soft shadow + 22-26px rounding); controls stay flat and filled.",
@@ -117,7 +117,7 @@
     ],
     "rules": [
       { "name": "The No-Hue Accent Rule", "body": "The default \"brand color\" is not a color at all — it's black. Before adding an actual brand hue system-wide, add it through the existing per-user Settings override, not as a new hardcoded token.", "section": "colors" },
-      { "name": "The Two-State Signal Rule", "body": "Status badges show only two states: open (Console Black — covers both 진행전 and 진행중) and closed (Fog gray). Urgency is layered on separately via the standalone red 지연 badge.", "section": "colors" },
+      { "name": "The Three-State Status Rule", "body": "진행전 = outline only, 진행중 = filled Console Black, 완료 = soft green (STATUS_BADGE_CLASS in lib/priority.ts). Replaced the Two-State rule on 2026-09-11 because 진행전 and 진행중 were indistinguishable. Urgency is layered on separately via the standalone red 지연 badge.", "section": "colors" },
       { "name": "The Explicit-Fallback Rule", "body": "Never let --font-sans resolve to a font-only stack without an explicit non-Latin fallback appended — this system shipped broken once already before this fix.", "section": "typography" },
       { "name": "The Float-or-Flat Rule", "body": "Containers (Card/Dialog/Popover/Sheet) float with real shadow and generous rounding. Controls (Button/Input/Badge/Checkbox) stay flat — no shadow, ever. No in-between tier.", "section": "elevation" }
     ],
@@ -129,7 +129,7 @@
       "Do keep any font-stack change explicit about its non-Latin fallback."
     ],
     "donts": [
-      "Don't give 진행전 and 진행중 different status-badge colors — they intentionally share the \"open\" black.",
+      "Don't collapse 진행전 and 진행중 back into one color — the Two-State rule was retired on 2026-09-11.",
       "Don't add a shadow to Button, Input, Badge, or Checkbox — shadow is reserved for container-level surfaces only.",
 "Don't reintroduce a 0.5px hairline border anywhere in the app — every surface (project/task/summary/status-group cards, header, bottom nav, desktop width-toggle bar) has been moved to the shadow-based Float-or-Flat treatment. There are no remaining exceptions as of this pass."
     ]

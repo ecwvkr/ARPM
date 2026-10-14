@@ -2,68 +2,126 @@
 
 <!-- impeccable:product-schema 1 -->
 
+> 마지막 갱신: 2026-10-14. 무엇이 왜 바뀌었는지는 [`docs/HISTORY.md`](docs/HISTORY.md),
+> 처음 작업지시서는 [`docs/archive/BUILD-ORDER-v3.md`](docs/archive/BUILD-ORDER-v3.md)에 있습니다.
+
 ## Platform
 
-web
+web (모바일에서는 설치형 앱(PWA)으로도 씁니다)
 
 ## Users
 
-A small trusted team (tentative team name "All Rounders") who will actually use this tool for their own real project and task work — not a demo or portfolio piece. No public signup: accounts are issued directly in the database by an admin. Roles:
+가칭 "All Rounders" 팀원 4명이 실제 업무에 매일 씁니다. 데모나 포트폴리오가 아닙니다.
+**자유 가입은 없습니다.** 총관리자가 설정 > 사용자 관리에서 계정을 발급합니다.
 
-- **총관리자 (superadmin)** — platform-wide moderator; only one who can archive/hide or soft-delete projects, and the only one who can view hidden/deleted projects.
-- **Project owner** — creates a project, invites members, sets its public/private visibility.
-- **Project member / task participant** — works on tasks inside projects they belong to or have been granted access to.
-- **Task master** — the owner of a specific task; can edit it, set its visibility, invite participants with scoped sharing, delegate master, or hard-delete it.
-
-The seeded demo accounts (총관리자/admin, 김민수, 이서연 in `prisma/seed.ts`) stand in for real teammates who will use these accounts day to day, not throwaway test fixtures.
+| 역할 | 범위 | 할 수 있는 것 |
+|---|---|---|
+| **총관리자** | 앱 전체 | **모든 파트너·프로젝트·태스크를 보고 고치고 지울 수 있는 절대 권한.** 계정 발급·수정·비활성화·영구 삭제, 글로벌 설정, 구글 캘린더 연결, 단체 채팅방 생성. 마지막 남은 총관리자는 해제·비활성화할 수 없다. |
+| **파트너 관리자** (OWNER) | 파트너 하나 | 파트너 이름·색상·공개 범위·노출 여부, 멤버 초대·제외, 참여 신청 수락·거부, 관리자 위임 |
+| **파트너 멤버** | 파트너 하나 | 그 파트너의 프로젝트 생성·참여, 파트너 공지·바로가기 작성 |
+| **프로젝트 담당자** (master) | 프로젝트 하나 | 정보 수정, 공개 범위, 참여자 초대(하위 포함/이 프로젝트만), 담당자 위임 |
+| **참여자** (MEMBER) | 프로젝트 하나 + 상속된 하위 | 상태 변경, 완료, 기한 변경, 우선순위, 태스크, 코멘트 |
+| **조회 전용 참여자** (VIEWER) | 프로젝트 하나 + 상속된 하위 | 보기와 코멘트만 |
 
 ## Product Purpose
 
-A project/task management tool for a small trusted team to share and track work, built around one thing generic PM tools don't model: work that **derives** from other work (a task branching into sub-tasks, arbitrarily deep), and **private sharing that follows that branching structure automatically**.
+소규모 팀이 **거래처(파트너)별로 돌아가는 여러 프로젝트**를 함께 추적하는 도구입니다.
 
-Success looks like: team members always see what's due or overdue across their projects, a task master can share a private task with exactly the right people — including people who should also see whatever sub-tasks get created under it later, without manually re-granting access — and the superadmin can retire a project without ever losing its data.
+일반 PM 도구가 다루지 않는 두 가지가 중심입니다.
+1. 일이 다른 일에서 **파생**된다 — 프로젝트 아래 하위 프로젝트가 깊이 제한 없이 뻗는다.
+2. 비공개 공유가 그 **파생 구조를 자동으로 따라간다** — "이 지점 아래 전부" 공유하면, 나중에 생기는 하위 프로젝트도 다시 공유하지 않아도 보인다.
+
+성공의 모습:
+- 팀원 누구나 자기 관련 마감·지연·멘션을 놓치지 않는다(벨 + 푸시 + 매일 아침 점검).
+- 담당자는 비공개 프로젝트를 정확히 필요한 사람에게만, 앞으로 생길 하위까지 포함해 공유한다.
+- 무엇을 지워도 보관함에서 되살릴 수 있다.
 
 ## Positioning
 
-Two mechanisms a generic Trello/Asana-style board does not offer:
+일반 Trello/Asana식 보드에 없는 것:
 
-1. **Task derivation as a first-class graph.** Tasks form an unlimited-depth parent→child tree ("파생"), rendered as an interactive canvas (React Flow + dagre) alongside list/kanban/status-group views — the lineage of how work branched is visible, not just a flat backlog.
-2. **Read-time, self-propagating private sharing.** Access to a private task is computed on read from an ancestor-walk (nearest granting ancestor wins), not stored per node. Granting `includeSubtree=true` on a node means every task created under it later — even far in the future — is automatically visible to that person with no re-sharing step. A branch can also be selectively carved back out of a broader grant. Moving a task to a new parent re-evaluates its visibility from its new position.
+1. **파생 트리가 1급 구조.** 프로젝트는 무제한 깊이의 부모→자식 트리를 이루고, '워크플로우' 보기(React Flow + dagre)에서 가지가 어떻게 뻗었는지 그대로 보인다. 리스트·보드 보기는 같은 트리를 보는 다른 방식이다.
+2. **읽는 시점에 계산되는 상속 공유.** 접근 권한은 노드마다 저장하지 않고, 볼 때마다 조상을 거슬러 올라가 **가장 가까운 grant**로 판정한다.
+   - `includeSubtree=true`: 그 지점 아래 전부(앞으로 생길 것 포함)
+   - `includeSubtree=false`: 그 프로젝트만. 전체 공유 아래 특정 가지에 걸면 그 가지를 **빼는** 의미가 된다.
+   - 프로젝트를 다른 상위 아래로 옮기면 새 위치 기준으로 다시 판정된다.
 
 ## Operating Context
 
-- Korean-language UI; team communicates and works in Korean.
-- Invite-only accounts, provisioned directly in the DB — there is deliberately no signup UI or account-management screen.
-- One superadmin moderates project lifecycle (hide/soft-delete); soft-deleted and hidden projects stay queryable only by the superadmin, never by regular members.
-- Project owners manage membership and visibility; task masters manage everything at the task level (visibility, sharing scope, delegation, hard delete).
-- Used on both desktop and mobile in real usage — desktop has a 3-step width toggle (넓게/패드/폰) for the PC layout, mobile has a persistent bottom navigation bar.
-- Deployed on Vercel; Postgres via Supabase; source at github.com/ecwvkr/ARPM.
+- 한국어 UI, 한국 시간 기준. 서버는 UTC로 돌기 때문에 날짜 처리에 주의가 필요하다(`docs/ENGINEERING-NOTES.md` §3).
+- PC와 모바일 모두 실사용. 콘텐츠 폭은 최대 1024px. 하단 탭 6개(홈·파트너·전체 프로젝트·태스크·코멘트·캘린더), 상단 바 왼쪽 로고를 누르면 설정·로그아웃.
+- 배포: Vercel Hobby(서울 리전 `icn1`) + Supabase Free(서울). **개발과 운영이 같은 DB를 쓴다.**
+- 저장소: github.com/ecwvkr/ARPM, 운영: https://allrounders-pm.vercel.app/
 
 ## Capabilities and Constraints
 
-- No self-signup, no OAuth, no account-management UI — accounts exist only via direct DB seeding. This is a deliberate MVP boundary, not a gap to close.
-- Explicit non-goals (current scope): file attachments, real-time multi-user sync, email/push notifications, GitHub integration, activity history log.
-- Private-task visibility is computed at read time via an ancestor walk on every render (list, all-tasks view, canvas) — it must stay correct as the tree grows or tasks are reparented, since nothing is cached/stored.
-- Terminology to preserve: **파생** (derive) = create a child task under a parent; **master** = the owning/delegatable role on a single task; **참여자** (participant) = has access to and can act on a task, whether invited directly or via inherited subtree access; **총관리자** (superadmin) = the one platform-wide moderator role, distinct from a project owner.
-- Completed tasks (`완료하기`) freeze their participant list — no further join/leave once done.
-- Deleting a task is a hard delete but promotes its children to its own parent rather than cascading; deleting/hiding a project is always soft (data preserved), and is superadmin-only.
+### 구조
+
+```
+파트너 (공개/비공개, 비공개는 미참여자에게 노출 여부 선택)
+ ├─ 파트너 공지 · 바로가기 링크 카드 · 파트너 채팅방
+ └─ 프로젝트 (트리, 무제한 깊이, 공개/비공개)
+     ├─ 하위 프로젝트 …
+     ├─ 태스크 (체크리스트 항목)
+     └─ 코멘트 (@멘션)
+```
+
+### 기능
+
+| 영역 | 내용 |
+|---|---|
+| 홈 | 요약 카드(파트너·프로젝트·코멘트), 전체공지, 오늘/이번주 마감, 파트너 목록(정렬·고정·개인 숨김) |
+| 파트너 | 공개 파트너는 바로 참여, 비공개는 참여 요청 → 관리자 수락. 리스트·보드·워크플로우 보기. 하단 파트너 탭에서 다른 파트너로 바로 이동 |
+| 프로젝트 | 상태 3단계(진행전·진행중·완료), 기한, 매주 반복, 참고 링크, 참여자별 우선순위(긴급·보통·보류), 개인 고정, 미확인 빨간 점, 소속 파트너 변경(하위 트리 동반) |
+| 태스크 | 프로젝트 안의 공유 체크리스트. 태스크 탭에서 전체 모아보기(보드·리스트). 프로젝트 완료 시 남은 태스크 처리 여부를 묻는다 |
+| 코멘트 | @멘션 칩과 알림, 주소 자동 링크, Ctrl+Enter 등록. 코멘트 탭에서 전체/멘션된/내가 작성한/내 프로젝트, 묶어보기·개별 보기 |
+| 캘린더 | 월간·일간, 프로젝트 마감 + 구글 캘린더 일정, 일정 추가·수정·드래그 이동, 구글 일정 → 프로젝트 전환, 완료 숨김 |
+| 채팅 | 파트너방·1:1방·단체방, 멘션·프로젝트 태그, 읽음 표시, 답장, 리액션 |
+| 알림 | 벨 + 웹 푸시. 초대·참여·담당자/관리자 변경·멘션·하위 생성·마감 임박/지연·캘린더 일정 추가/D-1. 마감·캘린더 점검은 매일 11:00(KST) 크론 |
+| 개인화 | 포인트 컬러, 프로필 사진(직접 자르기), 화면별 마지막 보기를 계정에 기억, 좌우 화살표 탭 이동 |
+| 관리 | 보관함(복구·영구 삭제), 활동 기록(위임·영구 삭제), 사용자 관리, 글로벌 설정, 구글 캘린더 연결 |
+
+### 제약과 규칙
+
+- **삭제는 두 단계.** 파트너·프로젝트는 먼저 보관함으로 가고(프로젝트는 하위 트리 통째로), 보관함에서 "영구삭제"를 직접 입력해야 지워진다.
+- **완료된 프로젝트는 수정이 막히고 참여·이탈도 잠긴다.** 완료를 취소하면 다시 고칠 수 있다.
+- 프로젝트 생성·참여는 **그 파트너에 직접 참여 중인 사람만** 할 수 있다. 공개 프로젝트의 코멘트는 볼 수 있는 누구나 쓸 수 있다.
+- 상위·하위 프로젝트는 같은 파트너 안에서만 연결된다.
+- 공개 프로젝트 중 마감일이 있는 것은 구글 "AR_PM 업무" 캘린더로 자동 내보내진다.
+- 아직 없는 것: 파일 첨부, 실시간 동시 편집, 이메일 알림, 전체 검색, 로그인 시도 제한, DB 백업 → [`docs/BACKLOG.md`](docs/BACKLOG.md)
+
+### 용어
+
+| 용어 | 뜻 |
+|---|---|
+| **파트너** | 최상위 단위. 거래처·사업 단위. (옛 문서의 "프로젝트") |
+| **프로젝트** | 파트너 안의 일. 트리를 이룬다. (옛 문서의 "업무") |
+| **하위 프로젝트 추가** | 파생. 프로젝트 아래 자식을 만든다. ("연계"는 쓰지 않는다) |
+| **상위 프로젝트 변경** | 트리에서 위치를 옮긴다. 하위 트리가 따라간다. |
+| **태스크** | 프로젝트 안의 체크리스트 항목 |
+| **담당자** (코드: master) | 프로젝트 하나를 책임지는 사람. 위임할 수 있다. |
+| **참여자** | 직접 초대됐거나 상위에서 권한을 물려받은 사람. 카드의 참여자 칩에는 직접 참여한 사람만 뜬다. |
+| **관리자** (코드: OWNER) | 파트너 하나를 관리하는 사람 |
+| **총관리자** | 앱 전체 관리자. 파트너 관리자와 다르다. |
+| **보관함** | 소프트 삭제된 파트너·프로젝트가 가는 곳 |
+| **리스트 뷰 / 보드 뷰 / 워크플로우** | 같은 데이터를 보는 세 가지 방식(목록 / 상태별 묶음 / 트리 그래프) |
 
 ## Brand Commitments
 
-- Name: **AR_PM** — "AR" from the team's (tentative, may still change) name "All Rounders"; "PM" for Project Management.
-- App identity assets are already in place: favicon, apple touch icon, and PWA manifest icons (`app/icon.svg`, `app/apple-icon.png`, `public/icon-512.png`), theme color `#2563eb`.
-- UI voice: Korean, sentence-style labels, minimal bold usage — a durable content constraint carried over from the original build spec (visual system details themselves belong in DESIGN.md, not here).
+- 이름: **AR_PM** — "AR"은 팀 가칭 "All Rounders"(바뀔 수 있음), "PM"은 Project Management.
+- 앱 아이콘이 곧 로고다: 파비콘, Apple 터치 아이콘, PWA 아이콘(192/512, `npm run generate:icons`), 상단 바 로고 메뉴. 테마 색은 매니페스트 기준 `#2563eb`이지만 앱 화면 자체는 검정 강조색의 무채색 체계다(`DESIGN.md`).
+- 말투: 한국어, 문장형 라벨, 굵은 글씨 남용 금지. 버튼은 무엇이 일어나는지 그대로 쓴다("보관함으로 이동", "완료").
 
 ## Evidence on Hand
 
-- Seeded accounts represent real teammates: 총관리자(admin, superadmin), 김민수, 이서연 (`prisma/seed.ts`).
-- A working demo project ("웹사이트 리뉴얼") with a real multi-level task tree (배포 준비, 테스트, QA 테스트 → 테스트케이스 작성 → 회귀 테스트 케이스, 성능 테스트) exists and was used to validate the sharing/derivation logic end-to-end.
-- No customer testimonials, case studies, pricing, or usage-scale claims exist yet — none should be invented for marketing-style copy.
+- 실사용자 4명이 실제 파트너 8곳, 프로젝트 수십 건, 코멘트 수십 건을 운영 중이다(2026-10 기준).
+- 성능은 프로젝트 2000건·코멘트 3000건으로 실측했다(목록 조회 110~150ms). 측정 데이터는 지웠다.
+- 고객 후기·사례·가격·사용 규모 주장은 없다. 홍보 문구에 지어내지 않는다.
 
 ## Product Principles
 
-1. Trust the team, minimize friction — no approval gates on everyday actions (join, leave, comment) once access is granted; the only gate is who gets access in the first place.
-2. Access is computed, not configured per node — sharing must keep working correctly as the tree grows or is reorganized, without anyone having to revisit every existing node.
-3. History is preserved, not just hidden — soft-delete over hard-delete for projects, child-promotion over cascade-delete for tasks, frozen participant snapshots on completion.
-4. Structure is the product — the derivation tree/canvas is the reason this tool exists over a generic board; every other view (list, kanban, status groups) is a different lens on the same tree.
-5. Korean-first, small-team scale — build and write for a handful of trusted coworkers, not a multi-tenant SaaS audience.
+1. **팀을 믿고 마찰을 줄인다.** 접근 권한을 받은 뒤의 일상 동작(참여·이탈·코멘트·태스크)에는 승인 절차를 두지 않는다. 관문은 "누가 들어오는가" 하나다.
+2. **권한은 계산하지, 노드마다 설정하지 않는다.** 트리가 자라거나 재배치돼도 기존 노드를 다시 손대지 않아도 공유가 맞게 유지돼야 한다.
+3. **기록은 숨기지 지우지 않는다.** 보관함, 활동 기록, 완료 후 동결.
+4. **구조가 제품이다.** 파생 트리가 이 도구가 존재하는 이유이고, 다른 보기는 모두 같은 트리를 보는 렌즈다.
+5. **한국어 우선, 소규모 팀 규모.** 멀티 테넌트 SaaS가 아니라 신뢰하는 몇 명의 동료를 위해 만들고 쓴다. 무료 플랜 안에서 돌아가도록 호출 수를 아낀다.
