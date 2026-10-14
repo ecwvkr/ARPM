@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { pushNotifications } from "@/lib/notify";
 import { getPartnerAccess } from "@/lib/permissions";
+import { listPartnerOptions } from "@/lib/partners";
 
 // 파트너 이름은 중복을 허용하지 않는다. 보관함(deletedAt)에 있는 것도 복구하면 되살아나므로
 // 중복 판정에 포함한다. excludeId는 이름 수정 시 자기 자신을 제외하기 위한 것.
@@ -502,4 +503,12 @@ export async function hardDeletePartner(
 
   await prisma.partner.delete({ where: { id: partnerId } });
   revalidatePath("/settings");
+}
+
+// 하단 네비게이션의 파트너 전환 목록. 팝업을 열 때만 부른다 — 모든 페이지에 미리
+// 실어 보내면 안 쓰는 화면에서도 조회가 돈다.
+export async function partnerOptions() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  return listPartnerOptions(session.user.id, !!session.user.isSuperAdmin);
 }

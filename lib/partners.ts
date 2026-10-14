@@ -104,3 +104,13 @@ export function listTrashedPartners(userId: string, isSuperAdmin: boolean) {
     orderBy: { deletedAt: "desc" },
   });
 }
+
+// 하단 네비게이션의 파트너 전환 목록용. 이름만 찍으면 되므로 소유자·멤버·프로젝트는
+// 안 가져온다 — 팝업을 열 때마다 도는 조회라 가벼워야 한다.
+export function listPartnerOptions(userId: string, isSuperAdmin: boolean) {
+  return prisma.partner.findMany({
+    where: visiblePartnersWhere(userId, isSuperAdmin, false),
+    select: { id: true, name: true, color: true },
+    orderBy: { name: "asc" },
+  });
+}
